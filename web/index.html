@@ -2,15 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>cipher-chat</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>cipher-chat</h1>
-  <p id="fp"></p>
-  <p id="peer">waiting for a peer...</p>
-  <div id="log"></div>
-  <input id="msg" placeholder="type a message" autocomplete="off">
-  <button id="send">send</button>
+  <main>
+    <h1>cipher-chat</h1>
+    <p id="fp"></p>
+    <p id="peer">waiting for a peer...</p>
+    <div id="log"></div>
+    <div id="composer">
+      <input id="msg" placeholder="type a message" autocomplete="off">
+      <button id="send">send</button>
+    </div>
+  </main>
   <script src="crypto.js"></script>
   <script src="app.js"></script>
 </body>

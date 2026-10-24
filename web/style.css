@@ -1,0 +1,98 @@
+:root {
+  --bg: #0a0a0a;
+  --panel: #130c0d;
+  --border: #3a0d12;
+  --red: #8b0000;
+  --red-bright: #c1121f;
+  --text: #d9cfcf;
+  --muted: #7d6b6d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Georgia, "Times New Roman", serif;
+  display: flex;
+  justify-content: center;
+}
+
+main {
+  width: 100%;
+  max-width: 640px;
+  padding: 2rem 1rem;
+}
+
+h1 {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-weight: normal;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  color: var(--red-bright);
+  text-shadow: 0 0 12px rgba(193, 18, 31, 0.5);
+}
+
+#fp,
+#peer {
+  margin: 0.25rem 0;
+  font-family: "Courier New", monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+#log {
+  margin: 1.5rem 0 1rem;
+  padding: 1rem;
+  min-height: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+#log p {
+  margin: 0.5rem 0;
+}
+
+#composer {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#msg {
+  flex: 1;
+  padding: 0.7rem 0.9rem;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+#msg:focus {
+  outline: none;
+  border-color: var(--red-bright);
+}
+
+#send {
+  padding: 0.7rem 1.2rem;
+  background: var(--red);
+  color: var(--text);
+  border: 1px solid var(--red-bright);
+  border-radius: 6px;
+  font-family: inherit;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+#send:hover {
+  background: var(--red-bright);
+}
