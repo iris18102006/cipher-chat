@@ -1,6 +1,7 @@
 const ws = new WebSocket("ws://localhost:8765");
 const log = document.getElementById("log");
 const input = document.getElementById("msg");
+const peerEl = document.getElementById("peer");
 
 let identity = null;
 let sharedKey = null;
@@ -33,6 +34,11 @@ ws.onopen = async () => {
   ws.send(JSON.stringify({ type: "hello", pub: await exportPub() }));
 };
 
+ws.onclose = () => {
+  sharedKey = null;
+  peerEl.textContent = "disconnected, is the relay running?";
+};
+
 ws.onmessage = async (e) => {
   await ready;
   let data;
@@ -45,7 +51,7 @@ ws.onmessage = async (e) => {
     if (data.type === "hello" || data.type === "hello-reply") {
       const peerKey = await importPub(data.pub);
       sharedKey = await deriveSharedKey(identity.privateKey, peerKey);
-      addLine("peer key: " + (await fingerprint(peerKey)));
+      peerEl.textContent = "peer key: " + (await fingerprint(peerKey));
       if (data.type === "hello") {
         ws.send(JSON.stringify({ type: "hello-reply", pub: await exportPub() }));
       }
