@@ -1,2 +1,2 @@
 # cipher-chat
-End-to-end encrypted terminal chat. Work in progress.
+End-to-end encrypted web chat. Work in progress.
