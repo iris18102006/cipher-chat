@@ -3,7 +3,7 @@ const log = document.getElementById("log");
 const input = document.getElementById("msg");
 
 let identity = null;
-let peerKey = null;
+let sharedKey = null;
 
 function addLine(text) {
   const p = document.createElement("p");
@@ -13,13 +13,12 @@ function addLine(text) {
 
 async function exportPub() {
   const raw = await crypto.subtle.exportKey("raw", identity.publicKey);
-  return btoa(String.fromCharCode(...new Uint8Array(raw)));
+  return b64(raw);
 }
 
-async function importPub(b64) {
-  const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+async function importPub(s) {
   return crypto.subtle.importKey(
-    "raw", raw, { name: "ECDH", namedCurve: "P-256" }, true, []
+    "raw", unb64(s), { name: "ECDH", namedCurve: "P-256" }, true, []
   );
 }
 
@@ -42,20 +41,30 @@ ws.onmessage = async (e) => {
   } catch {
     return;
   }
-  if (data.type === "hello" || data.type === "hello-reply") {
-    peerKey = await importPub(data.pub);
-    addLine("peer key: " + (await fingerprint(peerKey)));
-    if (data.type === "hello") {
-      ws.send(JSON.stringify({ type: "hello-reply", pub: await exportPub() }));
+  try {
+    if (data.type === "hello" || data.type === "hello-reply") {
+      const peerKey = await importPub(data.pub);
+      sharedKey = await deriveSharedKey(identity.privateKey, peerKey);
+      addLine("peer key: " + (await fingerprint(peerKey)));
+      if (data.type === "hello") {
+        ws.send(JSON.stringify({ type: "hello-reply", pub: await exportPub() }));
+      }
+    } else if (data.type === "msg" && sharedKey) {
+      addLine("them: " + (await decryptText(sharedKey, data.iv, data.ct)));
     }
-  } else if (data.type === "msg") {
-    addLine("them: " + data.text);
+  } catch {
+    addLine("[could not decrypt a message]");
   }
 };
 
-function send() {
+async function send() {
   if (!input.value) return;
-  ws.send(JSON.stringify({ type: "msg", text: input.value }));
+  if (!sharedKey) {
+    addLine("[no peer yet, message not sent]");
+    return;
+  }
+  const { iv, ct } = await encryptText(sharedKey, input.value);
+  ws.send(JSON.stringify({ type: "msg", iv, ct }));
   addLine("me: " + input.value);
   input.value = "";
 }
