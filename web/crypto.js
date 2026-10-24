@@ -44,6 +44,7 @@ async function loadOrCreateIdentity() {
   }
   return keys;
 }
+
 async function fingerprint(publicKey) {
   const raw = await crypto.subtle.exportKey("raw", publicKey);
   const hash = await crypto.subtle.digest("SHA-256", raw);
@@ -52,6 +53,7 @@ async function fingerprint(publicKey) {
     .join("");
   return hex.slice(0, 32).match(/.{4}/g).join(" ");
 }
+
 function b64(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
@@ -61,9 +63,21 @@ function unb64(s) {
 }
 
 async function deriveSharedKey(privateKey, peerPublicKey) {
-  return crypto.subtle.deriveKey(
+  const hkdfBase = await crypto.subtle.deriveKey(
     { name: "ECDH", public: peerPublicKey },
     privateKey,
+    "HKDF",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new Uint8Array(32),
+      info: new TextEncoder().encode("cipher-chat v1"),
+    },
+    hkdfBase,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"]
