@@ -44,3 +44,11 @@ async function loadOrCreateIdentity() {
   }
   return keys;
 }
+async function fingerprint(publicKey) {
+  const raw = await crypto.subtle.exportKey("raw", publicKey);
+  const hash = await crypto.subtle.digest("SHA-256", raw);
+  const hex = [...new Uint8Array(hash)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hex.slice(0, 32).match(/.{4}/g).join(" ");
+}

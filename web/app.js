@@ -19,3 +19,7 @@ function send() {
 
 document.getElementById("send").onclick = send;
 input.onkeydown = (e) => { if (e.key === "Enter") send(); };
+loadOrCreateIdentity().then(async (keys) => {
+  document.getElementById("fp").textContent =
+    "your key: " + (await fingerprint(keys.publicKey));
+});
