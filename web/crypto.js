@@ -52,3 +52,39 @@ async function fingerprint(publicKey) {
     .join("");
   return hex.slice(0, 32).match(/.{4}/g).join(" ");
 }
+function b64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+function unb64(s) {
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+
+async function deriveSharedKey(privateKey, peerPublicKey) {
+  return crypto.subtle.deriveKey(
+    { name: "ECDH", public: peerPublicKey },
+    privateKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptText(key, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(text)
+  );
+  return { iv: b64(iv), ct: b64(ct) };
+}
+
+async function decryptText(key, iv, ct) {
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: unb64(iv) },
+    key,
+    unb64(ct)
+  );
+  return new TextDecoder().decode(pt);
+}
