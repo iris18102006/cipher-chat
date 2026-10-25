@@ -3,3 +3,5 @@ __pycache__/
 *.key
 *.pem
 .env
+backend/cipher.db
+cookies.txt
