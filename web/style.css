@@ -96,3 +96,44 @@ h1 {
 #send:hover {
   background: var(--red-bright);
 }
+.msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 75%;
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
+  word-wrap: break-word;
+}
+
+.msg.me {
+  margin-left: auto;
+  align-items: flex-end;
+  background: var(--red);
+  border: 1px solid var(--red-bright);
+}
+
+.msg.them {
+  margin-right: auto;
+  align-items: flex-start;
+  background: #1c1214;
+  border: 1px solid var(--border);
+}
+
+.msg .time {
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.msg.me .time {
+  color: #e8b4b8;
+}
+
+.note {
+  margin: 0.5rem 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+}
