@@ -6,10 +6,30 @@ const peerEl = document.getElementById("peer");
 let identity = null;
 let sharedKey = null;
 
-function addLine(text) {
-  const p = document.createElement("p");
-  p.textContent = text;
-  log.appendChild(p);
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function addMessage(who, text) {
+  const row = document.createElement("div");
+  row.className = "msg " + who;
+  const body = document.createElement("span");
+  body.className = "text";
+  body.textContent = text;
+  const time = document.createElement("span");
+  time.className = "time";
+  time.textContent = timeNow();
+  row.append(body, time);
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addNote(text) {
+  const note = document.createElement("div");
+  note.className = "note";
+  note.textContent = text;
+  log.appendChild(note);
+  log.scrollTop = log.scrollHeight;
 }
 
 async function exportPub() {
@@ -56,22 +76,22 @@ ws.onmessage = async (e) => {
         ws.send(JSON.stringify({ type: "hello-reply", pub: await exportPub() }));
       }
     } else if (data.type === "msg" && sharedKey) {
-      addLine("them: " + (await decryptText(sharedKey, data.iv, data.ct)));
+      addMessage("them", await decryptText(sharedKey, data.iv, data.ct));
     }
   } catch {
-    addLine("[could not decrypt a message]");
+    addNote("could not decrypt a message");
   }
 };
 
 async function send() {
   if (!input.value) return;
   if (!sharedKey) {
-    addLine("[no peer yet, message not sent]");
+    addNote("no peer yet, message not sent");
     return;
   }
   const { iv, ct } = await encryptText(sharedKey, input.value);
   ws.send(JSON.stringify({ type: "msg", iv, ct }));
-  addLine("me: " + input.value);
+  addMessage("me", input.value);
   input.value = "";
 }
 
