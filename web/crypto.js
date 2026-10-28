@@ -1,5 +1,9 @@
+// All the crypto lives here. The private key is generated in the browser as
+// non-extractable and only ever sits in IndexedDB, it is never sent anywhere.
+
 const DB_NAME = "cipher-chat";
 const STORE = "keys";
+const ECDH = { name: "ECDH", namedCurve: "P-256" };
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -27,39 +31,48 @@ function dbSet(db, key, value) {
   });
 }
 
-async function generateIdentity() {
-  return crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
-    false,
-    ["deriveKey"]
-  );
-}
-
-async function loadOrCreateIdentity() {
+// One identity per username, so two accounts in the same browser don't share
+// (and impersonate) each other's key.
+async function loadOrCreateIdentity(username) {
   const db = await openDB();
-  let keys = await dbGet(db, "identity");
+  const slot = "identity:" + username;
+  let keys = await dbGet(db, slot);
   if (!keys) {
-    keys = await generateIdentity();
-    await dbSet(db, "identity", keys);
+    keys = await crypto.subtle.generateKey(ECDH, false, ["deriveKey"]);
+    await dbSet(db, slot, keys);
   }
   return keys;
 }
 
-async function fingerprint(publicKey) {
-  const raw = await crypto.subtle.exportKey("raw", publicKey);
-  const hash = await crypto.subtle.digest("SHA-256", raw);
-  const hex = [...new Uint8Array(hash)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return hex.slice(0, 32).match(/.{4}/g).join(" ");
-}
-
 function b64(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  // chunked, because spreading a big buffer into fromCharCode blows the stack
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
 }
 
 function unb64(s) {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+
+async function exportPub(publicKey) {
+  return b64(await crypto.subtle.exportKey("raw", publicKey));
+}
+
+function importPub(s) {
+  return crypto.subtle.importKey("raw", unb64(s), ECDH, true, []);
+}
+
+// "a1b2 c3d4 ..." from the SHA-256 of the raw public key (given as base64)
+async function fingerprintOf(pubB64) {
+  const hash = await crypto.subtle.digest("SHA-256", unb64(pubB64));
+  const hex = [...new Uint8Array(hash)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hex.slice(0, 32).match(/.{4}/g).join(" ");
 }
 
 async function deriveSharedKey(privateKey, peerPublicKey) {
