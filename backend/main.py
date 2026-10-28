@@ -228,6 +228,35 @@ def put_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
     return {"ok": True}
 
 
+@app.get("/api/contacts")
+def contacts(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        """
+        SELECT u.username, u.public_key, u.last_seen,
+               (SELECT COUNT(*) FROM messages m
+                 WHERE m.sender_id = u.id AND m.recipient_id = :me
+                   AND m.read_at IS NULL) AS unread,
+               (SELECT MAX(m.id) FROM messages m
+                 WHERE (m.sender_id = u.id AND m.recipient_id = :me)
+                    OR (m.sender_id = :me AND m.recipient_id = u.id)) AS last_msg
+        FROM users u
+        WHERE u.id != :me
+        ORDER BY last_msg IS NULL, last_msg DESC, u.username
+        """,
+        {"me": user["id"]},
+    ).fetchall()
+    return [
+        {
+            "username": r["username"],
+            "pub": r["public_key"],
+            "last_seen": r["last_seen"],
+            "online": manager.is_online(r["username"]),
+            "unread": r["unread"],
+        }
+        for r in rows
+    ]
+
+
 # ---------- pages ----------
 
 
