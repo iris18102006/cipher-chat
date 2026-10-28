@@ -335,6 +335,166 @@ def same_origin(ws: WebSocket) -> bool:
     return origin.split("://", 1)[-1] == host
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    # browsers don't apply same-origin rules to websockets, so check it ourselves
+    if not same_origin(ws):
+        await ws.close(code=4403)
+        return
+    conn = connect()
+    try:
+        user = user_from_token(conn, ws.cookies.get(COOKIE))
+        if not user:
+            await ws.close(code=4401)
+            return
+        await ws.accept()
+        me, my_id = user["username"], user["id"]
+
+        first_tab = not manager.is_online(me)
+        manager.sockets[me].add(ws)
+        if first_tab:
+            await manager.broadcast(
+                {"type": "presence", "user": me, "online": True}, skip=me
+            )
+
+        # anything sent while we were offline now counts as delivered
+        pending = conn.execute(
+            "SELECT m.id, u.username FROM messages m JOIN users u ON u.id = m.sender_id "
+            "WHERE m.recipient_id = ? AND m.delivered_at IS NULL",
+            (my_id,),
+        ).fetchall()
+        if pending:
+            conn.execute(
+                "UPDATE messages SET delivered_at = datetime('now') "
+                "WHERE recipient_id = ? AND delivered_at IS NULL",
+                (my_id,),
+            )
+            conn.commit()
+            for row in pending:
+                await manager.send_user(
+                    row["username"],
+                    {"type": "receipt", "id": row["id"], "status": "delivered"},
+                )
+
+        await ws.send_text(json.dumps({"type": "ready", "me": me}))
+
+        while True:
+            try:
+                data = json.loads(await ws.receive_text())
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(data, dict):
+                continue
+            kind = data.get("type")
+            to = str(data.get("to", "")).lower()
+
+            if kind == "ping":
+                await ws.send_text(json.dumps({"type": "pong"}))
+                continue
+
+            peer = conn.execute(
+                "SELECT id, username FROM users WHERE username = ?", (to,)
+            ).fetchone()
+            if not peer or peer["id"] == my_id:
+                continue
+
+            if kind == "typing":
+                await manager.send_user(
+                    peer["username"],
+                    {"type": "typing", "from": me, "state": bool(data.get("state"))},
+                )
+
+            elif kind == "msg":
+                iv, ct = data.get("iv"), data.get("ct")
+                if not (isinstance(iv, str) and isinstance(ct, str)):
+                    continue
+                if len(iv) > 32 or not ct or len(ct) > MAX_CT_LEN:
+                    continue
+                cur = conn.execute(
+                    "INSERT INTO messages (sender_id, recipient_id, iv, ct) "
+                    "VALUES (?, ?, ?, ?)",
+                    (my_id, peer["id"], iv, ct),
+                )
+                msg_id = cur.lastrowid
+                conn.commit()
+                row = conn.execute(
+                    "SELECT created_at FROM messages WHERE id = ?", (msg_id,)
+                ).fetchone()
+                payload = {
+                    "type": "msg",
+                    "id": msg_id,
+                    "from": me,
+                    "to": peer["username"],
+                    "iv": iv,
+                    "ct": ct,
+                    "ts": row["created_at"],
+                    "cid": data.get("cid"),
+                }
+                got = await manager.send_user(peer["username"], payload)
+                delivered = got > 0
+                if delivered:
+                    conn.execute(
+                        "UPDATE messages SET delivered_at = datetime('now') WHERE id = ?",
+                        (msg_id,),
+                    )
+                    conn.commit()
+                # echo to every tab of the sender so they all stay in sync
+                await manager.send_user(me, {**payload, "delivered": delivered})
+
+            elif kind == "read":
+                rows = conn.execute(
+                    "SELECT id FROM messages WHERE sender_id = ? AND recipient_id = ? "
+                    "AND read_at IS NULL",
+                    (peer["id"], my_id),
+                ).fetchall()
+                if rows:
+                    conn.execute(
+                        "UPDATE messages SET read_at = datetime('now'), "
+                        "delivered_at = COALESCE(delivered_at, datetime('now')) "
+                        "WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL",
+                        (peer["id"], my_id),
+                    )
+                    conn.commit()
+                    await manager.send_user(
+                        peer["username"],
+                        {
+                            "type": "read",
+                            "by": me,
+                            "ids": [r["id"] for r in rows],
+                        },
+                    )
+                # other tabs of mine should clear their unread badge too
+                await manager.send_user(me, {"type": "read-sync", "peer": to})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        # bad frame or db hiccup: drop this socket, don't take the server down
+        log.exception("websocket error")
+    finally:
+        try:
+            username = locals().get("me")
+            if username:
+                manager.sockets[username].discard(ws)
+                if not manager.sockets[username]:
+                    manager.sockets.pop(username, None)
+                    now = utc_now_sql(conn)
+                    conn.execute(
+                        "UPDATE users SET last_seen = ? WHERE id = ?",
+                        (now, my_id),
+                    )
+                    conn.commit()
+                    await manager.broadcast(
+                        {
+                            "type": "presence",
+                            "user": username,
+                            "online": False,
+                            "last_seen": now,
+                        }
+                    )
+        finally:
+            conn.close()
+
+
 # ---------- pages ----------
 
 
