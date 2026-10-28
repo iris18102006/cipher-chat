@@ -1,7 +1,11 @@
 .venv/
 __pycache__/
+.pytest_cache/
 *.key
 *.pem
 .env
 backend/cipher.db
+backend/cipher.db-wal
+backend/cipher.db-shm
 cookies.txt
+node_modules/
