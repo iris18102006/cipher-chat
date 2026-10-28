@@ -37,29 +37,3 @@ Open `http://127.0.0.1:8000`, sign up, then open a second browser profile (or a 
 
 If you serve it over https, set `CIPHER_SECURE_COOKIES=1` so the session cookie is only sent over https.
 
-## Tests
-
-    pip install -r requirements-dev.txt
-    python -m pytest tests
-
-## Limitations
-
-This is a learning project, not Signal.
-
-- Your private key lives in one browser. Logging in from a new browser creates a new key, so old history can't be decrypted there and friends get a key-change warning.
-- Clearing site data deletes your private key and with it your ability to read old messages.
-- No forward secrecy, a stolen private key decrypts everything
-- The server still sees metadata: who talks to whom, when, message sizes, and online status
-- The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
-- Login rate limiting is in memory and resets when the server restarts
-- 1-to-1 only, no group chats yet
-
-## Roadmap
-
-- [x] HKDF key derivation
-- [x] Accounts, buddy list, history
-- [x] Typing, online / last seen, delivered / read
-- [ ] Profiles you can customize (no code needed)
-- [ ] Friends and blocking
-- [ ] Forward secrecy with a ratchet
-- [ ] Group chats
