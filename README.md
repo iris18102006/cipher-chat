@@ -1,47 +1,39 @@
 # cipher-chat
 
-End-to-end encrypted web chat. Work in progress.
+End-to-end encrypted web chat with a 2000s social-site look. Work in progress.
 
-The relay server only ever sees ciphertext. Keys are generated in your browser and the private key never leaves it.
+The server only ever sees ciphertext. Keys are generated in your browser and the private key never leaves it.
+
+## Features
+
+- Accounts (argon2 password hashes, httpOnly session cookies that expire after 30 days)
+- Buddy list with online dots, last seen, unread badges and search
+- Direct messages with bubbles, timestamps, day separators and autoscroll
+- Typing indicator, delivered and read ticks
+- Message history that survives refreshes (stored encrypted, decrypted in your browser)
+- Key-change warning: if a friend's key changes, the composer locks until you trust the new key
+- Works on phones (one panel at a time)
 
 ## How it works
 
-1. Each browser generates an ECDH (P-256) keypair with the Web Crypto API. The private key is non-extractable and stored in IndexedDB.
-2. When two clients connect, they swap public keys through the relay.
-3. Both sides derive the same shared secret from their private key and the other's public key, then run it through HKDF (SHA-256) to get a 256-bit AES key.
+1. Each account gets an ECDH (P-256) keypair in the browser (Web Crypto API). The private key is non-extractable and stored in IndexedDB.
+2. The public key is uploaded to the server, which acts as a key directory.
+3. To talk to a friend, your browser derives a shared secret from your private key and their public key, then runs it through HKDF (SHA-256) to get a 256-bit AES key.
 4. Messages are encrypted with AES-GCM (random 12-byte IV per message) before leaving the browser.
-5. The relay just forwards the JSON blobs. It cannot read them.
-6. Each user has a key fingerprint (SHA-256 of the public key). Compare fingerprints with your contact over another channel to make sure nobody swapped keys.
+5. The server stores and forwards `{iv, ciphertext}`. It cannot read them.
+6. Every key has a fingerprint (SHA-256 of the public key). Use **Verify keys** in a chat and compare fingerprints with your friend over another channel.
+7. Your browser remembers the first key it saw for each friend (trust on first use) and warns you if it changes.
+
+The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` header, so other sites and logged-out visitors can't connect.
 
 ## Run it
 
-Terminal 1, the relay:
-
     python3 -m venv .venv
-    source .venv/bin/activate.fish
+    source .venv/bin/activate.fish   # bash/zsh: source .venv/bin/activate
     pip install -r requirements.txt
     python server.py
 
-Terminal 2, the web server:
+Open `http://127.0.0.1:8000`, sign up, then open a second browser profile (or a private window) and sign up as someone else.
 
-    cd web
-    python3 -m http.server 8000 --bind 127.0.0.1
+If you serve it over https, set `CIPHER_SECURE_COOKIES=1` so the session cookie is only sent over https.
 
-Open `http://127.0.0.1:8000` in two different browser profiles (or one normal window and one private window).
-
-## Limitations
-
-This is a learning project, not Signal.
-
-- 1-to-1 only, a third client breaks the shared key
-- No authentication beyond manually comparing fingerprints
-- No forward secrecy, a stolen private key decrypts everything
-- The relay still sees metadata: who connects, when, and message sizes
-- No message history, messages vanish on refresh
-
-## Roadmap
-
-- [x] HKDF key derivation
-- [ ] Rooms and usernames
-- [ ] Forward secrecy with a ratchet
-- [ ] Nicer UI
