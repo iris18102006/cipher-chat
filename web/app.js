@@ -324,3 +324,133 @@ function markRead(peer) {
   renderBuddies();
 }
 
+// ---------- websocket ----------
+
+function sendWS(obj) {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+    state.ws.send(JSON.stringify(obj));
+    return true;
+  }
+  return false;
+}
+
+function setConn(ok, text) {
+  const n = $("conn");
+  n.textContent = text;
+  n.className = "conn " + (ok ? "on" : "off");
+}
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss://" : "ws://";
+  const ws = new WebSocket(proto + location.host + "/ws");
+  state.ws = ws;
+
+  ws.onopen = async () => {
+    state.retry = 0;
+    setConn(true, "connected");
+    try {
+      await loadContacts();
+      // catch up on anything we missed while disconnected
+      if (state.open) {
+        await loadHistory(state.open);
+        renderMessages();
+        markRead(state.open);
+      }
+    } catch {}
+  };
+
+  ws.onmessage = (e) => {
+    let data;
+    try {
+      data = JSON.parse(e.data);
+    } catch {
+      return;
+    }
+    handleWS(data).catch(() => {});
+  };
+
+  ws.onclose = (e) => {
+    if (e.code === 4401 || e.code === 4403) {
+      location.href = "/login.html";
+      return;
+    }
+    for (const c of state.contacts.values()) c.typing = false;
+    setConn(false, "reconnecting...");
+    const wait = Math.min(1000 * 2 ** state.retry, 10000);
+    state.retry++;
+    setTimeout(connect, wait);
+  };
+}
+
+const typingTimers = new Map();
+
+function setTyping(peer, on) {
+  const c = state.contacts.get(peer);
+  if (!c) return;
+  c.typing = on;
+  clearTimeout(typingTimers.get(peer));
+  if (on) typingTimers.set(peer, setTimeout(() => setTyping(peer, false), 5000));
+  renderBuddies();
+  if (state.open === peer) {
+    renderChatHeader();
+    if (on && nearBottom()) scrollBottom();
+  }
+}
+
+async function handleWS(data) {
+  if (data.type === "presence") {
+    const c = state.contacts.get(data.user);
+    if (!c) return loadContacts();
+    c.online = data.online;
+    if (data.last_seen) c.last_seen = data.last_seen;
+    if (!data.online) c.typing = false;
+    renderBuddies();
+    if (state.open === data.user) renderChatHeader();
+  } else if (data.type === "typing") {
+    setTyping(data.from, data.state);
+  } else if (data.type === "msg") {
+    const peer = data.from === state.me ? data.to : data.from;
+    if (!state.contacts.has(peer)) await loadContacts();
+    const c = state.contacts.get(peer);
+    if (!c) return;
+    const list = state.msgs.get(peer);
+    const mine = data.from === state.me;
+    if (list && !list.some((m) => m.id === data.id)) {
+      const { text, failed } = await decryptFor(peer, data.iv, data.ct);
+      list.push({ id: data.id, from: data.from, text, failed, ts: data.ts, delivered: !!data.delivered, read: false });
+    }
+    if (!mine) {
+      c.typing = false;
+      if (state.open === peer && document.visibilityState === "visible") {
+        if (list) renderMessages();
+        markRead(peer);
+      } else {
+        c.unread++;
+        if (state.open === peer && list) renderMessages();
+      }
+    } else if (state.open === peer) {
+      renderMessages();
+      scrollBottom();
+    }
+    bump(peer);
+    renderBuddies();
+    if (state.open === peer) renderChatHeader();
+  } else if (data.type === "receipt") {
+    for (const list of state.msgs.values()) {
+      const m = list.find((x) => x.id === data.id);
+      if (m) m.delivered = true;
+    }
+    if (state.open) renderMessages();
+  } else if (data.type === "read") {
+    const list = state.msgs.get(data.by) || [];
+    for (const m of list) if (data.ids.includes(m.id)) m.delivered = m.read = true;
+    if (state.open === data.by) renderMessages();
+  } else if (data.type === "read-sync") {
+    const c = state.contacts.get(data.peer);
+    if (c) {
+      c.unread = 0;
+      renderBuddies();
+    }
+  }
+}
+
