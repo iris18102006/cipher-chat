@@ -96,3 +96,63 @@ def test_ws_rejects_anonymous_and_cross_origin(client):
         with a.websocket_connect("/ws", headers={"origin": "http://evil.example", "host": "testserver"}):
             pass
 
+
+def test_message_flow_receipts_and_history(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+            assert wa.receive_json() == {"type": "presence", "user": "bob", "online": True}
+            assert wb.receive_json()["type"] == "ready"
+
+            wa.send_json({"type": "typing", "to": "bob", "state": True})
+            assert wb.receive_json() == {"type": "typing", "from": "alice", "state": True}
+
+            wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": "c1"})
+            got = wb.receive_json()
+            assert got["type"] == "msg" and got["from"] == "alice" and got["cid"] == "c1"
+            echo = wa.receive_json()
+            assert echo["id"] == got["id"] and echo["delivered"] is True
+
+            wb.send_json({"type": "read", "to": "alice"})
+            assert wa.receive_json() == {"type": "read", "by": "bob", "ids": [got["id"]]}
+            assert wb.receive_json()["type"] == "read-sync"
+
+    hist = a.get("/api/messages/bob").json()
+    assert len(hist) == 1 and hist[0]["read"] and hist[0]["delivered"]
+    assert hist[0]["ct"] == "Y3Q="  # server only ever holds ciphertext
+
+
+def test_offline_message_delivered_on_connect(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+        assert wa.receive_json()["delivered"] is False
+        with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+            receipt = wa.receive_json()
+            if receipt["type"] == "presence":
+                receipt = wa.receive_json()
+            assert receipt["type"] == "receipt" and receipt["status"] == "delivered"
+            assert wb.receive_json()["type"] == "ready"
+    assert b.get("/api/contacts").json()[0]["unread"] == 1
+
+
+def test_oversized_and_self_messages_dropped(client):
+    a = signup(client, "alice")
+    signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "x" * 20000})
+        wa.send_json({"type": "msg", "to": "alice", "iv": "aXY=", "ct": "Y3Q="})
+        wa.send_json({"type": "ping"})
+        assert wa.receive_json() == {"type": "pong"}
+    assert a.get("/api/messages/bob").json() == []
+
+
+def test_last_seen_set_on_disconnect(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+    people = b.get("/api/contacts").json()
+    assert people[0]["online"] is False and people[0]["last_seen"]
