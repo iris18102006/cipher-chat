@@ -505,3 +505,92 @@ async function sendMessage() {
   }
 }
 
+// ---------- wiring ----------
+
+$("composer").onsubmit = (e) => {
+  e.preventDefault();
+  sendMessage();
+};
+
+$("msg").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+$("msg").addEventListener("input", () => {
+  autosize();
+  notifyTyping();
+});
+
+$("search").addEventListener("input", renderBuddies);
+$("older").onclick = loadOlder;
+
+$("back").onclick = () => {
+  stopTyping();
+  document.body.classList.remove("in-chat");
+  state.open = null;
+  $("chat-pane").hidden = true;
+  $("chat-empty").hidden = false;
+  renderBuddies();
+};
+
+$("verify").onclick = async () => {
+  const box = $("verify-box");
+  box.hidden = !box.hidden;
+  if (!box.hidden) await renderVerify();
+};
+
+$("trust").onclick = async () => {
+  const c = state.contacts.get(state.open);
+  if (!c || !c.pub) return;
+  try {
+    localStorage.setItem(knownSlot(c.username), c.pub);
+  } catch {}
+  c.changed = false;
+  await loadHistory(c.username);
+  renderChatHeader();
+  renderMessages();
+};
+
+$("logout").onclick = async () => {
+  try {
+    await fetch("/api/logout", { method: "POST" });
+  } catch {}
+  location.href = "/login.html";
+};
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && state.open) markRead(state.open);
+});
+window.addEventListener("focus", () => {
+  if (state.open) markRead(state.open);
+});
+
+// keepalive so idle proxies don't drop the socket
+setInterval(() => sendWS({ type: "ping" }), 25000);
+// pick up new signups and fresh last-seen times
+setInterval(() => {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) loadContacts().catch(() => {});
+}, 30000);
+
+(async function boot() {
+  try {
+    const me = await api("/api/me");
+    state.me = me.username;
+    $("me-name").textContent = me.username;
+    state.identity = await loadOrCreateIdentity(me.username);
+    state.myPub = await exportPub(state.identity.publicKey);
+    // publish our public key so friends can derive the shared secret
+    await api("/api/key", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pub: state.myPub }),
+    });
+    $("my-key").textContent = "your key: " + (await fingerprintOf(state.myPub));
+    connect();
+  } catch (err) {
+    if (state.me) setConn(false, "couldn't start, check the console");
+    console.error(err);
+  }
+})();
