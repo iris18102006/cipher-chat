@@ -139,3 +139,102 @@ h2 {
   background: linear-gradient(var(--orange), var(--orange-dark));
 }
 
+/* ---------- buddy list ---------- */
+
+#search {
+  margin: 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  font: inherit;
+}
+
+#buddy-list {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+#buddy-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #dde6f3;
+  cursor: pointer;
+}
+
+#buddy-list li:hover {
+  background: #fff4e6;
+}
+
+#buddy-list li.active {
+  background: var(--mist);
+  box-shadow: inset 3px 0 var(--orange);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid #0006;
+}
+
+.dot.on {
+  background: var(--green);
+  box-shadow: 0 0 4px var(--green);
+}
+
+.dot.off {
+  background: #bbb;
+}
+
+.buddy-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.buddy-name {
+  font-weight: bold;
+  color: var(--blue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-sub {
+  font-size: 10px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+  background: #d22;
+}
+
+#buddy-empty {
+  margin: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+#my-key {
+  margin: 0;
+  padding: 6px 8px;
+  border-top: 1px solid #dde6f3;
+  font: 10px "Courier New", monospace;
+  color: var(--muted);
+  word-break: break-all;
+}
+
