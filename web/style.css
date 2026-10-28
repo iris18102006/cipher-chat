@@ -1,139 +1,141 @@
 :root {
-  --bg: #0a0a0a;
-  --panel: #130c0d;
-  --border: #3a0d12;
-  --red: #8b0000;
-  --red-bright: #c1121f;
-  --text: #d9cfcf;
-  --muted: #7d6b6d;
+  --blue: #17407f;
+  --blue-light: #2a5da8;
+  --sky: #7ba7d9;
+  --orange: #ff9933;
+  --orange-dark: #e0701a;
+  --paper: #ffffff;
+  --mist: #eef3fb;
+  --line: #7f9db9;
+  --text: #111;
+  --muted: #667;
+  --green: #2eb82e;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
-  font-family: Georgia, "Times New Roman", serif;
   display: flex;
-  justify-content: center;
-}
-
-main {
-  width: 100%;
-  max-width: 640px;
-  padding: 2rem 1rem;
-}
-
-h1 {
-  margin: 0 0 1rem;
-  text-align: center;
-  font-weight: normal;
-  letter-spacing: 0.3em;
-  text-transform: lowercase;
-  color: var(--red-bright);
-  text-shadow: 0 0 12px rgba(193, 18, 31, 0.5);
-}
-
-#fp,
-#peer {
-  margin: 0.25rem 0;
-  font-family: "Courier New", monospace;
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-align: center;
-}
-
-#log {
-  margin: 1.5rem 0 1rem;
-  padding: 1rem;
-  min-height: 320px;
-  max-height: 60vh;
-  overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-#log p {
-  margin: 0.5rem 0;
-}
-
-#composer {
-  display: flex;
-  gap: 0.5rem;
-}
-
-#msg {
-  flex: 1;
-  padding: 0.7rem 0.9rem;
-  background: var(--panel);
+  flex-direction: column;
+  background: var(--sky);
+  font-family: Verdana, Tahoma, sans-serif;
+  font-size: 12px;
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: inherit;
 }
 
-#msg:focus {
-  outline: none;
-  border-color: var(--red-bright);
-}
-
-#send {
-  padding: 0.7rem 1.2rem;
-  background: var(--red);
-  color: var(--text);
-  border: 1px solid var(--red-bright);
-  border-radius: 6px;
-  font-family: inherit;
-  letter-spacing: 0.1em;
+button {
+  font: bold 12px Verdana, Tahoma, sans-serif;
+  color: var(--blue);
+  background: linear-gradient(#fff, #cfdcf0);
+  border: 1px solid var(--blue);
+  padding: 4px 12px;
   cursor: pointer;
 }
 
-#send:hover {
-  background: var(--red-bright);
+button:hover:not(:disabled) {
+  background: linear-gradient(#fff, #ffd9b0);
 }
-.msg {
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- top bar ---------- */
+
+#top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  color: #fff;
+  background: linear-gradient(var(--blue-light), var(--blue));
+  border-bottom: 3px solid var(--orange);
+}
+
+#top h1 {
+  margin: 0;
+  font-size: 24px;
+  font-style: italic;
+  text-shadow: 1px 1px #000;
+}
+
+#top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #dbe8ff;
+}
+
+#top-right button {
+  padding: 2px 10px;
+}
+
+.conn {
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.conn.on {
+  background: var(--green);
+}
+
+.conn.off {
+  background: #c33;
+}
+
+/* ---------- layout ---------- */
+
+#app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 980px;
+  margin: 10px auto;
+  padding: 0 10px;
+}
+
+#buddies,
+#chat {
+  background: var(--paper);
+  border: 1px solid var(--blue);
+  min-height: 0;
+}
+
+#buddies {
+  width: 250px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  max-width: 75%;
-  margin: 0.5rem 0;
-  padding: 0.5rem 0.8rem;
-  border-radius: 10px;
-  word-wrap: break-word;
 }
 
-.msg.me {
-  margin-left: auto;
-  align-items: flex-end;
-  background: var(--red);
-  border: 1px solid var(--red-bright);
+#chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.msg.them {
-  margin-right: auto;
-  align-items: flex-start;
-  background: #1c1214;
-  border: 1px solid var(--border);
+h2 {
+  margin: 0;
+  padding: 5px 8px;
+  font-size: 13px;
+  color: #fff;
+  background: linear-gradient(var(--orange), var(--orange-dark));
 }
 
-.msg .time {
-  margin-top: 0.2rem;
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-
-.msg.me .time {
-  color: #e8b4b8;
-}
-
-.note {
-  margin: 0.5rem 0;
-  text-align: center;
-  font-size: 0.75rem;
-  color: var(--muted);
-  font-style: italic;
-}
