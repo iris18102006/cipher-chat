@@ -169,3 +169,158 @@ function renderBuddies() {
   document.title = (n ? "(" + n + ") " : "") + "cipher-chat";
 }
 
+// ---------- chat pane ----------
+
+function renderChatHeader() {
+  const c = state.contacts.get(state.open);
+  if (!c) return;
+  $("chat-name").textContent = c.username;
+  const status = c.typing ? "typing..." : lastSeenText(c);
+  $("chat-status").textContent = status;
+  $("chat-status").className = c.online ? "online" : "";
+
+  const warn = $("key-warning");
+  if (!c.pub) {
+    warn.hidden = false;
+    $("key-warning-text").textContent =
+      c.username + " hasn't opened cipher-chat since encryption was set up, so there's no key yet. You can message them once they log in.";
+    $("trust").hidden = true;
+  } else if (c.changed) {
+    warn.hidden = false;
+    $("key-warning-text").textContent =
+      "Heads up: " + c.username + "'s encryption key changed. It could be a new device, or someone tampering. Check the key with them before trusting it.";
+    $("trust").hidden = false;
+  } else {
+    warn.hidden = true;
+  }
+  $("typing").hidden = !c.typing;
+  $("typing-name").textContent = c.typing ? c.username + " is typing" : "";
+  const locked = !c.pub || c.changed;
+  $("msg").disabled = locked;
+  $("send").disabled = locked;
+}
+
+async function renderVerify() {
+  const c = state.contacts.get(state.open);
+  const box = $("verify-box");
+  box.replaceChildren();
+  box.append(el("p", "", "Compare these with " + c.username + " on a call or in person. If they match, nobody is sitting in the middle."));
+  const mine = el("div", "fp");
+  mine.append(el("b", "", "your key: "), el("code", "", await fingerprintOf(state.myPub)));
+  box.append(mine);
+  if (c.pub) {
+    const theirs = el("div", "fp");
+    theirs.append(el("b", "", c.username + "'s key: "), el("code", "", await fingerprintOf(c.pub)));
+    box.append(theirs);
+  }
+}
+
+function nearBottom() {
+  const log = $("log");
+  return log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+}
+
+function scrollBottom() {
+  const log = $("log");
+  log.scrollTop = log.scrollHeight;
+}
+
+function tickFor(m) {
+  if (m.read) return { text: "\u2713\u2713 read", cls: "tick read" };
+  if (m.delivered) return { text: "\u2713\u2713 delivered", cls: "tick" };
+  return { text: "\u2713 sent", cls: "tick" };
+}
+
+function renderMessages(keepScroll) {
+  const box = $("messages");
+  const log = $("log");
+  const stick = !keepScroll && nearBottom();
+  const before = log.scrollHeight - log.scrollTop;
+  box.replaceChildren();
+  const list = state.msgs.get(state.open) || [];
+  let lastDay = "";
+  let prev = null;
+  for (const m of list) {
+    const d = parseTs(m.ts);
+    const label = dayLabel(d);
+    if (label !== lastDay) {
+      box.append(el("div", "day", label));
+      lastDay = label;
+      prev = null;
+    }
+    const mine = m.from === state.me;
+    const row = el("div", "msg " + (mine ? "me" : "them") + (m.failed ? " failed" : "") + (prev && prev.from === m.from ? " cont" : ""));
+    row.append(el("div", "text", m.text));
+    const meta = el("div", "meta");
+    meta.append(el("span", "time", clock(d)));
+    if (mine) {
+      const t = tickFor(m);
+      meta.append(el("span", t.cls, t.text));
+    }
+    row.append(meta);
+    box.append(row);
+    prev = m;
+  }
+  $("older").hidden = !state.hasOlder.get(state.open);
+  if (keepScroll) log.scrollTop = log.scrollHeight - before;
+  else if (stick) scrollBottom();
+}
+
+async function decryptList(peer, rows) {
+  const out = [];
+  for (const r of rows) {
+    const { text, failed } = await decryptFor(peer, r.iv, r.ct);
+    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, delivered: r.delivered, read: r.read });
+  }
+  return out;
+}
+
+async function loadHistory(peer) {
+  const rows = await api("/api/messages/" + encodeURIComponent(peer) + "?limit=" + PAGE);
+  state.msgs.set(peer, await decryptList(peer, rows));
+  state.hasOlder.set(peer, rows.length === PAGE);
+}
+
+async function loadOlder() {
+  const peer = state.open;
+  const list = state.msgs.get(peer) || [];
+  if (!list.length) return;
+  const rows = await api("/api/messages/" + encodeURIComponent(peer) + "?limit=" + PAGE + "&before=" + list[0].id);
+  state.msgs.set(peer, [...(await decryptList(peer, rows)), ...list]);
+  state.hasOlder.set(peer, rows.length === PAGE);
+  renderMessages(true);
+}
+
+async function openChat(peer) {
+  state.open = peer;
+  document.body.classList.add("in-chat");
+  $("chat-empty").hidden = true;
+  $("chat-pane").hidden = false;
+  $("verify-box").hidden = true;
+  $("msg").value = "";
+  autosize();
+  renderChatHeader();
+  renderBuddies();
+  try {
+    await loadHistory(peer);
+  } catch {
+    return;
+  }
+  if (state.open !== peer) return; // clicked someone else while loading
+  renderMessages();
+  scrollBottom();
+  markRead(peer);
+  if (!$("msg").disabled) $("msg").focus();
+}
+
+function markRead(peer) {
+  const c = state.contacts.get(peer);
+  if (!c) return;
+  const hasUnread = c.unread > 0 || (state.msgs.get(peer) || []).some((m) => m.from === peer && !m.read);
+  if (!hasUnread) return;
+  c.unread = 0;
+  for (const m of state.msgs.get(peer) || []) if (m.from === peer) m.read = true;
+  sendWS({ type: "read", to: peer });
+  renderBuddies();
+}
+
