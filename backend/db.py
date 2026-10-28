@@ -5,7 +5,9 @@ DB_PATH = Path(__file__).parent / "cipher.db"
 
 
 def connect():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    # FastAPI may run a dependency and its endpoint on different worker threads,
+    # and each request gets its own connection, so sharing across threads is safe
+    conn = sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
