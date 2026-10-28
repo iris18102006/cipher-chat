@@ -36,6 +36,20 @@ def init_db():
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                iv TEXT NOT NULL,
+                ct TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                delivered_at TEXT,
+                read_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_messages_pair
+                ON messages (sender_id, recipient_id, id);
+            CREATE INDEX IF NOT EXISTS idx_messages_recipient
+                ON messages (recipient_id, read_at);
             """
         )
         # added after the first version, so migrate old databases in place
