@@ -292,6 +292,49 @@ def history(
     ]
 
 
+# ---------- websocket: presence, typing, live messages ----------
+
+
+class Manager:
+    """Tracks open sockets per username. One user can have several tabs."""
+
+    def __init__(self):
+        self.sockets: dict[str, set[WebSocket]] = defaultdict(set)
+
+    def is_online(self, username: str) -> bool:
+        return bool(self.sockets.get(username))
+
+    async def send_user(self, username: str, payload: dict) -> int:
+        sent = 0
+        for ws in list(self.sockets.get(username, ())):
+            try:
+                await ws.send_text(json.dumps(payload))
+                sent += 1
+            except Exception:
+                self.sockets[username].discard(ws)
+        return sent
+
+    async def broadcast(self, payload: dict, skip: str | None = None):
+        for name in list(self.sockets):
+            if name != skip:
+                await self.send_user(name, payload)
+
+
+manager = Manager()
+
+
+def utc_now_sql(conn) -> str:
+    return conn.execute("SELECT datetime('now')").fetchone()[0]
+
+
+def same_origin(ws: WebSocket) -> bool:
+    origin = ws.headers.get("origin")
+    host = ws.headers.get("host")
+    if not origin or not host:
+        return False
+    return origin.split("://", 1)[-1] == host
+
+
 # ---------- pages ----------
 
 
