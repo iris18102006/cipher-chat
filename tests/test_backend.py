@@ -77,3 +77,22 @@ def test_expired_session_rejected(client):
     conn.close()
     assert a.get("/api/me").status_code == 401
 
+
+def test_key_upload_validation(client):
+    a = signup(client, "alice")
+    assert a.put("/api/key", json={"pub": "nope"}).status_code == 400
+    assert a.put("/api/key", json={"pub": PUB_A}).status_code == 200
+    b = signup(client, "bob")
+    people = b.get("/api/contacts").json()
+    assert people[0]["username"] == "alice" and people[0]["pub"] == PUB_A
+
+
+def test_ws_rejects_anonymous_and_cross_origin(client):
+    with pytest.raises(Exception):
+        with client.websocket_connect("/ws", headers=ORIGIN):
+            pass
+    a = signup(client, "alice")
+    with pytest.raises(Exception):
+        with a.websocket_connect("/ws", headers={"origin": "http://evil.example", "host": "testserver"}):
+            pass
+
