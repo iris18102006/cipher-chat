@@ -7,17 +7,60 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
+  <header id="top">
     <h1>cipher-chat</h1>
-    <p id="fp"></p>
-    <p id="peer">waiting for a peer...</p>
-    <div id="log"></div>
-    <div id="composer">
-      <input id="msg" placeholder="type a message" autocomplete="off">
-      <button id="send">send</button>
+    <div id="top-right">
+      <span id="conn" class="conn off">connecting...</span>
+      <span>logged in as <b id="me-name">...</b></span>
+      <button id="logout" type="button">Log out</button>
     </div>
-  </main>
-  <script src="guard.js"></script>
+  </header>
+
+  <div id="app">
+    <aside id="buddies">
+      <h2>Buddy List</h2>
+      <input id="search" type="text" placeholder="find a friend..." autocomplete="off">
+      <ul id="buddy-list"></ul>
+      <p id="buddy-empty" hidden>nobody here yet. invite a friend to sign up!</p>
+      <p id="my-key" title="your public key fingerprint"></p>
+    </aside>
+
+    <section id="chat">
+      <div id="chat-empty">
+        <p>pick a buddy on the left to start chatting.</p>
+        <p class="small">messages are encrypted in your browser before they leave it.</p>
+      </div>
+
+      <div id="chat-pane" hidden>
+        <div id="chat-head">
+          <button id="back" type="button" aria-label="back to buddy list">&laquo;</button>
+          <div>
+            <div id="chat-name"></div>
+            <div id="chat-status"></div>
+          </div>
+          <button id="verify" type="button">Verify keys</button>
+        </div>
+
+        <div id="key-warning" hidden>
+          <span id="key-warning-text"></span>
+          <button id="trust" type="button">I verified it, trust new key</button>
+        </div>
+        <div id="verify-box" hidden></div>
+
+        <div id="log">
+          <button id="older" type="button" hidden>load older messages</button>
+          <div id="messages"></div>
+        </div>
+        <div id="typing" hidden><span></span><span></span><span></span> <em id="typing-name"></em></div>
+
+        <form id="composer" autocomplete="off">
+          <textarea id="msg" rows="1" maxlength="4000" placeholder="type a message (Enter to send, Shift+Enter for a new line)"></textarea>
+          <button id="send" type="submit">Send</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
   <script src="crypto.js"></script>
   <script src="app.js"></script>
 </body>
