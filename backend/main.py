@@ -257,6 +257,41 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
     ]
 
 
+@app.get("/api/messages/{peer_name}")
+def history(
+    peer_name: str,
+    before: int | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    peer = get_peer(conn, peer_name)
+    rows = conn.execute(
+        """
+        SELECT m.id, u.username AS sender, m.iv, m.ct, m.created_at,
+               m.delivered_at, m.read_at
+        FROM messages m JOIN users u ON u.id = m.sender_id
+        WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
+            OR (m.sender_id = :peer AND m.recipient_id = :me))
+          AND (:before IS NULL OR m.id < :before)
+        ORDER BY m.id DESC LIMIT :limit
+        """,
+        {"me": user["id"], "peer": peer["id"], "before": before, "limit": limit},
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "from": r["sender"],
+            "iv": r["iv"],
+            "ct": r["ct"],
+            "ts": r["created_at"],
+            "delivered": r["delivered_at"] is not None,
+            "read": r["read_at"] is not None,
+        }
+        for r in reversed(rows)
+    ]
+
+
 # ---------- pages ----------
 
 
