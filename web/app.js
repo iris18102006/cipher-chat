@@ -1,101 +1,110 @@
-const ws = new WebSocket("ws://localhost:8765");
-const log = document.getElementById("log");
-const input = document.getElementById("msg");
-const peerEl = document.getElementById("peer");
+const $ = (id) => document.getElementById(id);
+const PAGE = 50;
 
-let identity = null;
-let sharedKey = null;
-
-function timeNow() {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function addMessage(who, text) {
-  const row = document.createElement("div");
-  row.className = "msg " + who;
-  const body = document.createElement("span");
-  body.className = "text";
-  body.textContent = text;
-  const time = document.createElement("span");
-  time.className = "time";
-  time.textContent = timeNow();
-  row.append(body, time);
-  log.appendChild(row);
-  log.scrollTop = log.scrollHeight;
-}
-
-function addNote(text) {
-  const note = document.createElement("div");
-  note.className = "note";
-  note.textContent = text;
-  log.appendChild(note);
-  log.scrollTop = log.scrollHeight;
-}
-
-async function exportPub() {
-  const raw = await crypto.subtle.exportKey("raw", identity.publicKey);
-  return b64(raw);
-}
-
-async function importPub(s) {
-  return crypto.subtle.importKey(
-    "raw", unb64(s), { name: "ECDH", namedCurve: "P-256" }, true, []
-  );
-}
-
-const ready = loadOrCreateIdentity().then(async (keys) => {
-  identity = keys;
-  document.getElementById("fp").textContent =
-    "your key: " + (await fingerprint(keys.publicKey));
-});
-
-ws.onopen = async () => {
-  await ready;
-  ws.send(JSON.stringify({ type: "hello", pub: await exportPub() }));
+const state = {
+  me: null,
+  identity: null,
+  myPub: null,
+  contacts: new Map(), // username -> { username, pub, online, last_seen, unread, typing, changed }
+  order: [], // usernames, most recent conversation first
+  msgs: new Map(), // username -> [{ id, from, text, ts, delivered, read, failed }]
+  hasOlder: new Map(),
+  open: null,
+  ws: null,
+  retry: 0,
+  keyCache: new Map(), // peer pub (base64) -> AES key
 };
 
-ws.onclose = () => {
-  sharedKey = null;
-  peerEl.textContent = "disconnected, is the relay running?";
-};
+// ---------- small helpers ----------
 
-ws.onmessage = async (e) => {
-  await ready;
-  let data;
-  try {
-    data = JSON.parse(e.data);
-  } catch {
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (res.status === 401) {
+    location.href = "/login.html";
+    throw new Error("not logged in");
+  }
+  if (!res.ok) throw new Error("request failed: " + res.status);
+  return res.json();
+}
+
+function parseTs(ts) {
+  // sqlite gives "YYYY-MM-DD HH:MM:SS" in UTC
+  return new Date(ts.replace(" ", "T") + "Z");
+}
+
+function clock(d) {
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function dayLabel(d) {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+
+function lastSeenText(c) {
+  if (c.online) return "online";
+  if (!c.last_seen) return "offline";
+  const d = parseTs(c.last_seen);
+  const day = dayLabel(d);
+  return "last seen " + (day === "Today" ? "today" : day.toLowerCase()) + " at " + clock(d);
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+// ---------- keys ----------
+
+async function sharedKeyFor(peer) {
+  const c = state.contacts.get(peer);
+  if (!c || !c.pub) return null;
+  let key = state.keyCache.get(c.pub);
+  if (!key) {
+    key = await deriveSharedKey(state.identity.privateKey, await importPub(c.pub));
+    state.keyCache.set(c.pub, key);
+  }
+  return key;
+}
+
+// trust on first use: remember the first key we saw for each friend and
+// shout if it ever changes (could be a new device, could be someone in the middle)
+function knownSlot(peer) {
+  return "cc-known:" + state.me + ":" + peer;
+}
+
+function checkKeyTrust(c) {
+  if (!c.pub) {
+    c.changed = false;
     return;
   }
+  let known = null;
   try {
-    if (data.type === "hello" || data.type === "hello-reply") {
-      const peerKey = await importPub(data.pub);
-      sharedKey = await deriveSharedKey(identity.privateKey, peerKey);
-      peerEl.textContent = "peer key: " + (await fingerprint(peerKey));
-      if (data.type === "hello") {
-        ws.send(JSON.stringify({ type: "hello-reply", pub: await exportPub() }));
-      }
-    } else if (data.type === "msg" && sharedKey) {
-      addMessage("them", await decryptText(sharedKey, data.iv, data.ct));
-    }
-  } catch {
-    addNote("could not decrypt a message");
+    known = localStorage.getItem(knownSlot(c.username));
+  } catch {}
+  if (!known) {
+    try {
+      localStorage.setItem(knownSlot(c.username), c.pub);
+    } catch {}
+    c.changed = false;
+  } else {
+    c.changed = known !== c.pub;
   }
-};
-
-async function send() {
-  if (!input.value) return;
-  if (!sharedKey) {
-    addNote("no peer yet, message not sent");
-    return;
-  }
-  const { iv, ct } = await encryptText(sharedKey, input.value);
-  ws.send(JSON.stringify({ type: "msg", iv, ct }));
-  addMessage("me", input.value);
-  input.value = "";
 }
 
-document.getElementById("send").onclick = send;
-input.onkeydown = (e) => {
-  if (e.key === "Enter") send();
-};
+async function decryptFor(peer, iv, ct) {
+  try {
+    const key = await sharedKeyFor(peer);
+    if (!key) throw new Error("no key");
+    return { text: await decryptText(key, iv, ct), failed: false };
+  } catch {
+    return { text: "can't decrypt this message (the key changed or it's corrupted)", failed: true };
+  }
+}
+
