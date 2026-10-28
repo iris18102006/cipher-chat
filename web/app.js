@@ -108,3 +108,64 @@ async function decryptFor(peer, iv, ct) {
   }
 }
 
+// ---------- contacts ----------
+
+async function loadContacts() {
+  const list = await api("/api/contacts");
+  const prev = state.contacts;
+  state.contacts = new Map();
+  state.order = [];
+  for (const row of list) {
+    const old = prev.get(row.username);
+    const c = {
+      username: row.username,
+      pub: row.pub,
+      online: row.online,
+      last_seen: row.last_seen,
+      unread: row.unread,
+      typing: old ? old.typing : false,
+      changed: false,
+    };
+    checkKeyTrust(c);
+    state.contacts.set(c.username, c);
+    state.order.push(c.username);
+  }
+  renderBuddies();
+  if (state.open) renderChatHeader();
+}
+
+function bump(username) {
+  state.order = [username, ...state.order.filter((u) => u !== username)];
+}
+
+function totalUnread() {
+  let n = 0;
+  for (const c of state.contacts.values()) n += c.unread;
+  return n;
+}
+
+function renderBuddies() {
+  const q = $("search").value.trim().toLowerCase();
+  const ul = $("buddy-list");
+  ul.replaceChildren();
+  let shown = 0;
+  for (const name of state.order) {
+    if (q && !name.includes(q)) continue;
+    const c = state.contacts.get(name);
+    const li = el("li", name === state.open ? "active" : "");
+    li.dataset.user = name;
+    li.append(el("span", "dot " + (c.online ? "on" : "off")));
+    const info = el("div", "buddy-info");
+    info.append(el("div", "buddy-name", name));
+    info.append(el("div", "buddy-sub", c.typing ? "typing..." : c.online ? "online" : lastSeenText(c)));
+    li.append(info);
+    if (c.unread > 0) li.append(el("span", "badge", c.unread > 99 ? "99+" : String(c.unread)));
+    li.onclick = () => openChat(name);
+    ul.append(li);
+    shown++;
+  }
+  $("buddy-empty").hidden = shown > 0 || q !== "";
+  const n = totalUnread();
+  document.title = (n ? "(" + n + ") " : "") + "cipher-chat";
+}
+
