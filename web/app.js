@@ -454,3 +454,54 @@ async function handleWS(data) {
   }
 }
 
+// ---------- composer ----------
+
+let lastTypingSent = 0;
+let typingStopTimer = null;
+
+function notifyTyping() {
+  const peer = state.open;
+  if (!peer) return;
+  const now = Date.now();
+  if (now - lastTypingSent > 2500) {
+    sendWS({ type: "typing", to: peer, state: true });
+    lastTypingSent = now;
+  }
+  clearTimeout(typingStopTimer);
+  typingStopTimer = setTimeout(() => {
+    sendWS({ type: "typing", to: peer, state: false });
+    lastTypingSent = 0;
+  }, 3000);
+}
+
+function stopTyping() {
+  clearTimeout(typingStopTimer);
+  if (state.open && lastTypingSent) sendWS({ type: "typing", to: state.open, state: false });
+  lastTypingSent = 0;
+}
+
+function autosize() {
+  const t = $("msg");
+  t.style.height = "auto";
+  t.style.height = Math.min(t.scrollHeight, 120) + "px";
+}
+
+async function sendMessage() {
+  const peer = state.open;
+  const text = $("msg").value.trim();
+  if (!peer || !text) return;
+  const c = state.contacts.get(peer);
+  if (!c || !c.pub || c.changed) return;
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+    setConn(false, "offline, message not sent");
+    return;
+  }
+  const key = await sharedKeyFor(peer);
+  const { iv, ct } = await encryptText(key, text);
+  if (sendWS({ type: "msg", to: peer, iv, ct, cid: crypto.randomUUID() })) {
+    $("msg").value = "";
+    autosize();
+    stopTyping();
+  }
+}
+
