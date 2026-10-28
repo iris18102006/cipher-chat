@@ -54,3 +54,12 @@ This is a learning project, not Signal.
 - Login rate limiting is in memory and resets when the server restarts
 - 1-to-1 only, no group chats yet
 
+## Roadmap
+
+- [x] HKDF key derivation
+- [x] Accounts, buddy list, history
+- [x] Typing, online / last seen, delivered / read
+- [ ] Profiles you can customize (no code needed)
+- [ ] Friends and blocking
+- [ ] Forward secrecy with a ratchet
+- [ ] Group chats
