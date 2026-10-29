@@ -60,6 +60,22 @@ function el(tag, cls, text) {
   return n;
 }
 
+// small popup in the corner, goes away by itself
+let toastTimer = null;
+
+function toast(text, onClick) {
+  const t = $("toast");
+  t.textContent = text;
+  t.onclick = () => {
+    t.hidden = true;
+    if (onClick) onClick();
+  };
+  t.style.cursor = onClick ? "pointer" : "default";
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), 6000);
+}
+
 // ---------- keys ----------
 
 async function sharedKeyFor(peer) {
@@ -485,6 +501,13 @@ async function handleWS(data) {
   } else if (data.type === "social") {
     // friend request / accepted / removed / block changed: reload the lists
     await loadContacts();
+    const from = state.contacts.get(data.from);
+    const who = from ? shownName(from) : data.from;
+    if (data.event === "request") {
+      toast(who + " sent you a friend request", () => openProfile(data.from));
+    } else if (data.event === "accepted") {
+      toast(who + " accepted your friend request", () => openProfile(data.from));
+    }
     // keep a profile that's open on that person up to date
     if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
       openProfile(data.from);
