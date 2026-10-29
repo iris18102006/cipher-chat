@@ -349,3 +349,66 @@ def test_unblocking_does_not_reveal_old_hidden_messages(client):
         wa.receive_json()
     b.delete("/api/blocks/alice")
     assert b.get("/api/messages/alice").json() == []
+
+
+# ---------- top friends, visitors ----------
+
+
+def befriend(a, b, an, bn):
+    a.post(f"/api/friends/{bn}")
+    b.post(f"/api/friends/{an}/accept")
+
+
+def test_top_friends_must_be_friends_and_keep_order(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    befriend(a, b, "alice", "bob")
+    # carol is not a friend yet
+    assert a.put("/api/profile", json={"top_friends": ["bob", "carol"]}).status_code == 400
+    befriend(a, c, "alice", "carol")
+    p = a.put("/api/profile", json={"top_friends": ["carol", "bob", "carol"]}).json()
+    assert [f["username"] for f in p["top_friends"]] == ["carol", "bob"]
+
+
+def test_top_friends_limit(client):
+    a = signup(client, "alice")
+    names = []
+    for i in range(9):
+        n = f"friend{i}"
+        names.append(n)
+        befriend(a, signup(client, n), "alice", n)
+    assert a.put("/api/profile", json={"top_friends": names}).status_code == 400
+    assert a.put("/api/profile", json={"top_friends": names[:8]}).status_code == 200
+
+
+def test_top_friends_drop_out_after_unfriend_or_block(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    befriend(a, b, "alice", "bob")
+    befriend(a, c, "alice", "carol")
+    a.put("/api/profile", json={"top_friends": ["bob", "carol"]})
+    a.delete("/api/friends/bob")
+    assert [f["username"] for f in c.get("/api/profile/alice").json()["top_friends"]] == ["carol"]
+    # carol blocks herself out of what bob sees of alice's top friends
+    befriend(a, b, "alice", "bob")
+    a.put("/api/profile", json={"top_friends": ["bob", "carol"]})
+    b.post("/api/blocks/carol")
+    assert [f["username"] for f in b.get("/api/profile/alice").json()["top_friends"]] == ["bob"]
+
+
+def test_visitor_counter_counts_people_not_refreshes(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    for _ in range(3):
+        b.get("/api/profile/alice")
+    c.get("/api/profile/alice")
+    assert a.get("/api/profile/alice").json()["visitors"] == 2
+    # looking at your own profile doesn't count
+    assert a.get("/api/profile/alice").json()["visitors"] == 2
+
+
+def test_profile_shows_friend_status_and_mutual_friends(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    befriend(a, c, "alice", "carol")
+    befriend(b, c, "bob", "carol")
+    p = b.get("/api/profile/alice").json()
+    assert p["friend"] == "none" and p["mutual_friends"] == 1 and p["friend_count"] == 1
+    a.post("/api/friends/bob")
+    assert b.get("/api/profile/alice").json()["friend"] == "incoming"
