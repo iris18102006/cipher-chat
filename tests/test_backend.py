@@ -412,3 +412,30 @@ def test_profile_shows_friend_status_and_mutual_friends(client):
     assert p["friend"] == "none" and p["mutual_friends"] == 1 and p["friend_count"] == 1
     a.post("/api/friends/bob")
     assert b.get("/api/profile/alice").json()["friend"] == "incoming"
+
+
+# ---------- live social events ----------
+
+
+def test_friend_events_pushed_live(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        assert wb.receive_json()["type"] == "ready"
+        a.post("/api/friends/bob")
+        assert wb.receive_json() == {"type": "social", "event": "request", "from": "alice"}
+        a.delete("/api/friends/bob")
+        assert wb.receive_json() == {"type": "social", "event": "removed", "from": "alice"}
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        b.post("/api/friends/alice/accept")
+        assert wa.receive_json() == {"type": "social", "event": "accepted", "from": "bob"}
+
+
+def test_block_sends_a_neutral_refresh_to_both_sides(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        wb.receive_json()
+        a.post("/api/blocks/bob")
+        # bob only learns to refresh, the frame doesn't say anyone was blocked
+        assert wb.receive_json() == {"type": "social", "event": "refresh", "from": "alice"}
