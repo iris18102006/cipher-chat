@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>cipher-chat</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="profile.css">
 </head>
 <body>
   <header id="top">
@@ -59,6 +60,17 @@
         </form>
       </div>
     </section>
+  </div>
+
+  <!-- profile page, filled in by profile.js -->
+  <div id="profile-overlay" hidden>
+    <div id="profile-card" class="theme-classic" role="dialog" aria-modal="true" aria-labelledby="pf-title">
+      <div id="pf-bar">
+        <span id="pf-title">Profile</span>
+        <button id="pf-close" type="button" aria-label="close profile">&times;</button>
+      </div>
+      <div id="pf-body"></div>
+    </div>
   </div>
 
   <script src="crypto.js"></script>

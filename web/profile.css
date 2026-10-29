@@ -1,0 +1,211 @@
+/* profile page. Every colour comes from a --p-* variable so a theme
+   (themes.css) can restyle the whole page by only changing those. */
+
+#profile-card {
+  --p-page: #eef3fb;
+  --p-card: #ffffff;
+  --p-text: #111111;
+  --p-muted: #667;
+  --p-head-a: #2a5da8;
+  --p-head-b: #17407f;
+  --p-head-text: #ffffff;
+  --p-accent: #ff9933;
+  --p-border: #7f9db9;
+  --p-font: Verdana, Tahoma, sans-serif;
+}
+
+#profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 10px;
+  overflow-y: auto;
+  background: rgba(10, 25, 55, 0.65);
+}
+
+#profile-card {
+  width: 100%;
+  max-width: 640px;
+  background: var(--p-page);
+  color: var(--p-text);
+  font-family: var(--p-font);
+  border: 2px solid var(--p-border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+#pf-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--p-head-text);
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+  border-bottom: 3px solid var(--p-accent);
+}
+
+#pf-close {
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+#pf-body {
+  padding: 12px;
+}
+
+/* ---------- top of the page ---------- */
+
+.pf-hero {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+.pf-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  font-size: 46px;
+  background: var(--p-page);
+  border: 3px solid var(--p-accent);
+  border-radius: 50%;
+}
+
+.pf-avatar.small {
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  border-width: 2px;
+}
+
+.pf-who {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-name {
+  margin: 0;
+  font-size: 20px;
+  color: var(--p-accent);
+  overflow-wrap: anywhere;
+}
+
+.pf-handle {
+  font-size: 11px;
+  color: var(--p-muted);
+}
+
+.pf-mood {
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.pf-headline {
+  margin-top: 6px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.pf-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--p-muted);
+}
+
+.pf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+/* ---------- sections ---------- */
+
+.pf-section {
+  margin-bottom: 10px;
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+.pf-section h3 {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--p-head-text);
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+}
+
+.pf-section .pf-content {
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pf-section .pf-content.empty {
+  color: var(--p-muted);
+  font-style: italic;
+}
+
+.pf-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--p-muted);
+}
+
+.pf-stats b {
+  color: var(--p-text);
+}
+
+.pf-top {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+
+.pf-top-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--p-page);
+  border: 1px solid var(--p-border);
+}
+
+.pf-top-item:hover {
+  border-color: var(--p-accent);
+}
+
+.pf-top-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-error {
+  padding: 20px;
+  text-align: center;
+  color: #a33;
+}
