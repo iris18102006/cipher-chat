@@ -258,8 +258,15 @@ def logout(
 
 
 @app.get("/api/me")
-def me(user=Depends(current_user)):
-    return {"username": user["username"]}
+def me(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        "SELECT display_name, avatar FROM users WHERE id = ?", (user["id"],)
+    ).fetchone()
+    return {
+        "username": user["username"],
+        "display_name": row["display_name"],
+        "avatar": row["avatar"],
+    }
 
 
 # ---------- profiles ----------

@@ -439,3 +439,9 @@ def test_block_sends_a_neutral_refresh_to_both_sides(client):
         a.post("/api/blocks/bob")
         # bob only learns to refresh, the frame doesn't say anyone was blocked
         assert wb.receive_json() == {"type": "social", "event": "refresh", "from": "alice"}
+
+
+def test_me_includes_display_name_and_avatar(client):
+    a = signup(client, "alice")
+    a.put("/api/profile", json={"display_name": "Ali", "avatar": "🌸"})
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": "🌸"}
