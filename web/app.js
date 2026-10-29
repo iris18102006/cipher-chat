@@ -224,9 +224,15 @@ function renderChatHeader() {
   } else {
     warn.hidden = true;
   }
+  $("block-banner").hidden = !c.blocked;
+  if (c.blocked) {
+    $("block-banner-text").textContent =
+      "You blocked " + shownName(c) + ". They can't message you and they can't see when you're online.";
+  }
+  $("block").textContent = c.blocked ? "Unblock" : "Block";
   $("typing").hidden = !c.typing;
   $("typing-name").textContent = c.typing ? c.username + " is typing" : "";
-  const locked = !c.pub || c.changed;
+  const locked = !c.pub || c.changed || c.blocked;
   $("msg").disabled = locked;
   $("send").disabled = locked;
 }
@@ -571,6 +577,26 @@ $("verify").onclick = async () => {
   box.hidden = !box.hidden;
   if (!box.hidden) await renderVerify();
 };
+
+async function setBlocked(username, on) {
+  const c = state.contacts.get(username);
+  if (!c) return;
+  if (on && !confirm("Block " + shownName(c) + "? They won't be able to message you or see when you're online, and you'll stop being friends.")) {
+    return;
+  }
+  try {
+    await api("/api/blocks/" + encodeURIComponent(username), { method: on ? "POST" : "DELETE" });
+    await loadContacts();
+  } catch {
+    setConn(false, "couldn't change the block, try again");
+  }
+}
+
+$("block").onclick = () => {
+  const c = state.contacts.get(state.open);
+  if (c) setBlocked(c.username, !c.blocked);
+};
+$("unblock").onclick = () => state.open && setBlocked(state.open, false);
 
 $("trust").onclick = async () => {
   const c = state.contacts.get(state.open);

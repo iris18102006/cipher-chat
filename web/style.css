@@ -581,3 +581,19 @@ h2 {
   color: #fff;
   background: #8a8fa0;
 }
+
+/* you blocked this person */
+
+#block-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  color: #5a1a1a;
+  background: #ffd9d9;
+  border-bottom: 1px solid #d98a8a;
+}
+
+#block-banner span {
+  flex: 1;
+}
