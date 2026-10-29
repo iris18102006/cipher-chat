@@ -208,3 +208,53 @@ def test_view_someone_elses_profile(client):
     assert b.get("/api/profile/ghost").status_code == 404
     assert client.get("/api/profile/alice").status_code == 401
     assert b.put("/api/profile", json={"mood": "x"}).status_code == 200
+
+
+# ---------- friends ----------
+
+
+def test_friend_request_flow(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    assert a.post("/api/friends/bob").json() == {"status": "outgoing"}
+    # asking twice changes nothing
+    assert a.post("/api/friends/bob").json() == {"status": "outgoing"}
+    assert [x["username"] for x in a.get("/api/friends").json()["outgoing"]] == ["bob"]
+    assert [x["username"] for x in b.get("/api/friends").json()["incoming"]] == ["alice"]
+    assert b.post("/api/friends/alice/accept").json() == {"status": "friends"}
+    assert [x["username"] for x in a.get("/api/friends").json()["friends"]] == ["bob"]
+    assert [x["username"] for x in b.get("/api/friends").json()["friends"]] == ["alice"]
+
+
+def test_friend_request_both_ways_becomes_friendship(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    assert b.post("/api/friends/alice").json() == {"status": "friends"}
+
+
+def test_only_the_addressee_can_accept(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    assert a.post("/api/friends/bob/accept").status_code == 404
+    assert b.post("/api/friends/alice/accept").status_code == 200
+    # accepting again is harmless
+    assert b.post("/api/friends/alice/accept").status_code == 200
+
+
+def test_decline_cancel_and_unfriend(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    assert b.delete("/api/friends/alice").json() == {"status": "none"}
+    assert a.get("/api/friends").json() == {"friends": [], "incoming": [], "outgoing": []}
+    a.post("/api/friends/bob")
+    assert a.delete("/api/friends/bob").status_code == 200  # cancel
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    assert a.delete("/api/friends/bob").status_code == 200  # unfriend
+    assert b.get("/api/friends").json()["friends"] == []
+
+
+def test_friend_edge_cases(client):
+    a = signup(client, "alice")
+    assert a.post("/api/friends/alice").status_code == 400
+    assert a.post("/api/friends/ghost").status_code == 404
+    assert client.post("/api/friends/alice").status_code == 401
