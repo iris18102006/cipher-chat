@@ -333,6 +333,105 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
     return profile_dict(row, user["id"])
 
 
+# ---------- friends ----------
+
+
+def friend_status(conn, me_id: int, other_id: int) -> str:
+    """none | friends | outgoing (I asked) | incoming (they asked me)"""
+    row = conn.execute(
+        "SELECT requester_id, status FROM friendships "
+        "WHERE (requester_id = :a AND addressee_id = :b) "
+        "   OR (requester_id = :b AND addressee_id = :a)",
+        {"a": me_id, "b": other_id},
+    ).fetchone()
+    if not row:
+        return "none"
+    if row["status"] == "accepted":
+        return "friends"
+    return "outgoing" if row["requester_id"] == me_id else "incoming"
+
+
+def other_user(conn, user, username: str):
+    peer = get_peer(conn, username)
+    if peer["id"] == user["id"]:
+        raise HTTPException(400, "that's you")
+    return peer
+
+
+@app.get("/api/friends")
+def list_friends(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        """
+        SELECT u.username, u.display_name, u.avatar, f.status,
+               f.requester_id = :me AS mine
+        FROM friendships f
+        JOIN users u ON u.id = CASE WHEN f.requester_id = :me
+                                    THEN f.addressee_id ELSE f.requester_id END
+        WHERE f.requester_id = :me OR f.addressee_id = :me
+        ORDER BY u.username
+        """,
+        {"me": user["id"]},
+    ).fetchall()
+    out = {"friends": [], "incoming": [], "outgoing": []}
+    for r in rows:
+        item = {
+            "username": r["username"],
+            "display_name": r["display_name"],
+            "avatar": r["avatar"],
+        }
+        if r["status"] == "accepted":
+            out["friends"].append(item)
+        elif r["mine"]:
+            out["outgoing"].append(item)
+        else:
+            out["incoming"].append(item)
+    return out
+
+
+@app.post("/api/friends/{username}")
+def add_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    status = friend_status(conn, user["id"], peer["id"])
+    if status == "incoming":
+        # they already asked me, so asking back just means yes
+        return accept_friend(username, user, conn)
+    if status == "none":
+        conn.execute(
+            "INSERT INTO friendships (requester_id, addressee_id) VALUES (?, ?)",
+            (user["id"], peer["id"]),
+        )
+        conn.commit()
+        status = "outgoing"
+    return {"status": status}
+
+
+@app.post("/api/friends/{username}/accept")
+def accept_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    cur = conn.execute(
+        "UPDATE friendships SET status = 'accepted' "
+        "WHERE requester_id = ? AND addressee_id = ? AND status = 'pending'",
+        (peer["id"], user["id"]),
+    )
+    conn.commit()
+    if cur.rowcount == 0 and friend_status(conn, user["id"], peer["id"]) != "friends":
+        raise HTTPException(404, "no friend request from that user")
+    return {"status": "friends"}
+
+
+@app.delete("/api/friends/{username}")
+def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    """Unfriend, cancel a request I sent, or decline one I got."""
+    peer = other_user(conn, user, username)
+    conn.execute(
+        "DELETE FROM friendships WHERE (requester_id = :a AND addressee_id = :b) "
+        "OR (requester_id = :b AND addressee_id = :a)",
+        {"a": user["id"], "b": peer["id"]},
+    )
+    conn.commit()
+    return {"status": "none"}
+
+
 # ---------- keys, contacts, history ----------
 
 
