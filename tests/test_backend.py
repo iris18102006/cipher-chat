@@ -1,5 +1,7 @@
 import base64
 import os
+import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -445,3 +447,41 @@ def test_me_includes_display_name_and_avatar(client):
     a = signup(client, "alice")
     a.put("/api/profile", json={"display_name": "Ali", "avatar": "🌸"})
     assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": "🌸"}
+
+
+# ---------- the frontend and backend agree ----------
+
+WEB = Path(__file__).parent.parent / "web"
+
+
+def test_every_theme_has_css_and_a_picker_button():
+    from backend import main
+
+    css = (WEB / "themes.css").read_text()
+    js = (WEB / "profile.js").read_text()
+    block = js.split("const THEME_CHOICES = [", 1)[1].split("];", 1)[0]
+    in_js = re.findall(r'\["([a-z]+)",\s*"', block)
+    for theme in main.THEMES:
+        assert f"#profile-card.theme-{theme} " in css, f"themes.css is missing {theme}"
+    assert sorted(in_js) == sorted(main.THEMES)
+
+
+def test_every_avatar_in_the_picker_is_accepted_by_the_server():
+    from backend import main
+
+    js = (WEB / "profile.js").read_text()
+    block = js.split("const AVATARS = [", 1)[1].split("];", 1)[0]
+    avatars = re.findall(r'"([^"]+)"', block)
+    assert len(avatars) >= 16
+    for emoji in avatars:
+        assert main.clean_avatar(emoji) == emoji
+
+
+def test_every_accent_in_the_picker_is_a_valid_colour():
+    from backend import main
+
+    js = (WEB / "profile.js").read_text()
+    line = [l for l in js.splitlines() if l.startswith("const ACCENTS")][0]
+    colours = re.findall(r'"(#[0-9a-fA-F]+)"', line)
+    assert colours
+    assert all(main.ACCENT_RE.match(c) for c in colours)
