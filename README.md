@@ -12,6 +12,10 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Typing indicator, delivered and read ticks
 - Message history that survives refreshes (stored encrypted, decrypted in your browser)
 - Key-change warning: if a friend's key changes, the composer locks until you trust the new key
+- Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", an emoji avatar, 8 themes and an accent colour, with a live preview while you edit
+- Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
+- Friend requests (send, accept, decline, cancel, unfriend) with a popup when one arrives
+- Blocking: a blocked person can't message you, can't see when you're online and can't see your profile
 - Works on phones (one panel at a time)
 
 ## How it works
@@ -23,6 +27,14 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 5. The server stores and forwards `{iv, ciphertext}`. It cannot read them.
 6. Every key has a fingerprint (SHA-256 of the public key). Use **Verify keys** in a chat and compare fingerprints with your friend over another channel.
 7. Your browser remembers the first key it saw for each friend (trust on first use) and warns you if it changes.
+
+## Profiles, friends and blocking
+
+- Profiles are plain text and an emoji. Nothing you type is ever rendered as html, so there's no way to inject code through a profile.
+- Themes are presets (`web/themes.css`), they only change a handful of colour variables.
+- Anyone logged in can look at a profile. Profiles are **not** encrypted, only messages are, so don't put secrets in your about me.
+- You can message anyone who hasn't blocked you, friends or not. Friends just get their own section in the buddy list and can go in your top friends.
+- When someone blocks you, your messages to them are still saved (so your own history stays complete) but they are never delivered or shown to them, and you're not told. They also see you as permanently offline. Blocking someone also ends your friendship.
 
 The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` header, so other sites and logged-out visitors can't connect.
 
@@ -50,16 +62,20 @@ This is a learning project, not Signal.
 - Clearing site data deletes your private key and with it your ability to read old messages.
 - No forward secrecy, a stolen private key decrypts everything
 - The server still sees metadata: who talks to whom, when, message sizes, and online status
+- Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
 - The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
 - Login rate limiting is in memory and resets when the server restarts
 - 1-to-1 only, no group chats yet
+- Avatars are emoji only, no image uploads yet
 
 ## Roadmap
 
 - [x] HKDF key derivation
 - [x] Accounts, buddy list, history
 - [x] Typing, online / last seen, delivered / read
-- [ ] Profiles you can customize (no code needed)
-- [ ] Friends and blocking
+- [x] Profiles you can customize (no code needed)
+- [x] Friends and blocking
+- [ ] Profile comments / a wall
+- [ ] Image avatars
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
