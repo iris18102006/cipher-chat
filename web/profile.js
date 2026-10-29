@@ -49,6 +49,29 @@ function section(title, text) {
   return box;
 }
 
+function topFriendsSection(p) {
+  const box = el("div", "pf-section");
+  box.append(el("h3", "", "Top friends"));
+  if (!p.top_friends.length) {
+    box.append(el("div", "pf-content empty", "pick up to 8 friends with Edit profile"));
+    return box;
+  }
+  const grid = el("div", "pf-top");
+  for (const f of p.top_friends) {
+    const item = el("div", "pf-top-item");
+    item.tabIndex = 0;
+    item.append(el("div", "pf-avatar small", avatarFor(f)), el("span", "", shownName(f)));
+    const open = () => openProfile(f.username);
+    item.onclick = open;
+    item.onkeydown = (e) => {
+      if (e.key === "Enter") open();
+    };
+    grid.append(item);
+  }
+  box.append(grid);
+  return box;
+}
+
 function stat(label, value) {
   const s = el("span");
   s.append(el("b", "", String(value)), " " + label);
@@ -88,6 +111,7 @@ function renderProfile(p) {
   body.append(section("About me", p.about_me));
   body.append(section("Interests", p.interests));
   if (p.song) body.append(section("Now playing", "\u266A " + p.song));
+  if (p.top_friends.length || p.me) body.append(topFriendsSection(p));
   if (p.location) body.append(section("Location", p.location));
 
   const stats = el("div", "pf-stats");
@@ -229,6 +253,37 @@ function renderEditor(p) {
   }
   form.append(ac.row);
 
+  // top friends: tap friends in the order you want them, up to 8
+  const top = (p.top_friends || []).map((f) => f.username);
+  const tf = choiceRow("Top friends", "max 8");
+  tf.box.textContent = "loading...";
+  form.append(tf.row);
+  api("/api/friends")
+    .then(({ friends }) => {
+      const paint = () => {
+        tf.box.replaceChildren();
+        if (!friends.length) {
+          tf.box.textContent = "add some friends first, then pick your top 8 here";
+          return;
+        }
+        for (const f of friends) {
+          const at = top.indexOf(f.username);
+          const b = el("button", "pf-choice text" + (at >= 0 ? " on" : ""));
+          b.type = "button";
+          b.textContent = (at >= 0 ? at + 1 + ". " : "") + avatarFor(f) + " " + shownName(f);
+          b.onclick = () => {
+            if (at >= 0) top.splice(at, 1);
+            else if (top.length < 8) top.push(f.username);
+            paint();
+          };
+          tf.box.append(b);
+        }
+      };
+      paint();
+      tf.box.dataset.ready = "1";
+    })
+    .catch(() => (tf.box.textContent = "couldn't load your friends"));
+
   const err = el("p", "pf-error");
   const bar = el("div", "pf-actions");
   const save = el("button", "", "Save");
@@ -248,6 +303,8 @@ function renderEditor(p) {
     changes.avatar = look.avatar || "";
     changes.theme = look.theme;
     changes.accent = look.accent || "";
+    // only send top friends once the list loaded, so a failed load can't wipe them
+    if (tf.box.dataset.ready) changes.top_friends = top;
     try {
       pfCurrent = await saveProfile(changes);
       renderProfile(pfCurrent);
