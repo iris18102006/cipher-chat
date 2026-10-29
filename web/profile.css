@@ -310,3 +310,44 @@
   font-size: 11px;
   color: #c33;
 }
+
+/* ---------- phones ---------- */
+
+@media (max-width: 700px) {
+  #profile-overlay {
+    padding: 0;
+  }
+
+  #profile-card {
+    min-height: 100%;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .pf-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .pf-actions {
+    justify-content: center;
+  }
+
+  .pf-top {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* label on top of the field instead of beside it */
+  .pf-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .pf-row label {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+
+  .pf-row.wide .pf-picker {
+    grid-column: 1 / -1;
+  }
+}
