@@ -55,6 +55,18 @@ def init_db():
         # added after the first version, so migrate old databases in place
         _add_column(conn, "users", "public_key", "TEXT")
         _add_column(conn, "users", "last_seen", "TEXT")
+        # profile fields, all optional, all plain text (the browser never renders them as html)
+        _add_column(conn, "users", "display_name", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "mood", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "headline", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "about_me", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "interests", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "location", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "song", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "avatar", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "theme", "TEXT NOT NULL DEFAULT 'classic'")
+        _add_column(conn, "users", "accent", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "top_friends", "TEXT NOT NULL DEFAULT '[]'")
         conn.commit()
     finally:
         conn.close()
