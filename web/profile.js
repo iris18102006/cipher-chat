@@ -74,8 +74,15 @@ function renderProfile(p) {
   hero.append(who);
   body.append(hero);
 
-  // buttons (edit, add friend, block...) get filled in by their own features
-  body.append(el("div", "pf-actions"));
+  // buttons (add friend, block...) get added to this row by their own features
+  const actions = el("div", "pf-actions");
+  if (p.me) {
+    const edit = el("button", "", "Edit profile");
+    edit.type = "button";
+    edit.onclick = () => renderEditor(p);
+    actions.append(edit);
+  }
+  body.append(actions);
 
   body.append(section("About me", p.about_me));
   body.append(section("Interests", p.interests));
@@ -88,6 +95,94 @@ function renderProfile(p) {
   if (!p.me) stats.append(stat("mutual friends", p.mutual_friends));
   stats.append(el("span", "", "joined " + parseTs(p.joined).toLocaleDateString()));
   body.append(stats);
+}
+
+// ---------- editing ----------
+
+// [field, label, max length, multiline, placeholder]
+const TEXT_FIELDS = [
+  ["display_name", "Display name", 30, false, "what your friends call you"],
+  ["mood", "Mood", 40, false, "like: \u{1F634} sleepy"],
+  ["headline", "Headline", 80, false, "a short line under your name"],
+  ["about_me", "About me", 600, true, "tell people who you are"],
+  ["interests", "Interests", 200, false, "music, games, anything"],
+  ["location", "Location", 40, false, "where are you from?"],
+  ["song", "Now playing", 80, false, "artist - song"],
+];
+
+function textRow(form, [field, label, max, multiline, hint], value) {
+  const row = el("div", "pf-row");
+  const id = "pf-in-" + field;
+  const lab = el("label", "", label);
+  lab.htmlFor = id;
+  const input = el(multiline ? "textarea" : "input");
+  input.id = id;
+  input.name = field;
+  input.maxLength = max;
+  input.placeholder = hint;
+  input.value = value || "";
+  if (multiline) input.rows = 5;
+  else input.type = "text";
+  const count = el("span", "pf-count");
+  const update = () => (count.textContent = input.value.length + "/" + max);
+  input.addEventListener("input", update);
+  update();
+  row.append(lab, input, count);
+  form.append(row);
+  return input;
+}
+
+async function saveProfile(changes) {
+  const res = await fetch("/api/profile", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(changes),
+  });
+  if (res.status === 401) {
+    location.href = "/login.html";
+    throw new Error("not logged in");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.detail === "string" ? data.detail : "couldn't save, try again");
+  }
+  return data;
+}
+
+function renderEditor(p) {
+  const body = $("pf-body");
+  body.replaceChildren();
+  const form = el("form", "pf-form");
+  form.autocomplete = "off";
+  const inputs = {};
+  for (const f of TEXT_FIELDS) inputs[f[0]] = textRow(form, f, p[f[0]]);
+
+  const err = el("p", "pf-error");
+  const bar = el("div", "pf-actions");
+  const save = el("button", "", "Save");
+  save.type = "submit";
+  const cancel = el("button", "", "Cancel");
+  cancel.type = "button";
+  cancel.onclick = () => renderProfile(pfCurrent);
+  bar.append(save, cancel);
+  form.append(err, bar);
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    err.textContent = "";
+    save.disabled = true;
+    const changes = {};
+    for (const [field] of TEXT_FIELDS) changes[field] = inputs[field].value;
+    try {
+      pfCurrent = await saveProfile(changes);
+      renderProfile(pfCurrent);
+    } catch (ex) {
+      err.textContent = ex.message;
+      save.disabled = false;
+    }
+  };
+  body.append(form);
+  inputs.display_name.focus();
 }
 
 // ---------- wiring ----------
