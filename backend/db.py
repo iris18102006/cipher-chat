@@ -50,6 +50,32 @@ def init_db():
                 ON messages (sender_id, recipient_id, id);
             CREATE INDEX IF NOT EXISTS idx_messages_recipient
                 ON messages (recipient_id, read_at);
+            -- one row per pair, requester asked, addressee has to accept
+            CREATE TABLE IF NOT EXISTS friendships (
+                requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (requester_id, addressee_id),
+                CHECK (requester_id != addressee_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_friendships_addressee
+                ON friendships (addressee_id, status);
+            CREATE TABLE IF NOT EXISTS blocks (
+                blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (blocker_id, blocked_id),
+                CHECK (blocker_id != blocked_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks (blocked_id);
+            -- who visited whose profile (one row per visitor, so it counts people not refreshes)
+            CREATE TABLE IF NOT EXISTS profile_visits (
+                profile_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                visitor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                last_visit TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (profile_id, visitor_id)
+            );
             """
         )
         # added after the first version, so migrate old databases in place
