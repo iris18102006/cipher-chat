@@ -36,6 +36,21 @@ MAX_CT_LEN = 16_000  # base64 chars of ciphertext, roughly 12 KB of text
 PUB_LEN = 88  # base64 of an uncompressed P-256 point (65 bytes)
 WEB_DIR = Path(__file__).parent.parent / "web"
 
+# profile theme presets (the css for each lives in web/themes.css)
+THEMES = ("classic", "emo", "kawaii", "neon", "forest", "sunset", "gothic", "terminal")
+ACCENT_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+# max length of each free-text profile field
+PROFILE_LIMITS = {
+    "display_name": 30,
+    "mood": 40,
+    "headline": 80,
+    "about_me": 600,
+    "interests": 200,
+    "location": 40,
+    "song": 80,
+}
+MAX_TOP_FRIENDS = 8
+
 # set CIPHER_SECURE_COOKIES=1 when serving over https
 SECURE_COOKIES = os.environ.get("CIPHER_SECURE_COOKIES") == "1"
 
@@ -66,6 +81,20 @@ class KeyBody(BaseModel):
     pub: str
 
 
+class ProfileBody(BaseModel):
+    # every field is optional so the editor can save just what changed
+    display_name: str | None = None
+    mood: str | None = None
+    headline: str | None = None
+    about_me: str | None = None
+    interests: str | None = None
+    location: str | None = None
+    song: str | None = None
+    avatar: str | None = None
+    theme: str | None = None
+    accent: str | None = None
+
+
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -78,6 +107,24 @@ def valid_pub(pub: str) -> bool:
     except ValueError:
         return False
     return len(raw) == 65 and raw[0] == 4
+
+
+def clean_text(value: str, limit: int, field: str, multiline: bool = False) -> str:
+    """Strip control characters and surrounding space, then enforce the length limit."""
+    keep = "\n" if multiline else ""
+    value = "".join(ch for ch in value if ch.isprintable() or ch in keep)
+    value = value.replace("\r", "").strip()
+    if len(value) > limit:
+        raise HTTPException(400, f"{field.replace('_', ' ')} is too long (max {limit})")
+    return value
+
+
+def clean_avatar(value: str) -> str:
+    # an avatar is a single emoji (or a few joined together), never ascii text
+    value = value.strip()
+    if len(value) > 8 or any(ord(ch) < 128 for ch in value):
+        raise HTTPException(400, "pick an emoji for your avatar")
+    return value
 
 
 # ---------- login rate limiting (in memory, per ip + username) ----------
