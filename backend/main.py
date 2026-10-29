@@ -93,6 +93,7 @@ class ProfileBody(BaseModel):
     avatar: str | None = None
     theme: str | None = None
     accent: str | None = None
+    top_friends: list[str] | None = None
 
 
 def hash_token(token: str) -> str:
@@ -265,7 +266,7 @@ def me(user=Depends(current_user)):
 
 PROFILE_COLUMNS = (
     "id, username, display_name, mood, headline, about_me, interests, "
-    "location, song, avatar, theme, accent, created_at, last_seen"
+    "location, song, avatar, theme, accent, top_friends, created_at, last_seen"
 )
 
 
@@ -289,6 +290,46 @@ def profile_dict(row, viewer_id: int) -> dict:
     }
 
 
+def top_friend_names(conn, user_id: int, names: list[str]) -> list[str]:
+    """Only real friends can be in your top friends, in the order you picked."""
+    picked: list[str] = []
+    allowed = friend_ids(conn, user_id)
+    for name in names:
+        name = name.strip().lower()
+        if name in picked:
+            continue
+        row = conn.execute("SELECT id FROM users WHERE username = ?", (name,)).fetchone()
+        if not row or row["id"] not in allowed:
+            raise HTTPException(400, f"{name} isn't one of your friends")
+        picked.append(name)
+    if len(picked) > MAX_TOP_FRIENDS:
+        raise HTTPException(400, f"you can only pick {MAX_TOP_FRIENDS} top friends")
+    return picked
+
+
+def top_friends_for(conn, row, viewer_id: int) -> list[dict]:
+    try:
+        names = json.loads(row["top_friends"])
+    except (TypeError, ValueError):
+        return []
+    owner_friends = friend_ids(conn, row["id"])
+    out = []
+    for name in names:
+        f = conn.execute(
+            "SELECT id, username, display_name, avatar FROM users WHERE username = ?",
+            (name,),
+        ).fetchone()
+        # drop people who aren't friends any more, or who have a block with the viewer
+        if not f or f["id"] not in owner_friends:
+            continue
+        if f["id"] != viewer_id and blocked_either_way(conn, viewer_id, f["id"]):
+            continue
+        out.append(
+            {"username": f["username"], "display_name": f["display_name"], "avatar": f["avatar"]}
+        )
+    return out
+
+
 @app.get("/api/profile/{username}")
 def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     row = conn.execute(
@@ -298,6 +339,22 @@ def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn
         raise HTTPException(404, "no such user")
     out = profile_dict(row, user["id"])
     out["blocked"] = i_blocked(conn, user["id"], row["id"])
+    out["top_friends"] = top_friends_for(conn, row, user["id"])
+    theirs = friend_ids(conn, row["id"])
+    out["friend_count"] = len(theirs)
+    if row["id"] != user["id"]:
+        out["friend"] = friend_status(conn, user["id"], row["id"])
+        out["mutual_friends"] = len(theirs & friend_ids(conn, user["id"]))
+        # one row per visitor, so refreshing doesn't inflate the counter
+        conn.execute(
+            "INSERT INTO profile_visits (profile_id, visitor_id) VALUES (?, ?) "
+            "ON CONFLICT (profile_id, visitor_id) DO UPDATE SET last_visit = CURRENT_TIMESTAMP",
+            (row["id"], user["id"]),
+        )
+        conn.commit()
+    out["visitors"] = conn.execute(
+        "SELECT COUNT(*) FROM profile_visits WHERE profile_id = ?", (row["id"],)
+    ).fetchone()[0]
     return out
 
 
@@ -322,6 +379,8 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
             if value and not ACCENT_RE.match(value):
                 raise HTTPException(400, "accent must look like #ff9933")
             updates[field] = value.lower()
+        elif field == "top_friends":
+            updates[field] = json.dumps(top_friend_names(conn, user["id"], value))
     if updates:
         # column names come from the fixed set above, never from the request
         sets = ", ".join(f"{col} = ?" for col in updates)
@@ -329,10 +388,7 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
             f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"])
         )
         conn.commit()
-    row = conn.execute(
-        f"SELECT {PROFILE_COLUMNS} FROM users WHERE id = ?", (user["id"],)
-    ).fetchone()
-    return profile_dict(row, user["id"])
+    return get_profile(user["username"], user, conn)
 
 
 # ---------- friends ----------
@@ -351,6 +407,16 @@ def friend_status(conn, me_id: int, other_id: int) -> str:
     if row["status"] == "accepted":
         return "friends"
     return "outgoing" if row["requester_id"] == me_id else "incoming"
+
+
+def friend_ids(conn, user_id: int) -> set[int]:
+    rows = conn.execute(
+        "SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END "
+        "FROM friendships WHERE status = 'accepted' "
+        "AND (requester_id = :me OR addressee_id = :me)",
+        {"me": user_id},
+    ).fetchall()
+    return {r[0] for r in rows}
 
 
 def other_user(conn, user, username: str):
