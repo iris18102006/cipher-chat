@@ -1,0 +1,99 @@
+/* profile themes. Each one only changes the --p-* variables from profile.css.
+   The names here have to match THEMES in backend/main.py. */
+
+#profile-card.theme-classic {
+  /* the defaults in profile.css, listed so the picker has something to preview */
+  --p-page: #eef3fb;
+  --p-card: #ffffff;
+}
+
+#profile-card.theme-emo {
+  --p-page: #1b1b22;
+  --p-card: #26262f;
+  --p-text: #f1e9f5;
+  --p-muted: #a99bb5;
+  --p-head-a: #3a1d3f;
+  --p-head-b: #120912;
+  --p-head-text: #ffd1f0;
+  --p-accent: #ff2e93;
+  --p-border: #6b3a63;
+  --p-font: "Trebuchet MS", Verdana, sans-serif;
+}
+
+#profile-card.theme-kawaii {
+  --p-page: #ffeaf4;
+  --p-card: #fff8fc;
+  --p-text: #5a2d4a;
+  --p-muted: #a0708f;
+  --p-head-a: #ffb3d9;
+  --p-head-b: #ff8ec7;
+  --p-head-text: #ffffff;
+  --p-accent: #ff6fb5;
+  --p-border: #ffb3d9;
+  --p-font: "Comic Sans MS", "Chalkboard SE", Verdana, sans-serif;
+}
+
+#profile-card.theme-neon {
+  --p-page: #08051a;
+  --p-card: #120a2e;
+  --p-text: #e8fbff;
+  --p-muted: #7fb7c9;
+  --p-head-a: #2d0a6b;
+  --p-head-b: #0a1a4a;
+  --p-head-text: #00f0ff;
+  --p-accent: #39ff14;
+  --p-border: #00f0ff;
+  --p-font: "Courier New", monospace;
+}
+
+#profile-card.theme-forest {
+  --p-page: #e4efe0;
+  --p-card: #f6fbf3;
+  --p-text: #1d3321;
+  --p-muted: #5d7a60;
+  --p-head-a: #4f8a54;
+  --p-head-b: #2c5a31;
+  --p-head-text: #f2ffe9;
+  --p-accent: #c98b2b;
+  --p-border: #7aa67e;
+  --p-font: Georgia, "Times New Roman", serif;
+}
+
+#profile-card.theme-sunset {
+  --p-page: #fff0e0;
+  --p-card: #fffaf4;
+  --p-text: #4a2312;
+  --p-muted: #9b6b52;
+  --p-head-a: #ff8a3d;
+  --p-head-b: #d9296b;
+  --p-head-text: #ffffff;
+  --p-accent: #7a2cff;
+  --p-border: #ffb27a;
+  --p-font: Verdana, Tahoma, sans-serif;
+}
+
+#profile-card.theme-gothic {
+  --p-page: #0d0d0f;
+  --p-card: #17171b;
+  --p-text: #e6e0d4;
+  --p-muted: #8c8577;
+  --p-head-a: #4a0d12;
+  --p-head-b: #1c0508;
+  --p-head-text: #e6e0d4;
+  --p-accent: #b3122a;
+  --p-border: #4a0d12;
+  --p-font: Georgia, "Times New Roman", serif;
+}
+
+#profile-card.theme-terminal {
+  --p-page: #000000;
+  --p-card: #031403;
+  --p-text: #33ff66;
+  --p-muted: #1fa443;
+  --p-head-a: #052a0c;
+  --p-head-b: #052a0c;
+  --p-head-text: #33ff66;
+  --p-accent: #ffd633;
+  --p-border: #1fa443;
+  --p-font: "Courier New", monospace;
+}
