@@ -82,6 +82,7 @@ function renderProfile(p) {
     edit.onclick = () => renderEditor(p);
     actions.append(edit);
   }
+  addSocialButtons(p, actions);
   body.append(actions);
 
   body.append(section("About me", p.about_me));

@@ -297,3 +297,16 @@
   border-color: var(--p-accent);
   box-shadow: 0 0 0 2px var(--p-accent);
 }
+
+/* friend buttons */
+
+.pf-actions button.static {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.pf-inline-error {
+  align-self: center;
+  font-size: 11px;
+  color: #c33;
+}
