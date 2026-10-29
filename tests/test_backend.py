@@ -156,3 +156,55 @@ def test_last_seen_set_on_disconnect(client):
         wa.receive_json()
     people = b.get("/api/contacts").json()
     assert people[0]["online"] is False and people[0]["last_seen"]
+
+
+# ---------- profiles ----------
+
+
+def test_profile_defaults_and_update(client):
+    a = signup(client, "alice")
+    p = a.get("/api/profile/alice").json()
+    assert p["me"] is True and p["theme"] == "classic" and p["display_name"] == ""
+    r = a.put(
+        "/api/profile",
+        json={"display_name": "  Ali  ", "mood": "happy", "about_me": "line1\nline2", "avatar": "🦄", "theme": "emo", "accent": "#FF00AA"},
+    )
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert p["display_name"] == "Ali" and p["about_me"] == "line1\nline2"
+    assert p["avatar"] == "🦄" and p["theme"] == "emo" and p["accent"] == "#ff00aa"
+
+
+def test_profile_partial_update_keeps_other_fields(client):
+    a = signup(client, "alice")
+    a.put("/api/profile", json={"mood": "chill", "song": "some song"})
+    p = a.put("/api/profile", json={"mood": "busy"}).json()
+    assert p["mood"] == "busy" and p["song"] == "some song"
+
+
+def test_profile_validation(client):
+    a = signup(client, "alice")
+    assert a.put("/api/profile", json={"theme": "nope"}).status_code == 400
+    assert a.put("/api/profile", json={"accent": "red"}).status_code == 400
+    assert a.put("/api/profile", json={"avatar": "abc"}).status_code == 400
+    assert a.put("/api/profile", json={"display_name": "x" * 31}).status_code == 400
+    assert a.put("/api/profile", json={"about_me": "x" * 601}).status_code == 400
+    # an empty accent resets back to the theme colour
+    assert a.put("/api/profile", json={"accent": ""}).status_code == 200
+
+
+def test_profile_text_is_stored_as_plain_text(client):
+    a = signup(client, "alice")
+    p = a.put("/api/profile", json={"headline": "<script>x</script>\x00hi"}).json()
+    # stored as typed (minus control chars), the browser renders it with textContent
+    assert p["headline"] == "<script>x</script>hi"
+
+
+def test_view_someone_elses_profile(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.put("/api/profile", json={"headline": "hello world"})
+    p = b.get("/api/profile/alice").json()
+    assert p["headline"] == "hello world" and p["me"] is False
+    assert b.get("/api/profile/ghost").status_code == 404
+    assert client.get("/api/profile/alice").status_code == 401
+    assert b.put("/api/profile", json={"mood": "x"}).status_code == 200
