@@ -261,6 +261,78 @@ def me(user=Depends(current_user)):
     return {"username": user["username"]}
 
 
+# ---------- profiles ----------
+
+PROFILE_COLUMNS = (
+    "id, username, display_name, mood, headline, about_me, interests, "
+    "location, song, avatar, theme, accent, created_at, last_seen"
+)
+
+
+def profile_dict(row, viewer_id: int) -> dict:
+    return {
+        "username": row["username"],
+        "display_name": row["display_name"],
+        "mood": row["mood"],
+        "headline": row["headline"],
+        "about_me": row["about_me"],
+        "interests": row["interests"],
+        "location": row["location"],
+        "song": row["song"],
+        "avatar": row["avatar"],
+        "theme": row["theme"],
+        "accent": row["accent"],
+        "joined": row["created_at"],
+        "last_seen": row["last_seen"],
+        "online": manager.is_online(row["username"]),
+        "me": row["id"] == viewer_id,
+    }
+
+
+@app.get("/api/profile/{username}")
+def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        f"SELECT {PROFILE_COLUMNS} FROM users WHERE username = ?", (username.lower(),)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "no such user")
+    return profile_dict(row, user["id"])
+
+
+@app.put("/api/profile")
+def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_conn)):
+    changes = body.model_dump(exclude_unset=True)
+    updates: dict[str, str] = {}
+    for field, value in changes.items():
+        if value is None:
+            continue
+        if field in PROFILE_LIMITS:
+            updates[field] = clean_text(
+                value, PROFILE_LIMITS[field], field, multiline=field == "about_me"
+            )
+        elif field == "avatar":
+            updates[field] = clean_avatar(value)
+        elif field == "theme":
+            if value not in THEMES:
+                raise HTTPException(400, "unknown theme")
+            updates[field] = value
+        elif field == "accent":
+            if value and not ACCENT_RE.match(value):
+                raise HTTPException(400, "accent must look like #ff9933")
+            updates[field] = value.lower()
+    if updates:
+        # column names come from the fixed set above, never from the request
+        sets = ", ".join(f"{col} = ?" for col in updates)
+        conn.execute(
+            f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"])
+        )
+        conn.commit()
+    row = conn.execute(
+        f"SELECT {PROFILE_COLUMNS} FROM users WHERE id = ?", (user["id"],)
+    ).fetchone()
+    return profile_dict(row, user["id"])
+
+
 # ---------- keys, contacts, history ----------
 
 
