@@ -155,14 +155,16 @@ function renderBuddies() {
   ul.replaceChildren();
   let shown = 0;
   for (const name of state.order) {
-    if (q && !name.includes(q)) continue;
     const c = state.contacts.get(name);
+    if (q && !name.includes(q) && !shownName(c).toLowerCase().includes(q)) continue;
     const li = el("li", name === state.open ? "active" : "");
     li.dataset.user = name;
     li.append(el("span", "dot " + (c.online ? "on" : "off")));
+    li.append(el("span", "buddy-avatar", avatarFor(c)));
     const info = el("div", "buddy-info");
-    info.append(el("div", "buddy-name", name));
+    info.append(el("div", "buddy-name", shownName(c)));
     info.append(el("div", "buddy-sub", c.typing ? "typing..." : c.online ? "online" : lastSeenText(c)));
+    if (c.mood) info.append(el("div", "buddy-mood", c.mood));
     li.append(info);
     if (c.unread > 0) li.append(el("span", "badge", c.unread > 99 ? "99+" : String(c.unread)));
     li.onclick = () => openChat(name);
@@ -179,7 +181,8 @@ function renderBuddies() {
 function renderChatHeader() {
   const c = state.contacts.get(state.open);
   if (!c) return;
-  $("chat-name").textContent = c.username;
+  $("chat-name").textContent = shownName(c);
+  $("chat-name").title = "@" + c.username;
   const status = c.typing ? "typing..." : lastSeenText(c);
   $("chat-status").textContent = status;
   $("chat-status").className = c.online ? "online" : "";

@@ -536,3 +536,20 @@ h2 {
     animation: none;
   }
 }
+
+/* avatars and moods in the buddy list */
+
+.buddy-avatar {
+  flex-shrink: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.buddy-mood {
+  overflow: hidden;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--blue-light);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
