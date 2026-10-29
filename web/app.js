@@ -5,7 +5,7 @@ const state = {
   me: null,
   identity: null,
   myPub: null,
-  contacts: new Map(), // username -> { username, pub, online, last_seen, unread, typing, changed }
+  contacts: new Map(), // username -> { username, display_name, avatar, mood, friend, blocked, pub, online, last_seen, unread, typing, changed }
   order: [], // usernames, most recent conversation first
   msgs: new Map(), // username -> [{ id, from, text, ts, delivered, read, failed }]
   hasOlder: new Map(),
@@ -119,6 +119,11 @@ async function loadContacts() {
     const old = prev.get(row.username);
     const c = {
       username: row.username,
+      display_name: row.display_name,
+      avatar: row.avatar,
+      mood: row.mood,
+      friend: row.friend, // none | friends | outgoing | incoming
+      blocked: row.blocked,
       pub: row.pub,
       online: row.online,
       last_seen: row.last_seen,
