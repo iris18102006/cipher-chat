@@ -294,9 +294,11 @@ def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn
     row = conn.execute(
         f"SELECT {PROFILE_COLUMNS} FROM users WHERE username = ?", (username.lower(),)
     ).fetchone()
-    if not row:
+    if not row or i_blocked(conn, row["id"], user["id"]):
         raise HTTPException(404, "no such user")
-    return profile_dict(row, user["id"])
+    out = profile_dict(row, user["id"])
+    out["blocked"] = i_blocked(conn, user["id"], row["id"])
+    return out
 
 
 @app.put("/api/profile")
@@ -391,6 +393,8 @@ def list_friends(user=Depends(current_user), conn=Depends(get_conn)):
 @app.post("/api/friends/{username}")
 def add_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     peer = other_user(conn, user, username)
+    if blocked_either_way(conn, user["id"], peer["id"]):
+        raise HTTPException(403, "you can't send a friend request to this user")
     status = friend_status(conn, user["id"], peer["id"])
     if status == "incoming":
         # they already asked me, so asking back just means yes
@@ -430,6 +434,65 @@ def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_co
     )
     conn.commit()
     return {"status": "none"}
+
+
+# ---------- blocking ----------
+
+
+def i_blocked(conn, me_id: int, other_id: int) -> bool:
+    return (
+        conn.execute(
+            "SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+            (me_id, other_id),
+        ).fetchone()
+        is not None
+    )
+
+
+def blocked_either_way(conn, a: int, b: int) -> bool:
+    return i_blocked(conn, a, b) or i_blocked(conn, b, a)
+
+
+@app.get("/api/blocks")
+def list_blocks(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        "SELECT u.username, u.display_name, u.avatar FROM blocks b "
+        "JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ? "
+        "ORDER BY u.username",
+        (user["id"],),
+    ).fetchall()
+    return [
+        {"username": r["username"], "display_name": r["display_name"], "avatar": r["avatar"]}
+        for r in rows
+    ]
+
+
+@app.post("/api/blocks/{username}")
+def block_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    conn.execute(
+        "INSERT OR IGNORE INTO blocks (blocker_id, blocked_id) VALUES (?, ?)",
+        (user["id"], peer["id"]),
+    )
+    # blocking someone also ends the friendship / any pending request
+    conn.execute(
+        "DELETE FROM friendships WHERE (requester_id = :a AND addressee_id = :b) "
+        "OR (requester_id = :b AND addressee_id = :a)",
+        {"a": user["id"], "b": peer["id"]},
+    )
+    conn.commit()
+    return {"blocked": True}
+
+
+@app.delete("/api/blocks/{username}")
+def unblock_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    conn.execute(
+        "DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+        (user["id"], peer["id"]),
+    )
+    conn.commit()
+    return {"blocked": False}
 
 
 # ---------- keys, contacts, history ----------
