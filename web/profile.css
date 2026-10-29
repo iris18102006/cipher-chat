@@ -96,8 +96,10 @@
 
 .pf-name {
   margin: 0;
+  padding: 0;
   font-size: 20px;
   color: var(--p-accent);
+  background: none; /* style.css gives every h2 the orange bar */
   overflow-wrap: anywhere;
 }
 
