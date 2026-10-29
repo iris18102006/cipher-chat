@@ -258,3 +258,94 @@ def test_friend_edge_cases(client):
     assert a.post("/api/friends/alice").status_code == 400
     assert a.post("/api/friends/ghost").status_code == 404
     assert client.post("/api/friends/alice").status_code == 401
+
+
+# ---------- blocking ----------
+
+
+def test_block_unblock_and_list(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    assert a.post("/api/blocks/bob").json() == {"blocked": True}
+    assert [x["username"] for x in a.get("/api/blocks").json()] == ["bob"]
+    # blocking ends the friendship for both
+    assert a.get("/api/friends").json()["friends"] == []
+    assert b.get("/api/friends").json()["friends"] == []
+    assert a.post("/api/blocks/bob").status_code == 200  # blocking twice is fine
+    assert a.delete("/api/blocks/bob").json() == {"blocked": False}
+    assert a.get("/api/blocks").json() == []
+    assert a.post("/api/blocks/alice").status_code == 400
+
+
+def test_friend_requests_cant_cross_a_block(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    assert a.post("/api/friends/bob").status_code == 403
+    assert b.post("/api/friends/alice").status_code == 403
+
+
+def test_blocked_user_cant_see_profile_blocker_still_can(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    assert b.get("/api/profile/alice").status_code == 404
+    p = a.get("/api/profile/bob").json()
+    assert p["blocked"] is True
+
+
+def test_contacts_show_relationship_and_hide_presence_from_blockers(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.put("/api/profile", json={"display_name": "Ali", "avatar": "🦄"})
+    a.post("/api/friends/bob")
+    row = b.get("/api/contacts").json()[0]
+    assert row["display_name"] == "Ali" and row["avatar"] == "🦄"
+    assert row["friend"] == "incoming" and row["blocked"] is False
+    assert a.get("/api/contacts").json()[0]["friend"] == "outgoing"
+    b.post("/api/blocks/alice")
+    assert b.get("/api/contacts").json()[0]["blocked"] is True
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        wb.receive_json()
+        seen = a.get("/api/contacts").json()[0]
+        assert seen["online"] is False and seen["last_seen"] is None
+
+
+def test_messages_to_someone_who_blocked_you_are_hidden(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/blocks/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+            wb.receive_json()
+            wa.send_json({"type": "typing", "to": "bob", "state": True})
+            wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+            echo = wa.receive_json()
+            # alice isn't told anything, it just looks sent
+            assert echo["type"] == "msg" and echo["delivered"] is False
+            # bob's socket got nothing, the next frame he sees is his own pong
+            wb.send_json({"type": "ping"})
+            assert wb.receive_json() == {"type": "pong"}
+    assert len(a.get("/api/messages/bob").json()) == 1
+    assert b.get("/api/messages/alice").json() == []
+    assert b.get("/api/contacts").json()[0]["unread"] == 0
+
+
+def test_cant_send_to_someone_you_blocked(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+        wa.send_json({"type": "ping"})
+        assert wa.receive_json() == {"type": "pong"}
+    assert a.get("/api/messages/bob").json() == []
+
+
+def test_unblocking_does_not_reveal_old_hidden_messages(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/blocks/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+        wa.receive_json()
+    b.delete("/api/blocks/alice")
+    assert b.get("/api/messages/alice").json() == []
