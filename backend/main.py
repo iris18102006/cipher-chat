@@ -457,14 +457,14 @@ def list_friends(user=Depends(current_user), conn=Depends(get_conn)):
 
 
 @app.post("/api/friends/{username}")
-def add_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+async def add_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     peer = other_user(conn, user, username)
     if blocked_either_way(conn, user["id"], peer["id"]):
         raise HTTPException(403, "you can't send a friend request to this user")
     status = friend_status(conn, user["id"], peer["id"])
     if status == "incoming":
         # they already asked me, so asking back just means yes
-        return accept_friend(username, user, conn)
+        return await accept_friend(username, user, conn)
     if status == "none":
         conn.execute(
             "INSERT INTO friendships (requester_id, addressee_id) VALUES (?, ?)",
@@ -472,11 +472,14 @@ def add_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)
         )
         conn.commit()
         status = "outgoing"
+        await manager.send_user(
+            peer["username"], {"type": "social", "event": "request", "from": user["username"]}
+        )
     return {"status": status}
 
 
 @app.post("/api/friends/{username}/accept")
-def accept_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+async def accept_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     peer = other_user(conn, user, username)
     cur = conn.execute(
         "UPDATE friendships SET status = 'accepted' "
@@ -486,11 +489,15 @@ def accept_friend(username: str, user=Depends(current_user), conn=Depends(get_co
     conn.commit()
     if cur.rowcount == 0 and friend_status(conn, user["id"], peer["id"]) != "friends":
         raise HTTPException(404, "no friend request from that user")
+    if cur.rowcount:
+        await manager.send_user(
+            peer["username"], {"type": "social", "event": "accepted", "from": user["username"]}
+        )
     return {"status": "friends"}
 
 
 @app.delete("/api/friends/{username}")
-def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+async def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     """Unfriend, cancel a request I sent, or decline one I got."""
     peer = other_user(conn, user, username)
     conn.execute(
@@ -499,6 +506,9 @@ def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_co
         {"a": user["id"], "b": peer["id"]},
     )
     conn.commit()
+    await manager.send_user(
+        peer["username"], {"type": "social", "event": "removed", "from": user["username"]}
+    )
     return {"status": "none"}
 
 
@@ -530,6 +540,13 @@ def blocked_names(conn, user_id: int) -> set[str]:
     return {r["username"] for r in rows}
 
 
+async def notify_block_change(me: str, other: str):
+    """Tell my other tabs, and quietly nudge the other person to refresh their
+    buddy list (their view of my presence just changed). Nothing says who blocked."""
+    await manager.send_user(me, {"type": "social", "event": "refresh", "from": other})
+    await manager.send_user(other, {"type": "social", "event": "refresh", "from": me})
+
+
 @app.get("/api/blocks")
 def list_blocks(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
@@ -545,7 +562,7 @@ def list_blocks(user=Depends(current_user), conn=Depends(get_conn)):
 
 
 @app.post("/api/blocks/{username}")
-def block_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+async def block_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     peer = other_user(conn, user, username)
     conn.execute(
         "INSERT OR IGNORE INTO blocks (blocker_id, blocked_id) VALUES (?, ?)",
@@ -558,17 +575,19 @@ def block_user(username: str, user=Depends(current_user), conn=Depends(get_conn)
         {"a": user["id"], "b": peer["id"]},
     )
     conn.commit()
+    await notify_block_change(user["username"], peer["username"])
     return {"blocked": True}
 
 
 @app.delete("/api/blocks/{username}")
-def unblock_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+async def unblock_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     peer = other_user(conn, user, username)
     conn.execute(
         "DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
         (user["id"], peer["id"]),
     )
     conn.commit()
+    await notify_block_change(user["username"], peer["username"])
     return {"blocked": False}
 
 
