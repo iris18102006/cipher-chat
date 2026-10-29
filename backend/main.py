@@ -453,6 +453,17 @@ def blocked_either_way(conn, a: int, b: int) -> bool:
     return i_blocked(conn, a, b) or i_blocked(conn, b, a)
 
 
+def blocked_names(conn, user_id: int) -> set[str]:
+    """Usernames I blocked plus usernames that blocked me."""
+    rows = conn.execute(
+        "SELECT username FROM users WHERE id IN ("
+        "SELECT blocked_id FROM blocks WHERE blocker_id = :me "
+        "UNION SELECT blocker_id FROM blocks WHERE blocked_id = :me)",
+        {"me": user_id},
+    ).fetchall()
+    return {r["username"] for r in rows}
+
+
 @app.get("/api/blocks")
 def list_blocks(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
@@ -516,9 +527,9 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
         SELECT u.username, u.public_key, u.last_seen,
                (SELECT COUNT(*) FROM messages m
                  WHERE m.sender_id = u.id AND m.recipient_id = :me
-                   AND m.read_at IS NULL) AS unread,
+                   AND m.read_at IS NULL AND m.hidden = 0) AS unread,
                (SELECT MAX(m.id) FROM messages m
-                 WHERE (m.sender_id = u.id AND m.recipient_id = :me)
+                 WHERE (m.sender_id = u.id AND m.recipient_id = :me AND m.hidden = 0)
                     OR (m.sender_id = :me AND m.recipient_id = u.id)) AS last_msg
         FROM users u
         WHERE u.id != :me
@@ -554,6 +565,7 @@ def history(
         FROM messages m JOIN users u ON u.id = m.sender_id
         WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
             OR (m.sender_id = :peer AND m.recipient_id = :me))
+          AND NOT (m.recipient_id = :me AND m.hidden = 1)
           AND (:before IS NULL OR m.id < :before)
         ORDER BY m.id DESC LIMIT :limit
         """,
@@ -595,9 +607,11 @@ class Manager:
                 self.sockets[username].discard(ws)
         return sent
 
-    async def broadcast(self, payload: dict, skip: str | None = None):
+    async def broadcast(self, payload: dict, skip: str | set[str] | None = None):
+        if isinstance(skip, str):
+            skip = {skip}
         for name in list(self.sockets):
-            if name != skip:
+            if name not in (skip or ()):
                 await self.send_user(name, payload)
 
 
@@ -635,19 +649,20 @@ async def websocket_endpoint(ws: WebSocket):
         manager.sockets[me].add(ws)
         if first_tab:
             await manager.broadcast(
-                {"type": "presence", "user": me, "online": True}, skip=me
+                {"type": "presence", "user": me, "online": True},
+                skip={me} | blocked_names(conn, my_id),
             )
 
         # anything sent while we were offline now counts as delivered
         pending = conn.execute(
             "SELECT m.id, u.username FROM messages m JOIN users u ON u.id = m.sender_id "
-            "WHERE m.recipient_id = ? AND m.delivered_at IS NULL",
+            "WHERE m.recipient_id = ? AND m.delivered_at IS NULL AND m.hidden = 0",
             (my_id,),
         ).fetchall()
         if pending:
             conn.execute(
                 "UPDATE messages SET delivered_at = datetime('now') "
-                "WHERE recipient_id = ? AND delivered_at IS NULL",
+                "WHERE recipient_id = ? AND delivered_at IS NULL AND hidden = 0",
                 (my_id,),
             )
             conn.commit()
@@ -680,6 +695,8 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
 
             if kind == "typing":
+                if blocked_either_way(conn, my_id, peer["id"]):
+                    continue
                 await manager.send_user(
                     peer["username"],
                     {"type": "typing", "from": me, "state": bool(data.get("state"))},
@@ -691,10 +708,15 @@ async def websocket_endpoint(ws: WebSocket):
                     continue
                 if len(iv) > 32 or not ct or len(ct) > MAX_CT_LEN:
                     continue
+                if i_blocked(conn, my_id, peer["id"]):
+                    continue  # you blocked them, unblock to talk again
+                # if they blocked me the message is kept (my history stays whole)
+                # but hidden from them, and I'm not told
+                hidden = 1 if i_blocked(conn, peer["id"], my_id) else 0
                 cur = conn.execute(
-                    "INSERT INTO messages (sender_id, recipient_id, iv, ct) "
-                    "VALUES (?, ?, ?, ?)",
-                    (my_id, peer["id"], iv, ct),
+                    "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (my_id, peer["id"], iv, ct, hidden),
                 )
                 msg_id = cur.lastrowid
                 conn.commit()
@@ -711,7 +733,7 @@ async def websocket_endpoint(ws: WebSocket):
                     "ts": row["created_at"],
                     "cid": data.get("cid"),
                 }
-                got = await manager.send_user(peer["username"], payload)
+                got = 0 if hidden else await manager.send_user(peer["username"], payload)
                 delivered = got > 0
                 if delivered:
                     conn.execute(
@@ -725,14 +747,15 @@ async def websocket_endpoint(ws: WebSocket):
             elif kind == "read":
                 rows = conn.execute(
                     "SELECT id FROM messages WHERE sender_id = ? AND recipient_id = ? "
-                    "AND read_at IS NULL",
+                    "AND read_at IS NULL AND hidden = 0",
                     (peer["id"], my_id),
                 ).fetchall()
                 if rows:
                     conn.execute(
                         "UPDATE messages SET read_at = datetime('now'), "
                         "delivered_at = COALESCE(delivered_at, datetime('now')) "
-                        "WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL",
+                        "WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL "
+                        "AND hidden = 0",
                         (peer["id"], my_id),
                     )
                     conn.commit()
@@ -770,7 +793,8 @@ async def websocket_endpoint(ws: WebSocket):
                             "user": username,
                             "online": False,
                             "last_seen": now,
-                        }
+                        },
+                        skip=blocked_names(conn, my_id),
                     )
         finally:
             conn.close()
