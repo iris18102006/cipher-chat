@@ -12,16 +12,24 @@ function avatarFor(p) {
 }
 
 let pfCurrent = null; // the profile that is open right now
+let pfReturnFocus = null; // what had focus before the page opened
 
 // ---------- open / close ----------
 
 function closeProfile() {
   $("profile-overlay").hidden = true;
   pfCurrent = null;
+  // put the keyboard back where it was
+  if (pfReturnFocus && document.contains(pfReturnFocus)) pfReturnFocus.focus();
+  pfReturnFocus = null;
 }
 
 async function openProfile(username) {
-  $("profile-overlay").hidden = false;
+  if ($("profile-overlay").hidden) {
+    pfReturnFocus = document.activeElement;
+    $("profile-overlay").hidden = false;
+    $("pf-close").focus();
+  }
   $("pf-body").replaceChildren(el("p", "pf-error", "loading..."));
   try {
     const p = await api("/api/profile/" + encodeURIComponent(username));
