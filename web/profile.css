@@ -220,7 +220,7 @@
 
 .pf-row {
   display: grid;
-  grid-template-columns: 110px 1fr auto;
+  grid-template-columns: 110px 1fr 46px;
   align-items: start;
   gap: 4px 8px;
   margin-bottom: 8px;
@@ -254,4 +254,46 @@
 .pf-form .pf-error {
   padding: 0 0 6px;
   text-align: left;
+}
+
+/* avatar / theme / accent pickers */
+
+.pf-row.wide .pf-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pf-choice {
+  min-width: 34px;
+  padding: 3px 6px;
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 2px solid var(--p-border);
+  border-radius: 6px;
+}
+
+.pf-choice:hover:not(:disabled) {
+  background: var(--p-page);
+  border-color: var(--p-accent);
+}
+
+.pf-choice.text {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.pf-choice.swatch {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.pf-choice.on {
+  border-color: var(--p-accent);
+  box-shadow: 0 0 0 2px var(--p-accent);
 }

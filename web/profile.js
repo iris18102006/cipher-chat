@@ -132,6 +132,41 @@ function textRow(form, [field, label, max, multiline, hint], value) {
   return input;
 }
 
+const AVATARS = [
+  "🦄", "🐱", "🐶", "🦊", "🐼", "🐸", "🐙", "🦋",
+  "🌸", "🌙", "⭐", "🔥", "💀", "👾", "🤖", "👻",
+  "🎧", "🎮", "🎸", "📚", "☕", "🍕", "🍓", "🌈",
+  "⚡", "🖤", "💜", "🐞", "🦇", "🌵", "🍄", "🪐",
+];
+// [id, label], ids match THEMES in backend/main.py
+const THEME_CHOICES = [
+  ["classic", "Classic"], ["emo", "Emo"], ["kawaii", "Kawaii"], ["neon", "Neon"],
+  ["forest", "Forest"], ["sunset", "Sunset"], ["gothic", "Gothic"], ["terminal", "Terminal"],
+];
+const ACCENTS = ["#ff9933", "#ff2e93", "#39ff14", "#00b7ff", "#7a2cff", "#e6b800", "#e63946", "#2ec27e"];
+
+// a row of buttons where exactly one is selected
+function choiceRow(title, hint) {
+  const row = el("div", "pf-row wide");
+  row.append(el("label", "", title));
+  const box = el("div", "pf-picker");
+  row.append(box);
+  if (hint) row.append(el("span", "pf-count", hint));
+  return { row, box };
+}
+
+function choiceButton(box, label, selected, onPick, extraClass) {
+  const b = el("button", "pf-choice" + (extraClass ? " " + extraClass : "") + (selected ? " on" : ""), label);
+  b.type = "button";
+  b.onclick = () => {
+    for (const other of box.children) other.classList.remove("on");
+    b.classList.add("on");
+    onPick();
+  };
+  box.append(b);
+  return b;
+}
+
 async function saveProfile(changes) {
   const res = await fetch("/api/profile", {
     method: "PUT",
@@ -155,7 +190,43 @@ function renderEditor(p) {
   const form = el("form", "pf-form");
   form.autocomplete = "off";
   const inputs = {};
+  // what's picked so far, applied to the card live so you see it before saving
+  const look = { avatar: p.avatar, theme: p.theme, accent: p.accent };
+  const preview = () => applyTheme($("profile-card"), look.theme, look.accent);
+
   for (const f of TEXT_FIELDS) inputs[f[0]] = textRow(form, f, p[f[0]]);
+
+  const av = choiceRow("Avatar");
+  choiceButton(av.box, "none", !look.avatar, () => (look.avatar = ""), "text");
+  for (const emoji of AVATARS) {
+    choiceButton(av.box, emoji, look.avatar === emoji, () => (look.avatar = emoji));
+  }
+  form.append(av.row);
+
+  const th = choiceRow("Theme");
+  for (const [id, label] of THEME_CHOICES) {
+    choiceButton(th.box, label, look.theme === id, () => {
+      look.theme = id;
+      preview();
+    }, "text");
+  }
+  form.append(th.row);
+
+  const ac = choiceRow("Accent colour", "optional");
+  choiceButton(ac.box, "theme's own", !look.accent, () => {
+    look.accent = "";
+    preview();
+  }, "text");
+  for (const color of ACCENTS) {
+    const b = choiceButton(ac.box, "", look.accent === color, () => {
+      look.accent = color;
+      preview();
+    }, "swatch");
+    b.style.background = color;
+    b.title = color;
+    b.setAttribute("aria-label", "accent " + color);
+  }
+  form.append(ac.row);
 
   const err = el("p", "pf-error");
   const bar = el("div", "pf-actions");
@@ -173,6 +244,9 @@ function renderEditor(p) {
     save.disabled = true;
     const changes = {};
     for (const [field] of TEXT_FIELDS) changes[field] = inputs[field].value;
+    changes.avatar = look.avatar || "";
+    changes.theme = look.theme;
+    changes.accent = look.accent || "";
     try {
       pfCurrent = await saveProfile(changes);
       renderProfile(pfCurrent);
