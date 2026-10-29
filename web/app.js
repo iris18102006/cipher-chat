@@ -149,27 +149,50 @@ function totalUnread() {
   return n;
 }
 
+// buddy list sections, in the order they're shown
+const BUDDY_GROUPS = [
+  ["requests", "Friend requests"],
+  ["friends", "Friends"],
+  ["people", "People"],
+  ["blocked", "Blocked"],
+];
+
+function groupOf(c) {
+  if (c.blocked) return "blocked";
+  if (c.friend === "incoming") return "requests";
+  if (c.friend === "friends") return "friends";
+  return "people";
+}
+
+function buddyRow(c) {
+  const li = el("li", c.username === state.open ? "active" : "");
+  li.dataset.user = c.username;
+  li.append(el("span", "dot " + (c.online ? "on" : "off")));
+  li.append(el("span", "buddy-avatar", avatarFor(c)));
+  const info = el("div", "buddy-info");
+  info.append(el("div", "buddy-name", shownName(c)));
+  info.append(el("div", "buddy-sub", c.typing ? "typing..." : c.online ? "online" : lastSeenText(c)));
+  if (c.mood) info.append(el("div", "buddy-mood", c.mood));
+  li.append(info);
+  if (c.unread > 0) li.append(el("span", "badge", c.unread > 99 ? "99+" : String(c.unread)));
+  li.onclick = () => openChat(c.username);
+  return li;
+}
+
 function renderBuddies() {
   const q = $("search").value.trim().toLowerCase();
   const ul = $("buddy-list");
   ul.replaceChildren();
   let shown = 0;
-  for (const name of state.order) {
-    const c = state.contacts.get(name);
-    if (q && !name.includes(q) && !shownName(c).toLowerCase().includes(q)) continue;
-    const li = el("li", name === state.open ? "active" : "");
-    li.dataset.user = name;
-    li.append(el("span", "dot " + (c.online ? "on" : "off")));
-    li.append(el("span", "buddy-avatar", avatarFor(c)));
-    const info = el("div", "buddy-info");
-    info.append(el("div", "buddy-name", shownName(c)));
-    info.append(el("div", "buddy-sub", c.typing ? "typing..." : c.online ? "online" : lastSeenText(c)));
-    if (c.mood) info.append(el("div", "buddy-mood", c.mood));
-    li.append(info);
-    if (c.unread > 0) li.append(el("span", "badge", c.unread > 99 ? "99+" : String(c.unread)));
-    li.onclick = () => openChat(name);
-    ul.append(li);
-    shown++;
+  for (const [key, title] of BUDDY_GROUPS) {
+    const rows = state.order
+      .map((name) => state.contacts.get(name))
+      .filter((c) => groupOf(c) === key)
+      .filter((c) => !q || c.username.includes(q) || shownName(c).toLowerCase().includes(q));
+    if (!rows.length) continue;
+    ul.append(el("li", "group " + key, title + " (" + rows.length + ")"));
+    for (const c of rows) ul.append(buddyRow(c));
+    shown += rows.length;
   }
   $("buddy-empty").hidden = shown > 0 || q !== "";
   const n = totalUnread();

@@ -553,3 +553,31 @@ h2 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* buddy list section headers */
+
+#buddy-list li.group {
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--blue);
+  background: var(--mist);
+  border-bottom: 1px solid #c5d4ea;
+  cursor: default;
+}
+
+#buddy-list li.group:hover {
+  background: var(--mist);
+}
+
+#buddy-list li.group.requests {
+  color: #fff;
+  background: var(--orange-dark);
+}
+
+#buddy-list li.group.blocked {
+  color: #fff;
+  background: #8a8fa0;
+}
