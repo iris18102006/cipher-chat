@@ -1,4 +1,4 @@
-// Friend requests as buttons on someone's profile.
+// Friend requests and blocking as buttons on someone's profile.
 // Loaded after profile.js. Uses $, el, api, state, loadContacts, openChat from app.js
 // and openProfile / closeProfile from profile.js.
 
@@ -45,6 +45,18 @@ function addSocialButtons(p, actions) {
   } else if (p.friend === "friends") {
     actions.append(socialButton("\u2713 Friends", () => {}, "static"));
     actions.append(socialButton("Unfriend", go("DELETE", base)));
+  }
+
+  // blocking works from here too, so you can unblock someone without opening their chat
+  if (p.blocked) {
+    actions.append(socialButton("Unblock", go("DELETE", "/api/blocks/" + encodeURIComponent(p.username))));
+  } else {
+    actions.append(
+      socialButton("Block", () => {
+        if (!confirm("Block " + shownName(p) + "? You'll stop being friends and they won't be able to message you.")) return;
+        go("POST", "/api/blocks/" + encodeURIComponent(p.username))();
+      })
+    );
   }
   actions.append(err);
 }
