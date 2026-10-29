@@ -524,7 +524,8 @@ def put_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
 def contacts(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
         """
-        SELECT u.username, u.public_key, u.last_seen,
+        SELECT u.id, u.username, u.public_key, u.last_seen,
+               u.display_name, u.avatar, u.mood,
                (SELECT COUNT(*) FROM messages m
                  WHERE m.sender_id = u.id AND m.recipient_id = :me
                    AND m.read_at IS NULL AND m.hidden = 0) AS unread,
@@ -537,16 +538,37 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
         """,
         {"me": user["id"]},
     ).fetchall()
-    return [
-        {
-            "username": r["username"],
-            "pub": r["public_key"],
-            "last_seen": r["last_seen"],
-            "online": manager.is_online(r["username"]),
-            "unread": r["unread"],
-        }
-        for r in rows
-    ]
+    mine = {
+        r[0]
+        for r in conn.execute(
+            "SELECT blocked_id FROM blocks WHERE blocker_id = ?", (user["id"],)
+        )
+    }
+    theirs = {
+        r[0]
+        for r in conn.execute(
+            "SELECT blocker_id FROM blocks WHERE blocked_id = ?", (user["id"],)
+        )
+    }
+    out = []
+    for r in rows:
+        # someone who blocked me looks permanently offline, with no last seen
+        hidden = r["id"] in theirs
+        out.append(
+            {
+                "username": r["username"],
+                "display_name": r["display_name"],
+                "avatar": r["avatar"],
+                "mood": r["mood"],
+                "pub": r["public_key"],
+                "last_seen": None if hidden else r["last_seen"],
+                "online": False if hidden else manager.is_online(r["username"]),
+                "unread": r["unread"],
+                "friend": friend_status(conn, user["id"], r["id"]),
+                "blocked": r["id"] in mine,
+            }
+        )
+    return out
 
 
 @app.get("/api/messages/{peer_name}")
