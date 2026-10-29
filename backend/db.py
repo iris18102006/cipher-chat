@@ -81,6 +81,9 @@ def init_db():
         # added after the first version, so migrate old databases in place
         _add_column(conn, "users", "public_key", "TEXT")
         _add_column(conn, "users", "last_seen", "TEXT")
+        # 1 when the recipient had blocked the sender: stored so the sender's own
+        # history stays intact, but never shown or delivered to the recipient
+        _add_column(conn, "messages", "hidden", "INTEGER NOT NULL DEFAULT 0")
         # profile fields, all optional, all plain text (the browser never renders them as html)
         _add_column(conn, "users", "display_name", "TEXT NOT NULL DEFAULT ''")
         _add_column(conn, "users", "mood", "TEXT NOT NULL DEFAULT ''")
