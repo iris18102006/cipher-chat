@@ -482,6 +482,13 @@ async function handleWS(data) {
     const list = state.msgs.get(data.by) || [];
     for (const m of list) if (data.ids.includes(m.id)) m.delivered = m.read = true;
     if (state.open === data.by) renderMessages();
+  } else if (data.type === "social") {
+    // friend request / accepted / removed / block changed: reload the lists
+    await loadContacts();
+    // keep a profile that's open on that person up to date
+    if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
+      openProfile(data.from);
+    }
   } else if (data.type === "read-sync") {
     const c = state.contacts.get(data.peer);
     if (c) {
