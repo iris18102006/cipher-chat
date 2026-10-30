@@ -591,6 +591,26 @@ $("msg").addEventListener("input", () => {
 });
 
 $("search").addEventListener("input", renderBuddies);
+$("add-user-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const username = $("add-username").value.trim().toLowerCase();
+  const err = $("add-user-error");
+  err.hidden = true;
+  err.textContent = "";
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    err.textContent = "enter an exact username";
+    err.hidden = false;
+    return;
+  }
+  try {
+    await openProfile(username);
+    if (!pfCurrent) throw new Error();
+    $("add-username").value = "";
+  } catch {
+    err.textContent = "user not found";
+    err.hidden = false;
+  }
+};
 $("older").onclick = loadOlder;
 
 $("back").onclick = () => {

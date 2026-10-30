@@ -22,7 +22,12 @@
   <div id="app">
     <aside id="buddies">
       <h2>Buddy List</h2>
-      <input id="search" type="text" placeholder="find a friend..." autocomplete="off">
+      <form id="add-user-form" autocomplete="off">
+        <input id="add-username" type="text" maxlength="20" placeholder="add by username..." aria-label="add by username">
+        <button type="submit">Find</button>
+      </form>
+      <p id="add-user-error" hidden></p>
+      <input id="search" type="text" placeholder="filter buddies..." autocomplete="off">
       <ul id="buddy-list"></ul>
       <p id="buddy-empty" hidden>nobody here yet. invite a friend to sign up!</p>
       <p id="my-key" title="your public key fingerprint"></p>

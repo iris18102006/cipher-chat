@@ -141,6 +141,31 @@ h2 {
 
 /* ---------- buddy list ---------- */
 
+
+#add-user-form {
+  display: flex;
+  gap: 5px;
+  margin: 8px 8px 0;
+}
+
+#add-user-form input {
+  min-width: 0;
+  flex: 1;
+  padding: 4px;
+  border: 1px solid var(--line);
+  font: inherit;
+}
+
+#add-user-form button {
+  padding: 4px 8px;
+}
+
+#add-user-error {
+  margin: 4px 8px 0;
+  color: #a33;
+  font-size: 10px;
+}
+
 #search {
   margin: 8px;
   padding: 4px;
