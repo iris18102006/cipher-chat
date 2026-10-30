@@ -75,7 +75,7 @@ This is a learning project, not Signal.
 - [x] Typing, online / last seen, delivered / read
 - [x] Profiles you can customize (no code needed)
 - [x] Friends and blocking
-- [ ] Profile comments / a wall
+- [x] Profile comments / a wall
 - [ ] Image avatars
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
