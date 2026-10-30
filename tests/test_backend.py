@@ -85,6 +85,9 @@ def test_key_upload_validation(client):
     assert a.put("/api/key", json={"pub": "nope"}).status_code == 400
     assert a.put("/api/key", json={"pub": PUB_A}).status_code == 200
     b = signup(client, "bob")
+    # strangers are not contacts; an exact username add creates the relationship first
+    assert b.get("/api/contacts").json() == []
+    b.post("/api/friends/alice")
     people = b.get("/api/contacts").json()
     assert people[0]["username"] == "alice" and people[0]["pub"] == PUB_A
 
@@ -101,6 +104,8 @@ def test_ws_rejects_anonymous_and_cross_origin(client):
 
 def test_message_flow_receipts_and_history(client):
     a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
     with a.websocket_connect("/ws", headers=ORIGIN) as wa:
         assert wa.receive_json()["type"] == "ready"
         with b.websocket_connect("/ws", headers=ORIGIN) as wb:
@@ -127,6 +132,8 @@ def test_message_flow_receipts_and_history(client):
 
 def test_offline_message_delivered_on_connect(client):
     a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
     with a.websocket_connect("/ws", headers=ORIGIN) as wa:
         wa.receive_json()
         wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
@@ -154,10 +161,38 @@ def test_oversized_and_self_messages_dropped(client):
 
 def test_last_seen_set_on_disconnect(client):
     a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/friends/alice")
     with a.websocket_connect("/ws", headers=ORIGIN) as wa:
         wa.receive_json()
     people = b.get("/api/contacts").json()
     assert people[0]["online"] is False and people[0]["last_seen"]
+
+
+
+
+def test_unrelated_users_never_appear_as_contacts(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    assert a.get("/api/contacts").json() == []
+    assert b.get("/api/contacts").json() == []
+    c.post("/api/friends/alice")
+    assert [row["username"] for row in a.get("/api/contacts").json()] == ["carol"]
+    assert b.get("/api/contacts").json() == []
+
+
+def test_custom_profile_style_is_saved_and_validated(client):
+    a = signup(client, "alice")
+    custom = {
+        "page": "#110011", "card": "#220022", "text": "#ffeeff",
+        "font": "comic", "pattern": "hearts", "border_style": "double",
+        "border_width": 5, "radius": 12, "name_effect": "glow", "marquee": True,
+    }
+    r = a.put("/api/profile", json={"custom": custom})
+    assert r.status_code == 200, r.text
+    assert r.json()["custom"] == custom
+    assert a.put("/api/profile", json={"custom": {"font": "javascript:evil"}}).status_code == 400
+    assert a.put("/api/profile", json={"custom": {"page": "red"}}).status_code == 400
+    assert a.put("/api/profile", json={"custom": {"border_width": 99}}).status_code == 400
+    assert a.put("/api/profile", json={"custom": {"raw_css": "body{}"}}).status_code == 400
 
 
 # ---------- profiles ----------
@@ -307,8 +342,9 @@ def test_contacts_show_relationship_and_hide_presence_from_blockers(client):
     assert b.get("/api/contacts").json()[0]["blocked"] is True
     with b.websocket_connect("/ws", headers=ORIGIN) as wb:
         wb.receive_json()
-        seen = a.get("/api/contacts").json()[0]
-        assert seen["online"] is False and seen["last_seen"] is None
+        # once bob blocks alice, the friendship is removed. Alice does not get
+        # a ghost contact or any presence information for bob.
+        assert a.get("/api/contacts").json() == []
 
 
 def test_messages_to_someone_who_blocked_you_are_hidden(client):
@@ -447,6 +483,26 @@ def test_me_includes_display_name_and_avatar(client):
     a = signup(client, "alice")
     a.put("/api/profile", json={"display_name": "Ali", "avatar": "🌸"})
     assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": "🌸"}
+
+
+
+
+def test_profile_wall_post_and_delete_permissions(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    r = b.post("/api/profile/alice/wall", json={"body": " hi alice! "})
+    assert r.status_code == 200, r.text
+    comment_id = r.json()["id"]
+    wall = a.get("/api/profile/alice").json()["wall"]
+    assert wall[0]["body"] == "hi alice!" and wall[0]["username"] == "bob"
+    assert c.delete(f"/api/profile/alice/wall/{comment_id}").status_code == 403
+    assert a.delete(f"/api/profile/alice/wall/{comment_id}").status_code == 200
+    assert a.get("/api/profile/alice").json()["wall"] == []
+
+
+def test_profile_wall_respects_blocks(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    assert b.post("/api/profile/alice/wall", json={"body": "nope"}).status_code == 404
 
 
 # ---------- the frontend and backend agree ----------
