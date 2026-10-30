@@ -12,6 +12,9 @@
   --p-accent: #ff9933;
   --p-border: #7f9db9;
   --p-font: Verdana, Tahoma, sans-serif;
+  --p-border-width: 2px;
+  --p-border-style: solid;
+  --p-radius: 0px;
 }
 
 #profile-overlay {
@@ -32,8 +35,10 @@
   background: var(--p-page);
   color: var(--p-text);
   font-family: var(--p-font);
-  border: 2px solid var(--p-border);
+  border: var(--p-border-width) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
 }
 
 #pf-bar {
@@ -351,3 +356,64 @@
     grid-column: 1 / -1;
   }
 }
+
+/* ---------- safe MySpace-style customization ---------- */
+
+#profile-card.font-verdana { --p-font: Verdana, Tahoma, sans-serif; }
+#profile-card.font-comic { --p-font: "Comic Sans MS", "Chalkboard SE", cursive; }
+#profile-card.font-georgia { --p-font: Georgia, "Times New Roman", serif; }
+#profile-card.font-courier { --p-font: "Courier New", monospace; }
+#profile-card.font-trebuchet { --p-font: "Trebuchet MS", Verdana, sans-serif; }
+#profile-card.font-times { --p-font: "Times New Roman", Times, serif; }
+#profile-card.font-impact { --p-font: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; }
+
+#profile-card.pattern-dots { background-image: radial-gradient(var(--p-border) 1px, transparent 1px); background-size: 12px 12px; }
+#profile-card.pattern-stripes { background-image: repeating-linear-gradient(90deg, transparent 0 14px, color-mix(in srgb, var(--p-border) 22%, transparent) 14px 21px); }
+#profile-card.pattern-checks { background-image: conic-gradient(color-mix(in srgb, var(--p-border) 18%, transparent) 25%, transparent 0 50%, color-mix(in srgb, var(--p-border) 18%, transparent) 0 75%, transparent 0); background-size: 24px 24px; }
+#profile-card.pattern-grid { background-image: linear-gradient(color-mix(in srgb, var(--p-border) 20%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--p-border) 20%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
+#profile-card.pattern-diagonal { background-image: repeating-linear-gradient(135deg, transparent 0 12px, color-mix(in srgb, var(--p-border) 20%, transparent) 12px 16px); }
+#profile-card.pattern-stars { background-image: radial-gradient(circle at 20% 20%, var(--p-accent) 0 1px, transparent 2px), radial-gradient(circle at 70% 60%, var(--p-accent) 0 1px, transparent 2px); background-size: 34px 34px; }
+#profile-card.pattern-hearts { background-image: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--p-accent) 35%, transparent) 0 2px, transparent 3px), radial-gradient(circle at 60% 70%, color-mix(in srgb, var(--p-accent) 35%, transparent) 0 2px, transparent 3px); background-size: 28px 28px; }
+
+#profile-card.name-glow .pf-name { text-shadow: 0 0 4px var(--p-accent), 0 0 10px var(--p-accent); }
+#profile-card.name-shadow .pf-name { text-shadow: 3px 3px 0 color-mix(in srgb, var(--p-text) 35%, transparent); }
+#profile-card.name-rainbow .pf-name {
+  background: linear-gradient(90deg, #ff4d4d, #ffb84d, #ffe44d, #55dd77, #55aaff, #aa66ff, #ff66bb);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#profile-card.pf-marquee .pf-name {
+  display: inline-block;
+  white-space: nowrap;
+  animation: pf-marquee 7s linear infinite alternate;
+}
+@keyframes pf-marquee { from { transform: translateX(0); } to { transform: translateX(28px); } }
+@media (prefers-reduced-motion: reduce) { #profile-card.pf-marquee .pf-name { animation: none; } }
+
+.pf-custom-title {
+  margin: 14px 0 8px;
+  padding-bottom: 5px;
+  font-weight: bold;
+  border-bottom: 1px solid var(--p-border);
+}
+.pf-custom-title span { font-weight: normal; color: var(--p-muted); font-size: 10px; }
+.pf-style-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.pf-style-color { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px; background: var(--p-card); border: 1px solid var(--p-border); font-size: 10px; }
+.pf-style-color input[type="color"] { width: 32px; height: 24px; padding: 0; border: 0; background: transparent; }
+.pf-style-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 8px; margin-bottom: 7px; }
+.pf-style-row select, .pf-style-row input[type="range"] { width: 100%; min-width: 0; }
+.pf-style-row.check input { justify-self: start; }
+.pf-reset-style { margin: 2px 0 10px; }
+
+@media (max-width: 700px) { .pf-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pf-style-row { grid-template-columns: 1fr; } }
+
+
+/* ---------- profile wall ---------- */
+.pf-wall-form { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 8px; }
+.pf-wall-form textarea { grid-column: 1 / -1; resize: vertical; padding: 6px; font: inherit; color: var(--p-text); background: var(--p-page); border: 1px solid var(--p-border); }
+.pf-wall-list { border-top: 1px solid var(--p-border); }
+.pf-wall-item { padding: 8px 10px; border-bottom: 1px solid var(--p-border); background: var(--p-card); }
+.pf-wall-item:last-child { border-bottom: 0; }
+.pf-wall-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 10px; color: var(--p-muted); }
+.pf-wall-who, .pf-wall-delete { padding: 0; border: 0; background: none; color: var(--p-accent); font: inherit; font-weight: bold; }
+.pf-wall-delete { margin-left: auto; color: var(--p-muted); }
+.pf-wall-body { white-space: pre-wrap; overflow-wrap: anywhere; }

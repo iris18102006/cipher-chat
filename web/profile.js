@@ -43,10 +43,36 @@ async function openProfile(username) {
 
 // ---------- viewing ----------
 
-function applyTheme(card, theme, accent) {
+const CUSTOM_COLOR_VARS = {
+  page: "--p-page", card: "--p-card", text: "--p-text", head_a: "--p-head-a",
+  head_b: "--p-head-b", head_text: "--p-head-text", border: "--p-border",
+};
+const CUSTOM_CLASSES = [
+  "font-verdana", "font-comic", "font-georgia", "font-courier", "font-trebuchet", "font-times", "font-impact",
+  "pattern-dots", "pattern-stripes", "pattern-checks", "pattern-grid", "pattern-diagonal", "pattern-stars", "pattern-hearts",
+  "name-glow", "name-shadow", "name-rainbow", "pf-marquee",
+];
+
+function applyTheme(card, theme, accent, custom = {}) {
   card.className = "theme-" + (theme || "classic");
+  for (const cls of CUSTOM_CLASSES) card.classList.remove(cls);
+  for (const variable of Object.values(CUSTOM_COLOR_VARS)) card.style.removeProperty(variable);
+  card.style.removeProperty("--p-border-width");
+  card.style.removeProperty("--p-radius");
+  card.style.removeProperty("--p-border-style");
+
   if (accent) card.style.setProperty("--p-accent", accent);
   else card.style.removeProperty("--p-accent");
+  for (const [key, variable] of Object.entries(CUSTOM_COLOR_VARS)) {
+    if (custom[key]) card.style.setProperty(variable, custom[key]);
+  }
+  if (custom.font) card.classList.add("font-" + custom.font);
+  if (custom.pattern && custom.pattern !== "none") card.classList.add("pattern-" + custom.pattern);
+  if (custom.name_effect && custom.name_effect !== "none") card.classList.add("name-" + custom.name_effect);
+  if (custom.marquee) card.classList.add("pf-marquee");
+  if (Number.isInteger(custom.border_width)) card.style.setProperty("--p-border-width", custom.border_width + "px");
+  if (Number.isInteger(custom.radius)) card.style.setProperty("--p-radius", custom.radius + "px");
+  if (custom.border_style) card.style.setProperty("--p-border-style", custom.border_style);
 }
 
 function section(title, text) {
@@ -86,8 +112,68 @@ function stat(label, value) {
   return s;
 }
 
+function wallSection(p) {
+  const box = el("div", "pf-section pf-wall");
+  box.append(el("h3", "", "Profile wall"));
+
+  const form = el("form", "pf-wall-form");
+  const input = el("textarea");
+  input.maxLength = 300;
+  input.rows = 3;
+  input.placeholder = p.me ? "write something on your wall..." : "leave a comment...";
+  const send = el("button", "", "Post");
+  send.type = "submit";
+  const err = el("span", "pf-inline-error");
+  form.append(input, send, err);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const body = input.value.trim();
+    if (!body) return;
+    send.disabled = true; err.textContent = "";
+    try {
+      await api("/api/profile/" + encodeURIComponent(p.username) + "/wall", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }),
+      });
+      await openProfile(p.username);
+    } catch {
+      err.textContent = "couldn't post comment";
+      send.disabled = false;
+    }
+  };
+  box.append(form);
+
+  const list = el("div", "pf-wall-list");
+  if (!p.wall || !p.wall.length) {
+    list.append(el("div", "pf-content empty", "no comments yet"));
+  } else {
+    for (const c of p.wall) {
+      const item = el("div", "pf-wall-item");
+      const head = el("div", "pf-wall-head");
+      const who = el("button", "pf-wall-who", avatarFor(c) + " " + shownName(c));
+      who.type = "button";
+      who.onclick = () => openProfile(c.username);
+      head.append(who, el("span", "", parseTs(c.created_at).toLocaleString()));
+      if (c.mine || p.me) {
+        const del = el("button", "pf-wall-delete", "delete");
+        del.type = "button";
+        del.onclick = async () => {
+          try {
+            await api("/api/profile/" + encodeURIComponent(p.username) + "/wall/" + c.id, { method: "DELETE" });
+            await openProfile(p.username);
+          } catch {}
+        };
+        head.append(del);
+      }
+      item.append(head, el("div", "pf-wall-body", c.body));
+      list.append(item);
+    }
+  }
+  box.append(list);
+  return box;
+}
+
 function renderProfile(p) {
-  applyTheme($("profile-card"), p.theme, p.accent);
+  applyTheme($("profile-card"), p.theme, p.accent, p.custom);
   $("pf-title").textContent = p.me ? "My profile" : shownName(p) + "'s profile";
   const body = $("pf-body");
   body.replaceChildren();
@@ -121,6 +207,7 @@ function renderProfile(p) {
   if (p.song) body.append(section("Now playing", "\u266A " + p.song));
   if (p.top_friends.length || p.me) body.append(topFriendsSection(p));
   if (p.location) body.append(section("Location", p.location));
+  body.append(wallSection(p));
 
   const stats = el("div", "pf-stats");
   stats.append(stat("friends", p.friend_count));
@@ -224,8 +311,8 @@ function renderEditor(p) {
   form.autocomplete = "off";
   const inputs = {};
   // what's picked so far, applied to the card live so you see it before saving
-  const look = { avatar: p.avatar, theme: p.theme, accent: p.accent };
-  const preview = () => applyTheme($("profile-card"), look.theme, look.accent);
+  const look = { avatar: p.avatar, theme: p.theme, accent: p.accent, custom: { ...(p.custom || {}) } };
+  const preview = () => applyTheme($("profile-card"), look.theme, look.accent, look.custom);
 
   for (const f of TEXT_FIELDS) inputs[f[0]] = textRow(form, f, p[f[0]]);
 
@@ -260,6 +347,74 @@ function renderEditor(p) {
     b.setAttribute("aria-label", "accent " + color);
   }
   form.append(ac.row);
+
+  const customTitle = el("div", "pf-custom-title", "Make it yours");
+  customTitle.append(el("span", "", " — safe MySpace-style controls, no raw CSS needed"));
+  form.append(customTitle);
+
+  const colorFields = [
+    ["page", "Page"], ["card", "Boxes"], ["text", "Text"], ["head_a", "Header 1"],
+    ["head_b", "Header 2"], ["head_text", "Header text"], ["border", "Borders"],
+  ];
+  const colors = el("div", "pf-style-grid");
+  for (const [key, label] of colorFields) {
+    const wrap = el("label", "pf-style-color");
+    wrap.append(el("span", "", label));
+    const input = el("input");
+    input.type = "color";
+    input.value = look.custom[key] || ({ page: "#eef3fb", card: "#ffffff", text: "#111111", head_a: "#2a5da8", head_b: "#17407f", head_text: "#ffffff", border: "#7f9db9" }[key]);
+    input.oninput = () => { look.custom[key] = input.value; preview(); };
+    wrap.append(input);
+    colors.append(wrap);
+  }
+  form.append(colors);
+
+  function selectStyle(label, key, choices, fallback) {
+    const row = el("label", "pf-style-row");
+    row.append(el("span", "", label));
+    const sel = el("select");
+    for (const [value, text] of choices) {
+      const opt = el("option", "", text);
+      opt.value = value;
+      if ((look.custom[key] || fallback) === value) opt.selected = true;
+      sel.append(opt);
+    }
+    sel.onchange = () => { look.custom[key] = sel.value; preview(); };
+    row.append(sel);
+    form.append(row);
+  }
+
+  selectStyle("Font", "font", [["verdana","Verdana"],["comic","Comic Sans"],["georgia","Georgia"],["courier","Courier"],["trebuchet","Trebuchet"],["times","Times"],["impact","Impact"]], "verdana");
+  selectStyle("Background pattern", "pattern", [["none","None"],["dots","Dots"],["stripes","Stripes"],["checks","Checks"],["grid","Grid"],["diagonal","Diagonal"],["stars","Stars"],["hearts","Hearts"]], "none");
+  selectStyle("Border style", "border_style", [["solid","Solid"],["dashed","Dashed"],["dotted","Dotted"],["double","Double"],["ridge","Ridge"],["groove","Groove"]], "solid");
+  selectStyle("Name effect", "name_effect", [["none","None"],["glow","Glow"],["shadow","Shadow"],["rainbow","Rainbow"]], "none");
+
+  function rangeStyle(label, key, min, max, fallback) {
+    const row = el("label", "pf-style-row");
+    const value = el("b", "", String(look.custom[key] ?? fallback));
+    const left = el("span", "");
+    left.append(label + " ", value);
+    const input = el("input");
+    input.type = "range"; input.min = String(min); input.max = String(max);
+    input.value = String(look.custom[key] ?? fallback);
+    input.oninput = () => { look.custom[key] = Number(input.value); value.textContent = input.value; preview(); };
+    row.append(left, input);
+    form.append(row);
+  }
+  rangeStyle("Border width", "border_width", 0, 6, 2);
+  rangeStyle("Corner roundness", "radius", 0, 24, 0);
+
+  const marquee = el("label", "pf-style-row check");
+  const marqueeInput = el("input");
+  marqueeInput.type = "checkbox"; marqueeInput.checked = !!look.custom.marquee;
+  marqueeInput.onchange = () => { look.custom.marquee = marqueeInput.checked; preview(); };
+  marquee.append(el("span", "", "Scrolling display name"), marqueeInput);
+  form.append(marquee);
+
+  const reset = el("button", "pf-reset-style", "Reset custom styling");
+  reset.type = "button";
+  reset.onclick = () => { look.custom = {}; renderEditor({ ...p, avatar: look.avatar, theme: look.theme, accent: look.accent, custom: {} }); };
+  form.append(reset);
 
   // top friends: tap friends in the order you want them, up to 8
   const top = (p.top_friends || []).map((f) => f.username);
@@ -311,6 +466,7 @@ function renderEditor(p) {
     changes.avatar = look.avatar || "";
     changes.theme = look.theme;
     changes.accent = look.accent || "";
+    changes.custom = look.custom;
     // only send top friends once the list loaded, so a failed load can't wipe them
     if (tf.box.dataset.ready) changes.top_friends = top;
     try {
