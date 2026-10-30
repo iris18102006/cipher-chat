@@ -76,6 +76,15 @@ def init_db():
                 last_visit TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (profile_id, visitor_id)
             );
+            CREATE TABLE IF NOT EXISTS profile_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_profile_comments_profile
+                ON profile_comments (profile_id, id DESC);
             """
         )
         # added after the first version, so migrate old databases in place
@@ -95,6 +104,7 @@ def init_db():
         _add_column(conn, "users", "avatar", "TEXT NOT NULL DEFAULT ''")
         _add_column(conn, "users", "theme", "TEXT NOT NULL DEFAULT 'classic'")
         _add_column(conn, "users", "accent", "TEXT NOT NULL DEFAULT ''")
+        _add_column(conn, "users", "custom_theme", "TEXT NOT NULL DEFAULT '{}'")
         _add_column(conn, "users", "top_friends", "TEXT NOT NULL DEFAULT '[]'")
         conn.commit()
     finally:
