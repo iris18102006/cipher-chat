@@ -51,6 +51,18 @@ PROFILE_LIMITS = {
 }
 MAX_TOP_FRIENDS = 8
 
+# Safe MySpace-style profile customization. Users can combine whitelisted
+# visual options, but never submit arbitrary CSS/HTML.
+CUSTOM_COLORS = ("page", "card", "text", "head_a", "head_b", "head_text", "border")
+CUSTOM_CHOICES = {
+    "font": ("verdana", "comic", "georgia", "courier", "trebuchet", "times", "impact"),
+    "pattern": ("none", "dots", "stripes", "checks", "grid", "diagonal", "stars", "hearts"),
+    "border_style": ("solid", "dashed", "dotted", "double", "ridge", "groove"),
+    "name_effect": ("none", "glow", "shadow", "rainbow"),
+}
+CUSTOM_RANGES = {"border_width": (0, 6), "radius": (0, 24)}
+CUSTOM_FLAGS = ("marquee",)
+
 # set CIPHER_SECURE_COOKIES=1 when serving over https
 SECURE_COOKIES = os.environ.get("CIPHER_SECURE_COOKIES") == "1"
 
@@ -81,6 +93,10 @@ class KeyBody(BaseModel):
     pub: str
 
 
+class CommentBody(BaseModel):
+    body: str
+
+
 class ProfileBody(BaseModel):
     # every field is optional so the editor can save just what changed
     display_name: str | None = None
@@ -93,6 +109,7 @@ class ProfileBody(BaseModel):
     avatar: str | None = None
     theme: str | None = None
     accent: str | None = None
+    custom: dict[str, str | int | bool] | None = None
     top_friends: list[str] | None = None
 
 
@@ -126,6 +143,42 @@ def clean_avatar(value: str) -> str:
     if len(value) > 8 or any(ord(ch) < 128 for ch in value):
         raise HTTPException(400, "pick an emoji for your avatar")
     return value
+
+
+def clean_custom(value: dict) -> dict:
+    """Validate custom profile styling without accepting arbitrary CSS."""
+    if not isinstance(value, dict):
+        raise HTTPException(400, "custom style must be an object")
+    out: dict = {}
+    for key, val in value.items():
+        if key in CUSTOM_COLORS:
+            if not isinstance(val, str) or not ACCENT_RE.fullmatch(val):
+                raise HTTPException(400, f"{key.replace('_', ' ')} must be a colour like #ff9933")
+            out[key] = val.lower()
+        elif key in CUSTOM_CHOICES:
+            if not isinstance(val, str) or val not in CUSTOM_CHOICES[key]:
+                raise HTTPException(400, f"unknown {key.replace('_', ' ')}")
+            out[key] = val
+        elif key in CUSTOM_RANGES:
+            lo, hi = CUSTOM_RANGES[key]
+            if isinstance(val, bool) or not isinstance(val, int) or not lo <= val <= hi:
+                raise HTTPException(400, f"{key.replace('_', ' ')} must be {lo} to {hi}")
+            out[key] = val
+        elif key in CUSTOM_FLAGS:
+            if not isinstance(val, bool):
+                raise HTTPException(400, f"{key} must be on or off")
+            out[key] = val
+        else:
+            raise HTTPException(400, f"unknown style option: {str(key)[:30]}")
+    return out
+
+
+def custom_from_row(row) -> dict:
+    try:
+        value = json.loads(row["custom_theme"])
+        return clean_custom(value)
+    except (TypeError, ValueError, HTTPException, KeyError, AttributeError):
+        return {}
 
 
 # ---------- login rate limiting (in memory, per ip + username) ----------
@@ -273,7 +326,7 @@ def me(user=Depends(current_user), conn=Depends(get_conn)):
 
 PROFILE_COLUMNS = (
     "id, username, display_name, mood, headline, about_me, interests, "
-    "location, song, avatar, theme, accent, top_friends, created_at, last_seen"
+    "location, song, avatar, theme, accent, custom_theme, top_friends, created_at, last_seen"
 )
 
 
@@ -290,6 +343,7 @@ def profile_dict(row, viewer_id: int) -> dict:
         "avatar": row["avatar"],
         "theme": row["theme"],
         "accent": row["accent"],
+        "custom": custom_from_row(row),
         "joined": row["created_at"],
         "last_seen": row["last_seen"],
         "online": manager.is_online(row["username"]),
@@ -312,6 +366,30 @@ def top_friend_names(conn, user_id: int, names: list[str]) -> list[str]:
     if len(picked) > MAX_TOP_FRIENDS:
         raise HTTPException(400, f"you can only pick {MAX_TOP_FRIENDS} top friends")
     return picked
+
+
+def wall_for(conn, profile_id: int, viewer_id: int) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT c.id, c.author_id, c.body, c.created_at,
+               u.username, u.display_name, u.avatar
+        FROM profile_comments c JOIN users u ON u.id = c.author_id
+        WHERE c.profile_id = ?
+        ORDER BY c.id DESC LIMIT 30
+        """,
+        (profile_id,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        if r["author_id"] != viewer_id and blocked_either_way(conn, viewer_id, r["author_id"]):
+            continue
+        out.append({
+            "id": r["id"], "username": r["username"],
+            "display_name": r["display_name"], "avatar": r["avatar"],
+            "body": r["body"], "created_at": r["created_at"],
+            "mine": r["author_id"] == viewer_id,
+        })
+    return out
 
 
 def top_friends_for(conn, row, viewer_id: int) -> list[dict]:
@@ -362,7 +440,42 @@ def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn
     out["visitors"] = conn.execute(
         "SELECT COUNT(*) FROM profile_visits WHERE profile_id = ?", (row["id"],)
     ).fetchone()[0]
+    out["wall"] = wall_for(conn, row["id"], user["id"])
     return out
+
+
+@app.post("/api/profile/{username}/wall")
+def post_wall_comment(username: str, body: CommentBody, user=Depends(current_user), conn=Depends(get_conn)):
+    profile = conn.execute("SELECT id, username FROM users WHERE username = ?", (username.lower(),)).fetchone()
+    if not profile or blocked_either_way(conn, user["id"], profile["id"]):
+        raise HTTPException(404, "no such user")
+    text = clean_text(body.body, 300, "comment", multiline=True)
+    if not text:
+        raise HTTPException(400, "comment can't be empty")
+    cur = conn.execute(
+        "INSERT INTO profile_comments (profile_id, author_id, body) VALUES (?, ?, ?)",
+        (profile["id"], user["id"], text),
+    )
+    conn.commit()
+    return {"id": cur.lastrowid, "ok": True}
+
+
+@app.delete("/api/profile/{username}/wall/{comment_id}")
+def delete_wall_comment(username: str, comment_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    profile = conn.execute("SELECT id FROM users WHERE username = ?", (username.lower(),)).fetchone()
+    if not profile:
+        raise HTTPException(404, "no such user")
+    row = conn.execute(
+        "SELECT author_id FROM profile_comments WHERE id = ? AND profile_id = ?",
+        (comment_id, profile["id"]),
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "no such comment")
+    if user["id"] not in (row["author_id"], profile["id"]):
+        raise HTTPException(403, "you can't delete that comment")
+    conn.execute("DELETE FROM profile_comments WHERE id = ?", (comment_id,))
+    conn.commit()
+    return {"ok": True}
 
 
 @app.put("/api/profile")
@@ -383,9 +496,11 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
                 raise HTTPException(400, "unknown theme")
             updates[field] = value
         elif field == "accent":
-            if value and not ACCENT_RE.match(value):
+            if value and not ACCENT_RE.fullmatch(value):
                 raise HTTPException(400, "accent must look like #ff9933")
             updates[field] = value.lower()
+        elif field == "custom":
+            updates["custom_theme"] = json.dumps(clean_custom(value), separators=(",", ":"))
         elif field == "top_friends":
             updates[field] = json.dumps(top_friend_names(conn, user["id"], value))
     if updates:
@@ -626,6 +741,13 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
                     OR (m.sender_id = :me AND m.recipient_id = u.id)) AS last_msg
         FROM users u
         WHERE u.id != :me
+          AND (
+              EXISTS (SELECT 1 FROM friendships f
+                      WHERE (f.requester_id = u.id AND f.addressee_id = :me)
+                         OR (f.requester_id = :me AND f.addressee_id = u.id))
+              OR EXISTS (SELECT 1 FROM blocks b
+                         WHERE b.blocker_id = :me AND b.blocked_id = u.id)
+          )
         ORDER BY last_msg IS NULL, last_msg DESC, u.username
         """,
         {"me": user["id"]},
@@ -702,6 +824,21 @@ def history(
 # ---------- websocket: presence, typing, live messages ----------
 
 
+def presence_audience(conn, user_id: int) -> set[str]:
+    """Only users with a social relationship should receive presence events."""
+    rows = conn.execute(
+        """
+        SELECT username FROM users WHERE id IN (
+            SELECT addressee_id FROM friendships WHERE requester_id = :me
+            UNION SELECT requester_id FROM friendships WHERE addressee_id = :me
+            UNION SELECT blocker_id FROM blocks WHERE blocked_id = :me
+        )
+        """,
+        {"me": user_id},
+    ).fetchall()
+    return {r["username"] for r in rows}
+
+
 class Manager:
     """Tracks open sockets per username. One user can have several tabs."""
 
@@ -721,12 +858,9 @@ class Manager:
                 self.sockets[username].discard(ws)
         return sent
 
-    async def broadcast(self, payload: dict, skip: str | set[str] | None = None):
-        if isinstance(skip, str):
-            skip = {skip}
-        for name in list(self.sockets):
-            if name not in (skip or ()):
-                await self.send_user(name, payload)
+    async def send_many(self, usernames: set[str], payload: dict):
+        for name in usernames:
+            await self.send_user(name, payload)
 
 
 manager = Manager()
@@ -762,9 +896,9 @@ async def websocket_endpoint(ws: WebSocket):
         first_tab = not manager.is_online(me)
         manager.sockets[me].add(ws)
         if first_tab:
-            await manager.broadcast(
+            await manager.send_many(
+                presence_audience(conn, my_id) - blocked_names(conn, my_id) - {me},
                 {"type": "presence", "user": me, "online": True},
-                skip={me} | blocked_names(conn, my_id),
             )
 
         # anything sent while we were offline now counts as delivered
@@ -901,14 +1035,14 @@ async def websocket_endpoint(ws: WebSocket):
                         (now, my_id),
                     )
                     conn.commit()
-                    await manager.broadcast(
+                    await manager.send_many(
+                        presence_audience(conn, my_id) - blocked_names(conn, my_id),
                         {
                             "type": "presence",
                             "user": username,
                             "online": False,
                             "last_seen": now,
                         },
-                        skip=blocked_names(conn, my_id),
                     )
         finally:
             conn.close()
