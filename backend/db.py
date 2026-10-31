@@ -85,6 +85,21 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_profile_comments_profile
                 ON profile_comments (profile_id, id DESC);
+            -- profile pictures and the photo/gif gallery. The bytes live in the
+            -- database so there are no file paths to get wrong or traverse.
+            CREATE TABLE IF NOT EXISTS images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL,
+                mime TEXT NOT NULL,
+                data BLOB NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                animated INTEGER NOT NULL DEFAULT 0,
+                caption TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_images_owner ON images (owner_id, kind, id);
             """
         )
         # added after the first version, so migrate old databases in place
@@ -106,6 +121,10 @@ def init_db():
         _add_column(conn, "users", "accent", "TEXT NOT NULL DEFAULT ''")
         _add_column(conn, "users", "custom_theme", "TEXT NOT NULL DEFAULT '{}'")
         _add_column(conn, "users", "top_friends", "TEXT NOT NULL DEFAULT '[]'")
+        # image profile: the old emoji `avatar` column is no longer used
+        _add_column(conn, "users", "avatar_id", "INTEGER")
+        _add_column(conn, "users", "bg_image_id", "INTEGER")
+        _add_column(conn, "users", "stickers", "TEXT NOT NULL DEFAULT '[]'")
         conn.commit()
     finally:
         conn.close()
