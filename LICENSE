@@ -1,0 +1,29 @@
+cipher-chat Proprietary License
+
+Copyright (c) 2026 Iris (GitHub: iris18102006). All rights reserved.
+
+1. VIEWING ONLY. This source code is published so it can be read. You may view it,
+   and nothing else, unless the author gives you written permission.
+
+2. YOU MAY NOT, without written permission from the author:
+   a. copy, fork outside GitHub, mirror, or download it for use elsewhere;
+   b. modify it or create derivative works;
+   c. use it, or any part of it, in your own projects or products;
+   d. run it as a service, host it, or offer it to others;
+   e. distribute, sublicense, sell or rent it;
+   f. use it to train, fine-tune or evaluate machine learning models;
+   g. remove or change this notice or the author credit.
+
+3. NO PERMISSION BY DEFAULT. No licence is granted by anything in this repository,
+   by the code being public, or by it being forked on GitHub. Any permission must be
+   written and signed by the author.
+
+4. THIRD-PARTY FILES. The fonts in web/fonts are not covered by this licence.
+   They keep their own (SIL Open Font License 1.1, see web/fonts/LICENSE.txt).
+
+5. TERMINATION. If you break these terms your right to view the code ends at once.
+
+6. NO WARRANTY. The code is provided "as is", without warranty of any kind. The author
+   is not liable for any damage that comes from it.
+
+To ask for permission, contact the author through github.com/iris18102006.
