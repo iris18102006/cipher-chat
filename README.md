@@ -84,3 +84,4 @@ This is a learning project, not Signal.
 - [x] Message requests and a settings page
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
+- [ ] Chat themes for each conversation
