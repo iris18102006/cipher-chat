@@ -144,6 +144,7 @@ async function loadContacts() {
       online: row.online,
       last_seen: row.last_seen,
       unread: row.unread,
+      held: row.held || 0, // messages from a friend request that wait for me to accept
       typing: old ? old.typing : false,
       changed: false,
     };
@@ -161,7 +162,7 @@ function bump(username) {
 
 function totalUnread() {
   let n = 0;
-  for (const c of state.contacts.values()) n += c.unread;
+  for (const c of state.contacts.values()) n += c.unread + c.held;
   return n;
 }
 
@@ -191,6 +192,11 @@ function buddyRow(c) {
   if (c.mood) info.append(el("div", "buddy-mood", c.mood));
   li.append(info);
   if (c.unread > 0) li.append(el("span", "badge", c.unread > 99 ? "99+" : String(c.unread)));
+  else if (c.held > 0) {
+    const w = el("span", "badge held", String(c.held));
+    w.title = c.held + " message(s) waiting until you accept the request";
+    li.append(w);
+  }
   li.onclick = () => openChat(c.username);
   return li;
 }
@@ -245,6 +251,17 @@ function renderChatHeader() {
     $("block-banner-text").textContent =
       "You blocked " + shownName(c) + ". They can't message you and they can't see when you're online.";
   }
+  // a friend request that's waiting on someone: say so, and let the person answer it right here
+  const banner = $("request-banner");
+  banner.hidden = c.blocked || (c.friend !== "incoming" && c.friend !== "outgoing");
+  if (!banner.hidden) {
+    const incoming = c.friend === "incoming";
+    $("req-accept").hidden = $("req-decline").hidden = !incoming;
+    $("request-banner-text").textContent = incoming
+      ? shownName(c) + " sent you a friend request." +
+        (c.held > 0 ? " They wrote " + c.held + " message" + (c.held > 1 ? "s" : "") + ", accept the request to read " + (c.held > 1 ? "them" : "it") + "." : "")
+      : "Waiting for " + shownName(c) + " to accept your friend request.";
+  }
   $("block").textContent = c.blocked ? "Unblock" : "Block";
   $("typing").hidden = !c.typing;
   $("typing-name").textContent = c.typing ? c.username + " is typing" : "";
@@ -279,6 +296,7 @@ function scrollBottom() {
 }
 
 function tickFor(m) {
+  if (m.held) return { text: "\u2713 sent, waiting for them to accept", cls: "tick" };
   if (m.read) return { text: "\u2713\u2713 read", cls: "tick read" };
   if (m.delivered) return { text: "\u2713\u2713 delivered", cls: "tick" };
   return { text: "\u2713 sent", cls: "tick" };
@@ -323,7 +341,7 @@ async function decryptList(peer, rows) {
   const out = [];
   for (const r of rows) {
     const { text, failed } = await decryptFor(peer, r.iv, r.ct);
-    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, delivered: r.delivered, read: r.read });
+    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, delivered: r.delivered, read: r.read, held: !!r.held });
   }
   return out;
 }
@@ -470,7 +488,7 @@ async function handleWS(data) {
     const mine = data.from === state.me;
     if (list && !list.some((m) => m.id === data.id)) {
       const { text, failed } = await decryptFor(peer, data.iv, data.ct);
-      list.push({ id: data.id, from: data.from, text, failed, ts: data.ts, delivered: !!data.delivered, read: false });
+      list.push({ id: data.id, from: data.from, text, failed, ts: data.ts, delivered: !!data.delivered, read: false, held: !!data.held });
     }
     if (!mine) {
       c.typing = false;
@@ -491,7 +509,10 @@ async function handleWS(data) {
   } else if (data.type === "receipt") {
     for (const list of state.msgs.values()) {
       const m = list.find((x) => x.id === data.id);
-      if (m) m.delivered = true;
+      if (m) {
+        m.delivered = true;
+        m.held = false;
+      }
     }
     if (state.open) renderMessages();
   } else if (data.type === "read") {
@@ -512,6 +533,13 @@ async function handleWS(data) {
     if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
       openProfile(data.from);
     }
+  } else if (data.type === "msg-rejected") {
+    const REASONS = {
+      wait: "They want you to wait until they accept your friend request.",
+      limit: "You can only leave a few messages until they accept your request.",
+      not_friends: "You're not friends with them any more, so that message wasn't sent.",
+    };
+    toast(REASONS[data.reason] || "That message wasn't sent.");
   } else if (data.type === "read-sync") {
     const c = state.contacts.get(data.peer);
     if (c) {
@@ -620,6 +648,34 @@ $("back").onclick = () => {
   $("chat-pane").hidden = true;
   $("chat-empty").hidden = false;
   renderBuddies();
+};
+
+// answer a friend request from the chat itself
+$("req-accept").onclick = async () => {
+  const peer = state.open;
+  if (!peer) return;
+  try {
+    await api("/api/friends/" + encodeURIComponent(peer) + "/accept", { method: "POST" });
+    await loadContacts();
+    if (state.open !== peer) return;
+    await loadHistory(peer); // messages that were waiting are there now
+    renderMessages();
+    scrollBottom();
+    markRead(peer);
+  } catch {
+    toast("couldn't accept that, try again");
+  }
+};
+$("req-decline").onclick = async () => {
+  const peer = state.open;
+  if (!peer) return;
+  try {
+    await api("/api/friends/" + encodeURIComponent(peer), { method: "DELETE" });
+    await loadContacts();
+    $("back").onclick();
+  } catch {
+    toast("couldn't decline that, try again");
+  }
 };
 
 $("verify").onclick = async () => {

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="profile.css">
   <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="fonts.css">
 </head>
 <body>
   <header id="top">
@@ -15,6 +16,7 @@
       <span id="conn" class="conn off">connecting...</span>
       <span>logged in as <b id="me-name">...</b></span>
       <button id="my-profile" type="button">My profile</button>
+      <button id="settings-btn" type="button">Settings</button>
       <button id="logout" type="button">Log out</button>
     </div>
   </header>
@@ -59,6 +61,11 @@
           <span id="block-banner-text"></span>
           <button id="unblock" type="button">Unblock</button>
         </div>
+        <div id="request-banner" hidden>
+          <span id="request-banner-text"></span>
+          <button id="req-accept" type="button">Accept</button>
+          <button id="req-decline" type="button">Decline</button>
+        </div>
         <div id="verify-box" hidden></div>
 
         <div id="log">
@@ -77,6 +84,17 @@
 
   <div id="toast" role="status" aria-live="polite" hidden></div>
 
+  <!-- settings, filled in by settings.js -->
+  <div id="settings-overlay" hidden>
+    <div id="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div id="settings-bar">
+        <span id="settings-title">Settings</span>
+        <button id="settings-close" type="button" aria-label="close settings">&times;</button>
+      </div>
+      <div id="settings-body"></div>
+    </div>
+  </div>
+
   <!-- profile page, filled in by profile.js -->
   <div id="profile-overlay" hidden>
     <div id="profile-card" class="theme-classic" role="dialog" aria-modal="true" aria-labelledby="pf-title">
@@ -93,5 +111,6 @@
   <script src="profile.js"></script>
   <script src="profile-media.js"></script>
   <script src="friends.js"></script>
+  <script src="settings.js"></script>
 </body>
 </html>

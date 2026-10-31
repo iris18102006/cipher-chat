@@ -633,3 +633,108 @@ h2 {
   border-radius: 6px;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
 }
+
+
+/* ---------- friend request banner, held-message badge ---------- */
+
+#request-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: #3d3a12;
+  background: #fff6c4;
+  border-bottom: 1px solid #d9c96a;
+}
+
+#request-banner span {
+  flex: 1;
+}
+
+.badge.held {
+  background: #b8860b;
+}
+
+/* ---------- settings ---------- */
+
+#settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 10px;
+  overflow-y: auto;
+  background: rgba(10, 25, 55, 0.65);
+}
+
+#settings-card {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border: 2px solid #7f9db9;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+#settings-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(#2a5da8, #17407f);
+  border-bottom: 3px solid #ff9933;
+}
+
+#settings-close {
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+#settings-body {
+  padding: 12px;
+}
+
+#settings-body fieldset {
+  margin: 0 0 12px;
+  padding: 8px 10px 10px;
+  border: 1px solid #7f9db9;
+}
+
+#settings-body legend {
+  padding: 0 6px;
+  font-weight: bold;
+  color: #17407f;
+}
+
+#settings-body .opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+#settings-body .opt input {
+  margin-top: 3px;
+}
+
+#settings-body .opt small {
+  display: block;
+  color: #556;
+}
+
+#settings-status {
+  min-height: 16px;
+  margin: 0;
+  font-size: 11px;
+  color: #556;
+}
+
+#settings-status.bad {
+  color: #b00020;
+}
