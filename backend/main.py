@@ -54,6 +54,11 @@ PROFILE_LIMITS = {
 }
 MAX_TOP_FRIENDS = 8
 
+# messages from someone whose friend request you haven't accepted yet
+MESSAGE_POLICIES = ("allow", "ask", "wait")
+MAX_HELD = 3  # how many messages someone can leave waiting while you decide
+HELD = 2  # messages.hidden = 2 means "waiting for the friend request to be accepted"
+
 # pictures: one profile picture plus a small gallery of photos / gifs
 IMAGE_TYPES = {"PNG": "image/png", "JPEG": "image/jpeg", "GIF": "image/gif", "WEBP": "image/webp"}
 MAX_PHOTOS = 12
@@ -72,8 +77,11 @@ CAPTION_LIMIT = 60
 CUSTOM_COLORS = ("page", "card", "text", "head_a", "head_b", "head_text", "border")
 CUSTOM_CHOICES = {
     "font": (
-        "verdana", "comic", "georgia", "courier", "trebuchet", "times", "impact",
-        "arial", "palatino", "lucida", "script",
+        # bundled fonts (web/fonts), the ones shown in the editor
+        "verdana", "nunito", "comic", "lora", "playfair", "courier", "typewriter",
+        "terminal", "pixel", "impact", "script", "gothic",
+        # older choices, still valid so profiles that use them keep working
+        "arial", "trebuchet", "georgia", "times", "palatino", "lucida",
     ),
     "pattern": ("none", "dots", "stripes", "checks", "grid", "diagonal", "stars", "hearts"),
     "border_style": ("solid", "dashed", "dotted", "double", "ridge", "groove"),
@@ -116,6 +124,10 @@ class KeyBody(BaseModel):
 
 class CommentBody(BaseModel):
     body: str
+
+
+class SettingsBody(BaseModel):
+    message_policy: str | None = None
 
 
 class CaptionBody(BaseModel):
@@ -802,6 +814,36 @@ def friend_status(conn, me_id: int, other_id: int) -> str:
     return "outgoing" if row["requester_id"] == me_id else "incoming"
 
 
+async def release_held(conn, recipient_id: int, sender_id: int | None = None):
+    """Let messages that were waiting for a decision through. They count as delivered
+    now, and the senders find out."""
+    rows = conn.execute(
+        "SELECT m.id, u.username FROM messages m JOIN users u ON u.id = m.sender_id "
+        "WHERE m.recipient_id = :r AND m.hidden = :held AND (:s IS NULL OR m.sender_id = :s)",
+        {"r": recipient_id, "s": sender_id, "held": HELD},
+    ).fetchall()
+    if not rows:
+        return
+    ids = [r["id"] for r in rows]
+    marks = ",".join("?" * len(ids))
+    conn.execute(
+        f"UPDATE messages SET hidden = 0, delivered_at = datetime('now') WHERE id IN ({marks})",
+        ids,
+    )
+    conn.commit()
+    for r in rows:
+        await manager.send_user(r["username"], {"type": "receipt", "id": r["id"], "status": "delivered"})
+
+
+def drop_held(conn, a: int, b: int):
+    """The request was declined, cancelled or blocked: waiting messages are never shown."""
+    conn.execute(
+        "UPDATE messages SET hidden = 1 WHERE hidden = :held AND "
+        "((sender_id = :a AND recipient_id = :b) OR (sender_id = :b AND recipient_id = :a))",
+        {"a": a, "b": b, "held": HELD},
+    )
+
+
 def friend_ids(conn, user_id: int) -> set[int]:
     rows = conn.execute(
         "SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END "
@@ -883,6 +925,7 @@ async def accept_friend(username: str, user=Depends(current_user), conn=Depends(
     if cur.rowcount == 0 and friend_status(conn, user["id"], peer["id"]) != "friends":
         raise HTTPException(404, "no friend request from that user")
     if cur.rowcount:
+        await release_held(conn, user["id"], peer["id"])
         await manager.send_user(
             peer["username"], {"type": "social", "event": "accepted", "from": user["username"]}
         )
@@ -898,6 +941,7 @@ async def remove_friend(username: str, user=Depends(current_user), conn=Depends(
         "OR (requester_id = :b AND addressee_id = :a)",
         {"a": user["id"], "b": peer["id"]},
     )
+    drop_held(conn, user["id"], peer["id"])
     conn.commit()
     await manager.send_user(
         peer["username"], {"type": "social", "event": "removed", "from": user["username"]}
@@ -971,6 +1015,7 @@ async def block_user(username: str, user=Depends(current_user), conn=Depends(get
         "OR (requester_id = :b AND addressee_id = :a)",
         {"a": user["id"], "b": peer["id"]},
     )
+    drop_held(conn, user["id"], peer["id"])
     conn.commit()
     await notify_block_change(user["username"], peer["username"])
     return {"blocked": True}
@@ -986,6 +1031,30 @@ async def unblock_user(username: str, user=Depends(current_user), conn=Depends(g
     conn.commit()
     await notify_block_change(user["username"], peer["username"])
     return {"blocked": False}
+
+
+# ---------- settings ----------
+
+
+@app.get("/api/settings")
+def get_settings(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute("SELECT msg_policy FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return {"message_policy": row["msg_policy"]}
+
+
+@app.put("/api/settings")
+async def put_settings(body: SettingsBody, user=Depends(current_user), conn=Depends(get_conn)):
+    if body.message_policy is not None:
+        if body.message_policy not in MESSAGE_POLICIES:
+            raise HTTPException(400, "pick allow, ask or wait")
+        conn.execute(
+            "UPDATE users SET msg_policy = ? WHERE id = ?", (body.message_policy, user["id"])
+        )
+        conn.commit()
+        if body.message_policy == "allow":
+            # you're fine with them now, so whatever was waiting comes through
+            await release_held(conn, user["id"])
+    return get_settings(user, conn)
 
 
 # ---------- keys, contacts, history ----------
@@ -1011,6 +1080,9 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
                (SELECT COUNT(*) FROM messages m
                  WHERE m.sender_id = u.id AND m.recipient_id = :me
                    AND m.read_at IS NULL AND m.hidden = 0) AS unread,
+               (SELECT COUNT(*) FROM messages m
+                 WHERE m.sender_id = u.id AND m.recipient_id = :me
+                   AND m.hidden = 2) AS held,
                (SELECT MAX(m.id) FROM messages m
                  WHERE (m.sender_id = u.id AND m.recipient_id = :me AND m.hidden = 0)
                     OR (m.sender_id = :me AND m.recipient_id = u.id)) AS last_msg
@@ -1053,6 +1125,7 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
                 "last_seen": None if hidden else r["last_seen"],
                 "online": False if hidden else manager.is_online(r["username"]),
                 "unread": r["unread"],
+                "held": 0 if hidden else r["held"],
                 "friend": friend_status(conn, user["id"], r["id"]),
                 "blocked": r["id"] in mine,
             }
@@ -1072,11 +1145,11 @@ def history(
     rows = conn.execute(
         """
         SELECT m.id, u.username AS sender, m.iv, m.ct, m.created_at,
-               m.delivered_at, m.read_at
+               m.delivered_at, m.read_at, m.hidden
         FROM messages m JOIN users u ON u.id = m.sender_id
         WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
             OR (m.sender_id = :peer AND m.recipient_id = :me))
-          AND NOT (m.recipient_id = :me AND m.hidden = 1)
+          AND NOT (m.recipient_id = :me AND m.hidden != 0)
           AND (:before IS NULL OR m.id < :before)
         ORDER BY m.id DESC LIMIT :limit
         """,
@@ -1091,9 +1164,36 @@ def history(
             "ts": r["created_at"],
             "delivered": r["delivered_at"] is not None,
             "read": r["read_at"] is not None,
+            # my own message that's still waiting for them to accept my request
+            "held": r["hidden"] == HELD and r["sender"] == user["username"],
         }
         for r in reversed(rows)
     ]
+
+
+def message_rule(conn, me_id: int, peer_id: int) -> tuple[int, str]:
+    """Can I message them right now? Returns (hidden value to store, reason it's refused).
+
+    Friends can always talk. If I asked them to be friends and they haven't answered,
+    their setting decides: allow it, hold my messages until they accept, or make me wait.
+    """
+    status = friend_status(conn, me_id, peer_id)
+    if status in ("friends", "incoming"):
+        return 0, ""  # (incoming: they asked me, so answering them is always fine)
+    if status == "none":
+        return 0, "not_friends"
+    policy = conn.execute("SELECT msg_policy FROM users WHERE id = ?", (peer_id,)).fetchone()[0]
+    if policy == "wait":
+        return 0, "wait"
+    if policy == "ask":
+        held = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE sender_id = ? AND recipient_id = ? AND hidden = ?",
+            (me_id, peer_id, HELD),
+        ).fetchone()[0]
+        if held >= MAX_HELD:
+            return 0, "limit"
+        return HELD, ""
+    return 0, ""
 
 
 # ---------- websocket: presence, typing, live messages ----------
@@ -1236,6 +1336,14 @@ async def websocket_endpoint(ws: WebSocket):
                 # if they blocked me the message is kept (my history stays whole)
                 # but hidden from them, and I'm not told
                 hidden = 1 if i_blocked(conn, peer["id"], my_id) else 0
+                if not hidden:
+                    hidden, why = message_rule(conn, my_id, peer["id"])
+                    if why:
+                        await manager.send_user(
+                            me,
+                            {"type": "msg-rejected", "to": peer["username"], "cid": data.get("cid"), "reason": why},
+                        )
+                        continue
                 cur = conn.execute(
                     "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden) "
                     "VALUES (?, ?, ?, ?, ?)",
@@ -1258,6 +1366,8 @@ async def websocket_endpoint(ws: WebSocket):
                 }
                 got = 0 if hidden else await manager.send_user(peer["username"], payload)
                 delivered = got > 0
+                # waiting for the friend request to be accepted: tell my tabs, not them
+                waiting = hidden == HELD
                 if delivered:
                     conn.execute(
                         "UPDATE messages SET delivered_at = datetime('now') WHERE id = ?",
@@ -1265,7 +1375,7 @@ async def websocket_endpoint(ws: WebSocket):
                     )
                     conn.commit()
                 # echo to every tab of the sender so they all stay in sync
-                await manager.send_user(me, {**payload, "delivered": delivered})
+                await manager.send_user(me, {**payload, "delivered": delivered, "held": waiting})
 
             elif kind == "read":
                 rows = conn.execute(

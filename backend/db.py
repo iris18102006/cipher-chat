@@ -125,6 +125,9 @@ def init_db():
         _add_column(conn, "users", "avatar_id", "INTEGER")
         _add_column(conn, "users", "bg_image_id", "INTEGER")
         _add_column(conn, "users", "stickers", "TEXT NOT NULL DEFAULT '[]'")
+        # what happens to messages from someone whose friend request I haven't accepted yet:
+        # allow (they arrive), ask (held until I accept) or wait (not allowed)
+        _add_column(conn, "users", "msg_policy", "TEXT NOT NULL DEFAULT 'allow'")
         conn.commit()
     finally:
         conn.close()
