@@ -184,7 +184,7 @@ function buddyRow(c) {
   const li = el("li", c.username === state.open ? "active" : "");
   li.dataset.user = c.username;
   li.append(el("span", "dot " + (c.online ? "on" : "off")));
-  li.append(el("span", "buddy-avatar", avatarFor(c)));
+  li.append(avatarNode(c, "tiny"));
   const info = el("div", "buddy-info");
   info.append(el("div", "buddy-name", shownName(c)));
   info.append(el("div", "buddy-sub", c.typing ? "typing..." : c.online ? "online" : lastSeenText(c)));

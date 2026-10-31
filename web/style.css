@@ -562,13 +562,7 @@ h2 {
   }
 }
 
-/* avatars and moods in the buddy list */
-
-.buddy-avatar {
-  flex-shrink: 0;
-  font-size: 20px;
-  line-height: 1;
-}
+/* moods in the buddy list (the avatars are .pf-avatar.tiny, see profile.css) */
 
 .buddy-mood {
   overflow: hidden;
