@@ -85,3 +85,6 @@ This is a learning project, not Signal.
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
 - [ ] Chat themes for each conversation
+- [ ] Fix: unblocking someone does nothing
+- [ ] Separate button for friend requests
+- [ ] Separate button that lists who you blocked
