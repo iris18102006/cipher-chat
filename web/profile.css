@@ -15,6 +15,8 @@
   --p-border-width: 2px;
   --p-border-style: solid;
   --p-radius: 0px;
+  /* boxes inside the page use half the page border, so the border slider changes them too */
+  --p-line: calc(var(--p-border-width) / 2);
 }
 
 #profile-overlay {
@@ -60,6 +62,7 @@
 }
 
 #pf-body {
+  position: relative; /* the stickers are placed on top of this */
   padding: 12px;
 }
 
@@ -71,28 +74,69 @@
   align-items: center;
   padding: 12px;
   background: var(--p-card);
-  border: 1px solid var(--p-border);
+  border: var(--p-line) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
 }
 
+/* profile picture: a photo, or the first letter of the name when there isn't one.
+   The outer box is the accent coloured ring, the inner one is the picture, and both
+   follow the shape picked in the editor (the av-* classes below). */
 .pf-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 84px;
   height: 84px;
   flex-shrink: 0;
-  font-size: 46px;
-  background: var(--p-page);
-  border: 3px solid var(--p-accent);
-  border-radius: 50%;
+  padding: 3px;
+  overflow: hidden;
+  background: var(--p-accent, #ff9933);
+  border-radius: var(--av-r, 50%);
+  clip-path: var(--av-clip, none);
+}
+
+.pf-avatar > img,
+.pf-avatar > .pf-avatar-letter {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  object-fit: cover;
+  border-radius: var(--av-r, 50%);
+  clip-path: var(--av-clip, none);
+  background: var(--p-page, #eef3fb);
+}
+
+.pf-avatar-letter {
+  font-size: 38px;
+  font-weight: bold;
+  color: var(--p-accent, #ff9933);
 }
 
 .pf-avatar.small {
   width: 44px;
   height: 44px;
-  font-size: 24px;
-  border-width: 2px;
+  padding: 2px;
 }
+
+.pf-avatar.small .pf-avatar-letter {
+  font-size: 20px;
+}
+
+.pf-avatar.tiny {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+}
+
+.pf-avatar.tiny .pf-avatar-letter {
+  font-size: 13px;
+}
+
+#profile-card.av-circle { --av-r: 50%; --av-clip: none; }
+#profile-card.av-rounded { --av-r: 24%; --av-clip: none; }
+#profile-card.av-square { --av-r: 0; --av-clip: none; }
+#profile-card.av-diamond { --av-r: 0; --av-clip: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+#profile-card.av-hexagon { --av-r: 0; --av-clip: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
 
 .pf-who {
   flex: 1;
@@ -144,8 +188,10 @@
 
 .pf-section {
   margin-bottom: 10px;
+  overflow: hidden;
   background: var(--p-card);
-  border: 1px solid var(--p-border);
+  border: var(--p-line) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
 }
 
 .pf-section h3 {
@@ -169,6 +215,8 @@
 
 .pf-stats {
   display: flex;
+  background: var(--p-card);
+  border-radius: var(--p-radius);
   flex-wrap: wrap;
   gap: 4px 16px;
   padding: 8px 10px;
@@ -198,6 +246,7 @@
   cursor: pointer;
   background: var(--p-page);
   border: 1px solid var(--p-border);
+  border-radius: calc(var(--p-radius) / 2);
 }
 
 .pf-top-item:hover {
@@ -358,14 +407,7 @@
 }
 
 /* ---------- safe MySpace-style customization ---------- */
-
-#profile-card.font-verdana { --p-font: Verdana, Tahoma, sans-serif; }
-#profile-card.font-comic { --p-font: "Comic Sans MS", "Chalkboard SE", cursive; }
-#profile-card.font-georgia { --p-font: Georgia, "Times New Roman", serif; }
-#profile-card.font-courier { --p-font: "Courier New", monospace; }
-#profile-card.font-trebuchet { --p-font: "Trebuchet MS", Verdana, sans-serif; }
-#profile-card.font-times { --p-font: "Times New Roman", Times, serif; }
-#profile-card.font-impact { --p-font: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; }
+/* fonts are set from profile.js (FONT_CHOICES), not here: a font class would lose to the theme's own */
 
 #profile-card.pattern-dots { background-image: radial-gradient(var(--p-border) 1px, transparent 1px); background-size: 12px 12px; }
 #profile-card.pattern-stripes { background-image: repeating-linear-gradient(90deg, transparent 0 14px, color-mix(in srgb, var(--p-border) 22%, transparent) 14px 21px); }
@@ -389,13 +431,6 @@
 @keyframes pf-marquee { from { transform: translateX(0); } to { transform: translateX(28px); } }
 @media (prefers-reduced-motion: reduce) { #profile-card.pf-marquee .pf-name { animation: none; } }
 
-.pf-custom-title {
-  margin: 14px 0 8px;
-  padding-bottom: 5px;
-  font-weight: bold;
-  border-bottom: 1px solid var(--p-border);
-}
-.pf-custom-title span { font-weight: normal; color: var(--p-muted); font-size: 10px; }
 .pf-style-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
 .pf-style-color { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px; background: var(--p-card); border: 1px solid var(--p-border); font-size: 10px; }
 .pf-style-color input[type="color"] { width: 32px; height: 24px; padding: 0; border: 0; background: transparent; }
@@ -417,3 +452,373 @@
 .pf-wall-who, .pf-wall-delete { padding: 0; border: 0; background: none; color: var(--p-accent); font: inherit; font-weight: bold; }
 .pf-wall-delete { margin-left: auto; color: var(--p-muted); }
 .pf-wall-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+
+/* ---------- editor groups ---------- */
+
+.pf-group {
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: var(--p-card);
+  border: var(--p-line) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
+}
+
+.pf-group > summary {
+  padding: 5px 8px;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--p-head-text);
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+}
+
+.pf-group-body {
+  padding: 10px 8px 4px;
+}
+
+.pf-hint {
+  margin: 0 0 8px;
+  font-size: 10px;
+  color: var(--p-muted);
+}
+
+/* theme picker: a little preview of each theme */
+
+.pf-row.wide .pf-themes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pf-theme-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px;
+  font-size: 10px;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 2px solid var(--p-border);
+}
+
+.pf-theme-btn:hover:not(:disabled) {
+  background: var(--p-card);
+  border-color: var(--p-accent);
+}
+
+.pf-theme-btn.on {
+  border-color: var(--p-accent);
+  box-shadow: 0 0 0 2px var(--p-accent);
+}
+
+.pf-swatch {
+  position: relative;
+  display: block;
+  height: 42px;
+  overflow: hidden;
+  background: var(--p-page);
+  border: 1px solid var(--p-border);
+}
+
+.pf-swatch::before {
+  content: "";
+  display: block;
+  height: 11px;
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+  border-bottom: 2px solid var(--p-accent);
+}
+
+.pf-swatch::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 5px;
+  height: 12px;
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+/* little shapes on the avatar shape buttons */
+
+.pf-shape {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--p-accent);
+}
+
+.pf-shape.shape-circle { border-radius: 50%; }
+.pf-shape.shape-rounded { border-radius: 24%; }
+.pf-shape.shape-diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.pf-shape.shape-hexagon { clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
+
+.pf-choice.text.with-icon,
+.pf-choice.text.with-avatar {
+  display: inline-flex;
+  align-items: center;
+}
+
+.pf-choice.text.with-avatar .pf-avatar {
+  margin-right: 6px;
+}
+
+/* ---------- profile picture editor ---------- */
+
+.pf-avatar-edit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.pf-avatar-side {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-avatar-side .pf-actions {
+  margin: 0 0 6px;
+}
+
+/* ---------- gallery on a profile ---------- */
+
+.pf-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.pf-photo {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--p-page);
+  border: 1px solid var(--p-border);
+  border-radius: calc(var(--p-radius) / 2);
+}
+
+.pf-photo:hover,
+.pf-photo:focus-visible {
+  border-color: var(--p-accent);
+}
+
+.pf-photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.pf-photo figcaption {
+  padding: 3px 5px;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--p-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-gif-tag {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+}
+
+/* full size view (lives outside the profile card, so no --p-* colours here) */
+
+#pf-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.88);
+}
+
+#pf-lightbox img {
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+}
+
+#pf-lightbox .cap {
+  min-height: 16px;
+  max-width: 90%;
+  color: #fff;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+#pf-lightbox .nav {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- picture library in the editor ---------- */
+
+.pf-lib {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pf-lib-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  background: var(--p-page);
+  border: 1px solid var(--p-border);
+}
+
+.pf-lib-item .pic {
+  position: relative;
+}
+
+.pf-lib-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.pf-lib-item input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 10px;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+.pf-lib-item button {
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
+.pf-choice.thumb {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 2px;
+}
+
+.pf-choice.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+/* ---------- stickers ---------- */
+
+/* on a profile: a layer over the whole page that never blocks clicks */
+.pf-stickers {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pf-sticker {
+  position: absolute;
+  max-width: none;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* in the editor: a small copy of the page you drag stickers around on */
+.pf-board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5%;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 100 / 130;
+  margin: 0 auto 8px;
+  padding: 3%;
+  overflow: hidden;
+  touch-action: none;
+  background: var(--p-page);
+  border: 2px dashed var(--p-border);
+  border-radius: var(--p-radius);
+}
+
+.pf-board-block {
+  min-height: 0;
+  padding: 2px 5px;
+  overflow: hidden;
+  font-size: 9px;
+  color: var(--p-muted);
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+.pf-board .pf-sticker {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  outline: 2px dashed transparent;
+}
+
+.pf-board .pf-sticker:active {
+  cursor: grabbing;
+}
+
+.pf-board .pf-sticker.selected,
+.pf-board .pf-sticker:focus-visible {
+  outline-color: var(--p-accent);
+}
+
+.pf-sticker-controls {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 700px) {
+  .pf-row.wide .pf-themes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pf-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pf-avatar-edit {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-board .pf-sticker {
+    transition: none;
+  }
+}

@@ -1,13 +1,25 @@
 /* profile themes. Each one only changes the --p-* variables from profile.css.
-   The names here have to match THEMES in backend/main.py. */
+   The names here have to match THEMES in backend/main.py.
+   Every theme also styles a .pf-swatch, the little preview in the theme picker. */
 
-#profile-card.theme-classic {
-  /* the defaults in profile.css, listed so the picker has something to preview */
+#profile-card.theme-classic,
+.pf-swatch.theme-classic {
+  /* same as the defaults in profile.css, listed in full so the picker can preview it
+     and so choosing classic really switches every colour back */
   --p-page: #eef3fb;
   --p-card: #ffffff;
+  --p-text: #111111;
+  --p-muted: #667;
+  --p-head-a: #2a5da8;
+  --p-head-b: #17407f;
+  --p-head-text: #ffffff;
+  --p-accent: #ff9933;
+  --p-border: #7f9db9;
+  --p-font: Verdana, Tahoma, sans-serif;
 }
 
-#profile-card.theme-emo {
+#profile-card.theme-emo,
+.pf-swatch.theme-emo {
   --p-page: #1b1b22;
   --p-card: #26262f;
   --p-text: #f1e9f5;
@@ -20,7 +32,8 @@
   --p-font: "Trebuchet MS", Verdana, sans-serif;
 }
 
-#profile-card.theme-kawaii {
+#profile-card.theme-kawaii,
+.pf-swatch.theme-kawaii {
   --p-page: #ffeaf4;
   --p-card: #fff8fc;
   --p-text: #5a2d4a;
@@ -33,7 +46,8 @@
   --p-font: "Comic Sans MS", "Chalkboard SE", Verdana, sans-serif;
 }
 
-#profile-card.theme-neon {
+#profile-card.theme-neon,
+.pf-swatch.theme-neon {
   --p-page: #08051a;
   --p-card: #120a2e;
   --p-text: #e8fbff;
@@ -46,7 +60,8 @@
   --p-font: "Courier New", monospace;
 }
 
-#profile-card.theme-forest {
+#profile-card.theme-forest,
+.pf-swatch.theme-forest {
   --p-page: #e4efe0;
   --p-card: #f6fbf3;
   --p-text: #1d3321;
@@ -59,7 +74,8 @@
   --p-font: Georgia, "Times New Roman", serif;
 }
 
-#profile-card.theme-sunset {
+#profile-card.theme-sunset,
+.pf-swatch.theme-sunset {
   --p-page: #fff0e0;
   --p-card: #fffaf4;
   --p-text: #4a2312;
@@ -72,7 +88,8 @@
   --p-font: Verdana, Tahoma, sans-serif;
 }
 
-#profile-card.theme-gothic {
+#profile-card.theme-gothic,
+.pf-swatch.theme-gothic {
   --p-page: #0d0d0f;
   --p-card: #17171b;
   --p-text: #e6e0d4;
@@ -85,7 +102,8 @@
   --p-font: Georgia, "Times New Roman", serif;
 }
 
-#profile-card.theme-terminal {
+#profile-card.theme-terminal,
+.pf-swatch.theme-terminal {
   --p-page: #000000;
   --p-card: #031403;
   --p-text: #33ff66;
