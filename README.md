@@ -12,7 +12,8 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Typing indicator, delivered and read ticks
 - Message history that survives refreshes (stored encrypted, decrypted in your browser)
 - Key-change warning: if a friend's key changes, the composer locks until you trust the new key
-- Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", an emoji avatar, 8 themes and an accent colour, with a live preview while you edit
+- Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", a profile photo, 8 themes with previews, an accent colour, 11 fonts, avatar shapes, border and corner controls, with a live preview while you edit
+- Pictures: upload a profile photo, a gallery of up to 12 photos and GIFs (click to view full size), a background picture, and stickers you drag around a small copy of your page. All without writing code
 - Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
 - Friend requests (send, accept, decline, cancel, unfriend) with a popup when one arrives
 - Blocking: a blocked person can't message you, can't see when you're online and can't see your profile
@@ -30,7 +31,9 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 
 ## Profiles, friends and blocking
 
-- Profiles are plain text and an emoji. Nothing you type is ever rendered as html, so there's no way to inject code through a profile.
+- Profiles are plain text plus pictures. Nothing you type is ever rendered as html, so there's no way to inject code through a profile.
+- Uploads: png, jpg, gif and webp only (no svg). Profile photos are cropped square and every still picture is re-saved as a resized webp, which also removes hidden data like GPS from photos. Animated GIFs are checked and kept as they are so they keep moving. Limits: 5 MB for a profile photo, 4 MB and 12 per person for the gallery, 8 stickers. Pictures are stored in the database, only logged-in people can load them, and someone who blocked you doesn't show you theirs.
+- Pictures are **not** encrypted, same as the rest of a profile. Only messages are.
 - Themes are presets (`web/themes.css`), they only change a handful of colour variables.
 - Anyone logged in can look at a profile. Profiles are **not** encrypted, only messages are, so don't put secrets in your about me.
 - You can message anyone who hasn't blocked you, friends or not. Friends just get their own section in the buddy list and can go in your top friends.
@@ -66,7 +69,6 @@ This is a learning project, not Signal.
 - The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
 - Login rate limiting is in memory and resets when the server restarts
 - 1-to-1 only, no group chats yet
-- Avatars are emoji only, no image uploads yet
 
 ## Roadmap
 
@@ -76,6 +78,6 @@ This is a learning project, not Signal.
 - [x] Profiles you can customize (no code needed)
 - [x] Friends and blocking
 - [x] Profile comments / a wall
-- [ ] Image avatars
+- [x] Image avatars, gallery, GIFs and stickers
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
