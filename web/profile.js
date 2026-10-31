@@ -70,19 +70,30 @@ const COLOR_FIELDS = [
   ["head_b", "Header 2"], ["head_text", "Header text"], ["border", "Borders"],
 ];
 // [id, label, css font stack]. The ids match CUSTOM_CHOICES["font"] in backend/main.py.
+// Most of these are bundled in web/fonts (see fonts.css) so they look the same on every computer.
 // The font is set on the card itself (not with a class) so it always beats the theme's own font.
 const FONT_CHOICES = [
-  ["verdana", "Verdana", "Verdana, Tahoma, sans-serif"],
-  ["arial", "Arial", "Arial, Helvetica, sans-serif"],
-  ["trebuchet", "Trebuchet", '"Trebuchet MS", Verdana, sans-serif'],
-  ["comic", "Comic Sans", '"Comic Sans MS", "Chalkboard SE", cursive'],
-  ["georgia", "Georgia", 'Georgia, "Times New Roman", serif'],
-  ["times", "Times", '"Times New Roman", Times, serif'],
-  ["palatino", "Palatino", '"Palatino Linotype", Palatino, "Book Antiqua", serif'],
-  ["courier", "Courier", '"Courier New", monospace'],
-  ["lucida", "Lucida", '"Lucida Console", "Lucida Sans Typewriter", Monaco, monospace'],
-  ["impact", "Impact", 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif'],
-  ["script", "Script", '"Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive'],
+  ["verdana", "Classic", "Verdana, Tahoma, sans-serif"],
+  ["nunito", "Nunito", '"Nunito", Verdana, sans-serif'],
+  ["comic", "Comic Neue", '"Comic Neue", "Comic Sans MS", cursive'],
+  ["lora", "Lora", '"Lora", Georgia, serif'],
+  ["playfair", "Playfair", '"Playfair Display", Georgia, serif'],
+  ["courier", "Courier Prime", '"Courier Prime", "Courier New", monospace'],
+  ["typewriter", "Typewriter", '"Special Elite", "Courier New", monospace'],
+  ["terminal", "Terminal", '"VT323", "Courier New", monospace'],
+  ["pixel", "Pixel", '"Press Start 2P", monospace'],
+  ["impact", "Poster", 'Anton, Impact, sans-serif'],
+  ["script", "Handwriting", '"Dancing Script", "Brush Script MT", cursive'],
+  ["gothic", "Gothic", '"Pirata One", "Old English Text MT", serif'],
+];
+// older choices: not in the picker any more, but profiles that picked them still show them
+const LEGACY_FONTS = [
+  ["arial", "Arial, Helvetica, sans-serif"],
+  ["trebuchet", '"Trebuchet MS", Verdana, sans-serif'],
+  ["georgia", 'Georgia, "Times New Roman", serif'],
+  ["times", '"Times New Roman", Times, serif'],
+  ["palatino", '"Palatino Linotype", Palatino, "Book Antiqua", serif'],
+  ["lucida", '"Lucida Console", Monaco, monospace'],
 ];
 const PATTERNS = [
   ["none", "None"], ["dots", "Dots"], ["stripes", "Stripes"], ["checks", "Checks"],
@@ -118,7 +129,9 @@ function applyTheme(card, look) {
     if (custom[key]) card.style.setProperty(variable, custom[key]);
   }
   const font = FONT_CHOICES.find((f) => f[0] === custom.font);
+  const legacy = LEGACY_FONTS.find((f) => f[0] === custom.font);
   if (font) card.style.setProperty("--p-font", font[2]);
+  else if (legacy) card.style.setProperty("--p-font", legacy[1]);
   if (custom.pattern && custom.pattern !== "none") card.classList.add("pattern-" + custom.pattern);
   if (custom.name_effect && custom.name_effect !== "none") card.classList.add("name-" + custom.name_effect);
   if (custom.avatar_shape) card.classList.add("av-" + custom.avatar_shape);
@@ -467,7 +480,7 @@ function renderEditor(p) {
   }
   looks.append(th.row);
 
-  const ac = choiceRow("Accent colour", "optional");
+  const ac = choiceRow("Accent colour", "or pick your own");
   choiceButton(ac.box, "theme's own", !look.accent, () => {
     look.accent = "";
     preview();
@@ -481,6 +494,42 @@ function renderEditor(p) {
     b.title = color;
     b.setAttribute("aria-label", "accent " + color);
   }
+  // your own colour: a colour picker and a hex box that follow each other
+  const own = el("input");
+  own.type = "color";
+  own.title = "pick your own accent colour";
+  own.setAttribute("aria-label", "your own accent colour");
+  const hex = el("input");
+  hex.type = "text";
+  hex.maxLength = 7;
+  hex.placeholder = "#rrggbb";
+  hex.setAttribute("aria-label", "accent colour as hex");
+  hex.className = "pf-hex";
+  const useOwn = (color) => {
+    look.accent = color;
+    for (const b of ac.box.querySelectorAll(".pf-choice")) b.classList.remove("on");
+    own.value = color;
+    hex.value = color;
+    hex.classList.remove("bad");
+    preview();
+  };
+  own.oninput = () => useOwn(own.value.toLowerCase());
+  hex.oninput = () => {
+    const v = hex.value.trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(v)) useOwn(v);
+    else hex.classList.toggle("bad", v !== "");
+  };
+  if (look.accent && !ACCENTS.includes(look.accent)) {
+    own.value = look.accent;
+    hex.value = look.accent;
+  } else {
+    own.value = look.accent || "#ff9933";
+  }
+  ac.box.append(own, hex);
+  // choosing a preset or "theme's own" clears the hex box
+  ac.box.addEventListener("click", (e) => {
+    if (e.target.closest(".pf-choice")) hex.value = "";
+  });
   looks.append(ac.row);
 
   const colors = el("div", "pf-style-grid");

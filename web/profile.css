@@ -32,6 +32,7 @@
 }
 
 #profile-card {
+  position: relative; /* the heart and star patterns are a layer inside it */
   width: 100%;
   max-width: 640px;
   background: var(--p-page);
@@ -414,8 +415,6 @@
 #profile-card.pattern-checks { background-image: conic-gradient(color-mix(in srgb, var(--p-border) 18%, transparent) 25%, transparent 0 50%, color-mix(in srgb, var(--p-border) 18%, transparent) 0 75%, transparent 0); background-size: 24px 24px; }
 #profile-card.pattern-grid { background-image: linear-gradient(color-mix(in srgb, var(--p-border) 20%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--p-border) 20%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
 #profile-card.pattern-diagonal { background-image: repeating-linear-gradient(135deg, transparent 0 12px, color-mix(in srgb, var(--p-border) 20%, transparent) 12px 16px); }
-#profile-card.pattern-stars { background-image: radial-gradient(circle at 20% 20%, var(--p-accent) 0 1px, transparent 2px), radial-gradient(circle at 70% 60%, var(--p-accent) 0 1px, transparent 2px); background-size: 34px 34px; }
-#profile-card.pattern-hearts { background-image: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--p-accent) 35%, transparent) 0 2px, transparent 3px), radial-gradient(circle at 60% 70%, color-mix(in srgb, var(--p-accent) 35%, transparent) 0 2px, transparent 3px); background-size: 28px 28px; }
 
 #profile-card.name-glow .pf-name { text-shadow: 0 0 4px var(--p-accent), 0 0 10px var(--p-accent); }
 #profile-card.name-shadow .pf-name { text-shadow: 3px 3px 0 color-mix(in srgb, var(--p-text) 35%, transparent); }
@@ -821,4 +820,53 @@
   .pf-board .pf-sticker {
     transition: none;
   }
+}
+
+
+/* hearts and stars are real shapes: a coloured layer cut out with a mask */
+#profile-card.pattern-hearts::before,
+#profile-card.pattern-stars::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--p-accent) 38%, transparent);
+  -webkit-mask-size: 44px 44px;
+  mask-size: 44px 44px;
+}
+
+#profile-card.pattern-hearts::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%2038S10%2030%2010%2020c0-5%204-8%207.5-8%203%200%205%201.8%206.5%204%201.5-2.2%203.5-4%206.5-4C34%2012%2038%2015%2038%2020c0%2010-14%2018-14%2018z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%2038S10%2030%2010%2020c0-5%204-8%207.5-8%203%200%205%201.8%206.5%204%201.5-2.2%203.5-4%206.5-4C34%2012%2038%2015%2038%2020c0%2010-14%2018-14%2018z'/%3E%3C/svg%3E");
+}
+
+#profile-card.pattern-stars::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%208l4.2%209.6%2010.4%201-7.9%206.9%202.3%2010.2L24%2030.4l-9%205.3%202.3-10.2-7.9-6.9%2010.4-1z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%208l4.2%209.6%2010.4%201-7.9%206.9%202.3%2010.2L24%2030.4l-9%205.3%202.3-10.2-7.9-6.9%2010.4-1z'/%3E%3C/svg%3E");
+}
+
+#profile-card.pattern-hearts #pf-bar,
+#profile-card.pattern-stars #pf-bar {
+  position: relative;
+}
+
+.pf-hex {
+  width: 84px;
+  padding: 3px 5px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+.pf-hex.bad {
+  border-color: #c0392b;
+}
+
+.pf-picker input[type="color"] {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  cursor: pointer;
 }
