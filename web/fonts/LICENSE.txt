@@ -1,0 +1,5 @@
+These fonts are bundled so profiles look the same on every computer.
+All of them are free under the SIL Open Font License 1.1 (https://openfontlicense.org):
+Comic Neue, Anton, Dancing Script, Courier Prime, Lora, Playfair Display, Nunito,
+Press Start 2P, VT323, Special Elite and Pirata One.
+They come from the Fontsource packages on npm (@fontsource/<name>), latin subset, regular weight.
