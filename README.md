@@ -12,7 +12,8 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Typing indicator, delivered and read ticks
 - Message history that survives refreshes (stored encrypted, decrypted in your browser)
 - Key-change warning: if a friend's key changes, the composer locks until you trust the new key
-- Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", a profile photo, 8 themes with previews, an accent colour, 11 fonts, avatar shapes, border and corner controls, with a live preview while you edit
+- Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", a profile photo, 8 themes with previews, an accent colour (presets or any colour you pick), 12 bundled fonts, avatar shapes, real heart and star patterns, border and corner controls, with a live preview while you edit
+- Settings: choose what happens to messages from someone whose friend request you haven't accepted yet: let them through, hold them until you accept (up to 3, you only see a count), or make them wait. You answer the request right from the chat
 - Pictures: upload a profile photo, a gallery of up to 12 photos and GIFs (click to view full size), a background picture, and stickers you drag around a small copy of your page. All without writing code
 - Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
 - Friend requests (send, accept, decline, cancel, unfriend) with a popup when one arrives
@@ -65,6 +66,7 @@ This is a learning project, not Signal.
 - Clearing site data deletes your private key and with it your ability to read old messages.
 - No forward secrecy, a stolen private key decrypts everything
 - The server still sees metadata: who talks to whom, when, message sizes, and online status
+- Message settings only cover people who sent you a friend request. Nobody can message someone they have no friend request or friendship with. Being refused ("wait") is shown to the sender, unlike a block
 - Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
 - The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
 - Login rate limiting is in memory and resets when the server restarts
@@ -79,5 +81,6 @@ This is a learning project, not Signal.
 - [x] Friends and blocking
 - [x] Profile comments / a wall
 - [x] Image avatars, gallery, GIFs and stickers
+- [x] Message requests and a settings page
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
