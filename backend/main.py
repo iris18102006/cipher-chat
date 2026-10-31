@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import io
 import json
 import logging
 import os
@@ -23,8 +24,10 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from .db import connect, init_db
@@ -51,14 +54,32 @@ PROFILE_LIMITS = {
 }
 MAX_TOP_FRIENDS = 8
 
+# pictures: one profile picture plus a small gallery of photos / gifs
+IMAGE_TYPES = {"PNG": "image/png", "JPEG": "image/jpeg", "GIF": "image/gif", "WEBP": "image/webp"}
+MAX_PHOTOS = 12
+MAX_STICKERS = 8
+MAX_AVATAR_UPLOAD = 5 * 1024 * 1024
+MAX_PHOTO_UPLOAD = 4 * 1024 * 1024
+MAX_SIDE = 8000  # pixels
+MAX_PIXELS = 25_000_000
+MAX_FRAMES = 300
+AVATAR_PX = 320
+PHOTO_PX = 1600
+CAPTION_LIMIT = 60
+
 # Safe MySpace-style profile customization. Users can combine whitelisted
 # visual options, but never submit arbitrary CSS/HTML.
 CUSTOM_COLORS = ("page", "card", "text", "head_a", "head_b", "head_text", "border")
 CUSTOM_CHOICES = {
-    "font": ("verdana", "comic", "georgia", "courier", "trebuchet", "times", "impact"),
+    "font": (
+        "verdana", "comic", "georgia", "courier", "trebuchet", "times", "impact",
+        "arial", "palatino", "lucida", "script",
+    ),
     "pattern": ("none", "dots", "stripes", "checks", "grid", "diagonal", "stars", "hearts"),
     "border_style": ("solid", "dashed", "dotted", "double", "ridge", "groove"),
     "name_effect": ("none", "glow", "shadow", "rainbow"),
+    "avatar_shape": ("circle", "rounded", "square", "diamond", "hexagon"),
+    "bg_mode": ("tile", "cover", "center"),
 }
 CUSTOM_RANGES = {"border_width": (0, 6), "radius": (0, 24)}
 CUSTOM_FLAGS = ("marquee",)
@@ -97,6 +118,18 @@ class CommentBody(BaseModel):
     body: str
 
 
+class CaptionBody(BaseModel):
+    caption: str
+
+
+class StickerBody(BaseModel):
+    img: int  # id of one of your own gallery pictures
+    x: float  # centre, % of the profile's width
+    y: float  # centre, % of the profile's height
+    w: float  # width, % of the profile's width
+    r: int = 0  # rotation in degrees
+
+
 class ProfileBody(BaseModel):
     # every field is optional so the editor can save just what changed
     display_name: str | None = None
@@ -106,11 +139,12 @@ class ProfileBody(BaseModel):
     interests: str | None = None
     location: str | None = None
     song: str | None = None
-    avatar: str | None = None
     theme: str | None = None
     accent: str | None = None
     custom: dict[str, str | int | bool] | None = None
     top_friends: list[str] | None = None
+    bg_image: int | None = None  # a gallery picture id, 0 clears it
+    stickers: list[StickerBody] | None = None
 
 
 def hash_token(token: str) -> str:
@@ -134,14 +168,6 @@ def clean_text(value: str, limit: int, field: str, multiline: bool = False) -> s
     value = value.replace("\r", "").strip()
     if len(value) > limit:
         raise HTTPException(400, f"{field.replace('_', ' ')} is too long (max {limit})")
-    return value
-
-
-def clean_avatar(value: str) -> str:
-    # an avatar is a single emoji (or a few joined together), never ascii text
-    value = value.strip()
-    if len(value) > 8 or any(ord(ch) < 128 for ch in value):
-        raise HTTPException(400, "pick an emoji for your avatar")
     return value
 
 
@@ -179,6 +205,154 @@ def custom_from_row(row) -> dict:
         return clean_custom(value)
     except (TypeError, ValueError, HTTPException, KeyError, AttributeError):
         return {}
+
+
+# ---------- pictures ----------
+
+
+def avatar_url(image_id) -> str:
+    return f"/api/img/{image_id}" if image_id else ""
+
+
+async def read_body(request: Request, limit: int) -> bytes:
+    """Read an upload, giving up as soon as it goes over the limit."""
+    too_big = HTTPException(413, f"that file is too big (max {limit // (1024 * 1024)} MB)")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        raise too_big
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > limit:
+            raise too_big
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def process_image(raw: bytes, kind: str) -> dict:
+    """Check that an upload really is a png/jpg/gif/webp and make it safe to serve.
+
+    Still pictures (and every profile picture) are decoded and saved again as a
+    resized webp, which also throws away any hidden data like GPS in the photo.
+    Animated gifs are kept as they are so they keep moving, after checking them.
+    """
+    try:
+        img = Image.open(io.BytesIO(raw))
+        fmt = img.format
+        if fmt not in IMAGE_TYPES:
+            raise HTTPException(400, "use a png, jpg, gif or webp picture")
+        w, h = img.size
+        if w < 1 or h < 1 or w > MAX_SIDE or h > MAX_SIDE or w * h > MAX_PIXELS:
+            raise HTTPException(400, f"that picture is too big (max {MAX_SIDE}px on a side)")
+        frames = getattr(img, "n_frames", 1)
+        if frames > 1 and fmt in ("GIF", "WEBP") and kind == "photo":
+            if frames > MAX_FRAMES:
+                raise HTTPException(400, f"that gif has too many frames (max {MAX_FRAMES})")
+            img.seek(frames - 1)  # a broken file fails here instead of in somebody's browser
+            img.load()
+            return {"mime": IMAGE_TYPES[fmt], "data": raw, "width": w, "height": h, "animated": 1}
+        img.seek(0)
+        img = ImageOps.exif_transpose(img)
+        has_alpha = img.mode in ("RGBA", "LA", "PA") or "transparency" in img.info
+        img = img.convert("RGBA" if has_alpha else "RGB")
+        if kind == "avatar":
+            img = ImageOps.fit(img, (AVATAR_PX, AVATAR_PX), Image.Resampling.LANCZOS)
+        else:
+            img.thumbnail((PHOTO_PX, PHOTO_PX), Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, "WEBP", quality=85)
+        return {
+            "mime": "image/webp", "data": out.getvalue(),
+            "width": img.width, "height": img.height, "animated": 0,
+        }
+    except HTTPException:
+        raise
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError, SyntaxError, EOFError):
+        raise HTTPException(400, "that doesn't look like a picture we can read")
+
+
+def own_photo(conn, user_id: int, image_id: int):
+    row = conn.execute(
+        "SELECT id FROM images WHERE id = ? AND owner_id = ? AND kind = 'photo'",
+        (image_id, user_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(400, "that picture isn't in your gallery")
+    return row
+
+
+def clean_stickers(conn, user_id: int, stickers: list[StickerBody]) -> list[dict]:
+    if len(stickers) > MAX_STICKERS:
+        raise HTTPException(400, f"you can only place {MAX_STICKERS} stickers")
+    out = []
+    for s in stickers:
+        own_photo(conn, user_id, s.img)
+        if not (0 <= s.x <= 100 and 0 <= s.y <= 100):
+            raise HTTPException(400, "stickers have to stay on the page")
+        if not 4 <= s.w <= 45:
+            raise HTTPException(400, "sticker size must be 4 to 45")
+        if not -45 <= s.r <= 45:
+            raise HTTPException(400, "sticker tilt must be -45 to 45")
+        out.append({"img": s.img, "x": round(s.x, 2), "y": round(s.y, 2), "w": round(s.w, 2), "r": s.r})
+    return out
+
+
+def media_for(conn, row) -> dict:
+    """Profile picture, gallery, background and stickers for one user row
+    (needs id, avatar_id, bg_image_id and stickers)."""
+    photos = conn.execute(
+        "SELECT id, caption, width, height, animated FROM images "
+        "WHERE owner_id = ? AND kind = 'photo' ORDER BY id",
+        (row["id"],),
+    ).fetchall()
+    ids = {r["id"] for r in photos}
+    try:
+        placed = json.loads(row["stickers"])
+    except (TypeError, ValueError):
+        placed = []
+    stickers = []
+    for st in placed if isinstance(placed, list) else []:
+        # a sticker whose picture was deleted just disappears
+        if isinstance(st, dict) and st.get("img") in ids:
+            stickers.append({**st, "url": avatar_url(st["img"])})
+    bg = row["bg_image_id"] if row["bg_image_id"] in ids else 0
+    return {
+        "avatar": avatar_url(row["avatar_id"]),
+        "photos": [
+            {
+                "id": r["id"], "url": avatar_url(r["id"]), "caption": r["caption"],
+                "width": r["width"], "height": r["height"], "animated": bool(r["animated"]),
+            }
+            for r in photos
+        ],
+        "stickers": stickers,
+        "bg_image": bg,
+        "bg_url": avatar_url(bg),
+    }
+
+
+def media_response(conn, user_id: int) -> dict:
+    row = conn.execute(
+        "SELECT id, avatar_id, bg_image_id, stickers FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    return media_for(conn, row)
+
+
+def purge_image_refs(conn, user_id: int, image_id: int):
+    """Take a deleted picture out of the background and the stickers."""
+    row = conn.execute(
+        "SELECT bg_image_id, stickers FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    try:
+        placed = [st for st in json.loads(row["stickers"]) if st.get("img") != image_id]
+    except (TypeError, ValueError, AttributeError):
+        placed = []
+    bg = None if row["bg_image_id"] == image_id else row["bg_image_id"]
+    conn.execute(
+        "UPDATE users SET bg_image_id = ?, stickers = ? WHERE id = ?",
+        (bg, json.dumps(placed, separators=(",", ":")), user_id),
+    )
 
 
 # ---------- login rate limiting (in memory, per ip + username) ----------
@@ -313,12 +487,12 @@ def logout(
 @app.get("/api/me")
 def me(user=Depends(current_user), conn=Depends(get_conn)):
     row = conn.execute(
-        "SELECT display_name, avatar FROM users WHERE id = ?", (user["id"],)
+        "SELECT display_name, avatar_id FROM users WHERE id = ?", (user["id"],)
     ).fetchone()
     return {
         "username": user["username"],
         "display_name": row["display_name"],
-        "avatar": row["avatar"],
+        "avatar": avatar_url(row["avatar_id"]),
     }
 
 
@@ -326,7 +500,8 @@ def me(user=Depends(current_user), conn=Depends(get_conn)):
 
 PROFILE_COLUMNS = (
     "id, username, display_name, mood, headline, about_me, interests, "
-    "location, song, avatar, theme, accent, custom_theme, top_friends, created_at, last_seen"
+    "location, song, avatar_id, bg_image_id, stickers, theme, accent, custom_theme, "
+    "top_friends, created_at, last_seen"
 )
 
 
@@ -340,7 +515,7 @@ def profile_dict(row, viewer_id: int) -> dict:
         "interests": row["interests"],
         "location": row["location"],
         "song": row["song"],
-        "avatar": row["avatar"],
+        "avatar": avatar_url(row["avatar_id"]),
         "theme": row["theme"],
         "accent": row["accent"],
         "custom": custom_from_row(row),
@@ -372,7 +547,7 @@ def wall_for(conn, profile_id: int, viewer_id: int) -> list[dict]:
     rows = conn.execute(
         """
         SELECT c.id, c.author_id, c.body, c.created_at,
-               u.username, u.display_name, u.avatar
+               u.username, u.display_name, u.avatar_id
         FROM profile_comments c JOIN users u ON u.id = c.author_id
         WHERE c.profile_id = ?
         ORDER BY c.id DESC LIMIT 30
@@ -385,7 +560,7 @@ def wall_for(conn, profile_id: int, viewer_id: int) -> list[dict]:
             continue
         out.append({
             "id": r["id"], "username": r["username"],
-            "display_name": r["display_name"], "avatar": r["avatar"],
+            "display_name": r["display_name"], "avatar": avatar_url(r["avatar_id"]),
             "body": r["body"], "created_at": r["created_at"],
             "mine": r["author_id"] == viewer_id,
         })
@@ -401,7 +576,7 @@ def top_friends_for(conn, row, viewer_id: int) -> list[dict]:
     out = []
     for name in names:
         f = conn.execute(
-            "SELECT id, username, display_name, avatar FROM users WHERE username = ?",
+            "SELECT id, username, display_name, avatar_id FROM users WHERE username = ?",
             (name,),
         ).fetchone()
         # drop people who aren't friends any more, or who have a block with the viewer
@@ -410,7 +585,11 @@ def top_friends_for(conn, row, viewer_id: int) -> list[dict]:
         if f["id"] != viewer_id and blocked_either_way(conn, viewer_id, f["id"]):
             continue
         out.append(
-            {"username": f["username"], "display_name": f["display_name"], "avatar": f["avatar"]}
+            {
+                "username": f["username"],
+                "display_name": f["display_name"],
+                "avatar": avatar_url(f["avatar_id"]),
+            }
         )
     return out
 
@@ -441,6 +620,7 @@ def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn
         "SELECT COUNT(*) FROM profile_visits WHERE profile_id = ?", (row["id"],)
     ).fetchone()[0]
     out["wall"] = wall_for(conn, row["id"], user["id"])
+    out.update(media_for(conn, row))
     return out
 
 
@@ -481,7 +661,7 @@ def delete_wall_comment(username: str, comment_id: int, user=Depends(current_use
 @app.put("/api/profile")
 def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_conn)):
     changes = body.model_dump(exclude_unset=True)
-    updates: dict[str, str] = {}
+    updates: dict = {}
     for field, value in changes.items():
         if value is None:
             continue
@@ -489,8 +669,6 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
             updates[field] = clean_text(
                 value, PROFILE_LIMITS[field], field, multiline=field == "about_me"
             )
-        elif field == "avatar":
-            updates[field] = clean_avatar(value)
         elif field == "theme":
             if value not in THEMES:
                 raise HTTPException(400, "unknown theme")
@@ -503,6 +681,14 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
             updates["custom_theme"] = json.dumps(clean_custom(value), separators=(",", ":"))
         elif field == "top_friends":
             updates[field] = json.dumps(top_friend_names(conn, user["id"], value))
+        elif field == "bg_image":
+            if value:
+                own_photo(conn, user["id"], value)
+            updates["bg_image_id"] = value or None
+        elif field == "stickers":
+            updates["stickers"] = json.dumps(
+                clean_stickers(conn, user["id"], body.stickers), separators=(",", ":")
+            )
     if updates:
         # column names come from the fixed set above, never from the request
         sets = ", ".join(f"{col} = ?" for col in updates)
@@ -511,6 +697,91 @@ def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_
         )
         conn.commit()
     return get_profile(user["username"], user, conn)
+
+
+# ---------- pictures: profile picture, gallery, serving ----------
+
+
+@app.get("/api/img/{image_id}")
+def get_image(image_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        "SELECT owner_id, mime, data FROM images WHERE id = ?", (image_id,)
+    ).fetchone()
+    # someone who blocked you doesn't show you their pictures either
+    if not row or (row["owner_id"] != user["id"] and i_blocked(conn, row["owner_id"], user["id"])):
+        raise HTTPException(404, "no such picture")
+    return Response(
+        content=bytes(row["data"]),
+        media_type=row["mime"],
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
+
+
+@app.put("/api/me/avatar")
+async def set_avatar(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    raw = await read_body(request, MAX_AVATAR_UPLOAD)
+    img = await run_in_threadpool(process_image, raw, "avatar")
+    old = conn.execute("SELECT avatar_id FROM users WHERE id = ?", (user["id"],)).fetchone()["avatar_id"]
+    cur = conn.execute(
+        "INSERT INTO images (owner_id, kind, mime, data, width, height, animated) "
+        "VALUES (?, 'avatar', ?, ?, ?, ?, ?)",
+        (user["id"], img["mime"], img["data"], img["width"], img["height"], img["animated"]),
+    )
+    conn.execute("UPDATE users SET avatar_id = ? WHERE id = ?", (cur.lastrowid, user["id"]))
+    if old:
+        conn.execute("DELETE FROM images WHERE id = ? AND owner_id = ?", (old, user["id"]))
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.delete("/api/me/avatar")
+def remove_avatar(user=Depends(current_user), conn=Depends(get_conn)):
+    old = conn.execute("SELECT avatar_id FROM users WHERE id = ?", (user["id"],)).fetchone()["avatar_id"]
+    conn.execute("UPDATE users SET avatar_id = NULL WHERE id = ?", (user["id"],))
+    if old:
+        conn.execute("DELETE FROM images WHERE id = ? AND owner_id = ?", (old, user["id"]))
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.post("/api/me/photos")
+async def add_photo(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    have = conn.execute(
+        "SELECT COUNT(*) FROM images WHERE owner_id = ? AND kind = 'photo'", (user["id"],)
+    ).fetchone()[0]
+    if have >= MAX_PHOTOS:
+        raise HTTPException(400, f"you can have up to {MAX_PHOTOS} pictures, remove one first")
+    raw = await read_body(request, MAX_PHOTO_UPLOAD)
+    img = await run_in_threadpool(process_image, raw, "photo")
+    conn.execute(
+        "INSERT INTO images (owner_id, kind, mime, data, width, height, animated) "
+        "VALUES (?, 'photo', ?, ?, ?, ?, ?)",
+        (user["id"], img["mime"], img["data"], img["width"], img["height"], img["animated"]),
+    )
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.patch("/api/me/photos/{image_id}")
+def caption_photo(image_id: int, body: CaptionBody, user=Depends(current_user), conn=Depends(get_conn)):
+    own_photo(conn, user["id"], image_id)
+    caption = clean_text(body.caption, CAPTION_LIMIT, "caption")
+    conn.execute("UPDATE images SET caption = ? WHERE id = ?", (caption, image_id))
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.delete("/api/me/photos/{image_id}")
+def delete_photo(image_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    own_photo(conn, user["id"], image_id)
+    conn.execute("DELETE FROM images WHERE id = ?", (image_id,))
+    purge_image_refs(conn, user["id"], image_id)
+    conn.commit()
+    return media_response(conn, user["id"])
 
 
 # ---------- friends ----------
@@ -552,7 +823,7 @@ def other_user(conn, user, username: str):
 def list_friends(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
         """
-        SELECT u.username, u.display_name, u.avatar, f.status,
+        SELECT u.username, u.display_name, u.avatar_id, f.status,
                f.requester_id = :me AS mine
         FROM friendships f
         JOIN users u ON u.id = CASE WHEN f.requester_id = :me
@@ -567,7 +838,7 @@ def list_friends(user=Depends(current_user), conn=Depends(get_conn)):
         item = {
             "username": r["username"],
             "display_name": r["display_name"],
-            "avatar": r["avatar"],
+            "avatar": avatar_url(r["avatar_id"]),
         }
         if r["status"] == "accepted":
             out["friends"].append(item)
@@ -672,13 +943,17 @@ async def notify_block_change(me: str, other: str):
 @app.get("/api/blocks")
 def list_blocks(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
-        "SELECT u.username, u.display_name, u.avatar FROM blocks b "
+        "SELECT u.username, u.display_name, u.avatar_id FROM blocks b "
         "JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ? "
         "ORDER BY u.username",
         (user["id"],),
     ).fetchall()
     return [
-        {"username": r["username"], "display_name": r["display_name"], "avatar": r["avatar"]}
+        {
+            "username": r["username"],
+            "display_name": r["display_name"],
+            "avatar": avatar_url(r["avatar_id"]),
+        }
         for r in rows
     ]
 
@@ -732,7 +1007,7 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
         """
         SELECT u.id, u.username, u.public_key, u.last_seen,
-               u.display_name, u.avatar, u.mood,
+               u.display_name, u.avatar_id, u.mood,
                (SELECT COUNT(*) FROM messages m
                  WHERE m.sender_id = u.id AND m.recipient_id = :me
                    AND m.read_at IS NULL AND m.hidden = 0) AS unread,
@@ -772,7 +1047,7 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
             {
                 "username": r["username"],
                 "display_name": r["display_name"],
-                "avatar": r["avatar"],
+                "avatar": avatar_url(r["avatar_id"]),
                 "mood": r["mood"],
                 "pub": r["public_key"],
                 "last_seen": None if hidden else r["last_seen"],
