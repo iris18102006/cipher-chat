@@ -1,10 +1,12 @@
 import base64
 import os
 import re
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from backend import db
 
@@ -33,6 +35,27 @@ def signup(client, name, pw="password123"):
     r = c.post("/api/signup", json={"username": name, "password": pw})
     assert r.status_code == 200, r.text
     return c
+
+
+def make_image(fmt="PNG", size=(40, 30), frames=1):
+    buf = BytesIO()
+    if frames > 1:
+        imgs = [Image.new("RGB", size, ((i * 40) % 255, 50, 90)) for i in range(frames)]
+        imgs[0].save(buf, "GIF", save_all=True, append_images=imgs[1:], duration=80, loop=0)
+    else:
+        Image.new("RGB", size, (200, 30, 90)).save(buf, fmt)
+    return buf.getvalue()
+
+
+RAW = {"content-type": "application/octet-stream"}
+
+
+def put_avatar(c, data):
+    return c.put("/api/me/avatar", content=data, headers=RAW)
+
+
+def add_photo(c, data):
+    return c.post("/api/me/photos", content=data, headers=RAW)
 
 
 def test_signup_validation(client):
@@ -204,12 +227,12 @@ def test_profile_defaults_and_update(client):
     assert p["me"] is True and p["theme"] == "classic" and p["display_name"] == ""
     r = a.put(
         "/api/profile",
-        json={"display_name": "  Ali  ", "mood": "happy", "about_me": "line1\nline2", "avatar": "🦄", "theme": "emo", "accent": "#FF00AA"},
+        json={"display_name": "  Ali  ", "mood": "happy", "about_me": "line1\nline2", "theme": "emo", "accent": "#FF00AA"},
     )
     assert r.status_code == 200, r.text
     p = r.json()
     assert p["display_name"] == "Ali" and p["about_me"] == "line1\nline2"
-    assert p["avatar"] == "🦄" and p["theme"] == "emo" and p["accent"] == "#ff00aa"
+    assert p["avatar"] == "" and p["theme"] == "emo" and p["accent"] == "#ff00aa"
 
 
 def test_profile_partial_update_keeps_other_fields(client):
@@ -223,7 +246,6 @@ def test_profile_validation(client):
     a = signup(client, "alice")
     assert a.put("/api/profile", json={"theme": "nope"}).status_code == 400
     assert a.put("/api/profile", json={"accent": "red"}).status_code == 400
-    assert a.put("/api/profile", json={"avatar": "abc"}).status_code == 400
     assert a.put("/api/profile", json={"display_name": "x" * 31}).status_code == 400
     assert a.put("/api/profile", json={"about_me": "x" * 601}).status_code == 400
     # an empty accent resets back to the theme colour
@@ -332,10 +354,11 @@ def test_blocked_user_cant_see_profile_blocker_still_can(client):
 
 def test_contacts_show_relationship_and_hide_presence_from_blockers(client):
     a, b = signup(client, "alice"), signup(client, "bob")
-    a.put("/api/profile", json={"display_name": "Ali", "avatar": "🦄"})
+    a.put("/api/profile", json={"display_name": "Ali"})
+    avatar = put_avatar(a, make_image()).json()["avatar"]
     a.post("/api/friends/bob")
     row = b.get("/api/contacts").json()[0]
-    assert row["display_name"] == "Ali" and row["avatar"] == "🦄"
+    assert row["display_name"] == "Ali" and row["avatar"] == avatar
     assert row["friend"] == "incoming" and row["blocked"] is False
     assert a.get("/api/contacts").json()[0]["friend"] == "outgoing"
     b.post("/api/blocks/alice")
@@ -481,8 +504,10 @@ def test_block_sends_a_neutral_refresh_to_both_sides(client):
 
 def test_me_includes_display_name_and_avatar(client):
     a = signup(client, "alice")
-    a.put("/api/profile", json={"display_name": "Ali", "avatar": "🌸"})
-    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": "🌸"}
+    a.put("/api/profile", json={"display_name": "Ali"})
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": ""}
+    avatar = put_avatar(a, make_image()).json()["avatar"]
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": avatar}
 
 
 
@@ -518,19 +543,9 @@ def test_every_theme_has_css_and_a_picker_button():
     block = js.split("const THEME_CHOICES = [", 1)[1].split("];", 1)[0]
     in_js = re.findall(r'\["([a-z]+)",\s*"', block)
     for theme in main.THEMES:
-        assert f"#profile-card.theme-{theme} " in css, f"themes.css is missing {theme}"
+        assert f"#profile-card.theme-{theme}" in css, f"themes.css is missing {theme}"
+        assert f".pf-swatch.theme-{theme}" in css, f"themes.css has no picker preview for {theme}"
     assert sorted(in_js) == sorted(main.THEMES)
-
-
-def test_every_avatar_in_the_picker_is_accepted_by_the_server():
-    from backend import main
-
-    js = (WEB / "profile.js").read_text()
-    block = js.split("const AVATARS = [", 1)[1].split("];", 1)[0]
-    avatars = re.findall(r'"([^"]+)"', block)
-    assert len(avatars) >= 16
-    for emoji in avatars:
-        assert main.clean_avatar(emoji) == emoji
 
 
 def test_every_accent_in_the_picker_is_a_valid_colour():
@@ -541,3 +556,183 @@ def test_every_accent_in_the_picker_is_a_valid_colour():
     colours = re.findall(r'"(#[0-9a-fA-F]+)"', line)
     assert colours
     assert all(main.ACCENT_RE.match(c) for c in colours)
+
+
+def test_the_web_files_have_no_emoji():
+    # profile pictures are uploaded photos now, nothing in the ui should be an emoji
+    bad = re.compile("[\U0001F000-\U0001FAFF\u2190-\u2BFF\uFE0F]")
+    for path in WEB.iterdir():
+        if path.suffix in (".js", ".html", ".css"):
+            found = bad.findall(path.read_text())
+            assert not found, f"{path.name} has emoji: {found[:5]}"
+
+
+def test_every_style_option_has_a_button_in_the_editor():
+    from backend import main
+
+    js = (WEB / "profile.js").read_text()
+    for key, values in main.CUSTOM_CHOICES.items():
+        for value in values:
+            assert f'"{value}"' in js, f"the editor has no button for {key} = {value}"
+
+
+# ---------- pictures ----------
+
+
+def test_avatar_upload_is_resized_and_served(client):
+    a = signup(client, "alice")
+    r = put_avatar(a, make_image("PNG", size=(1000, 600)))
+    assert r.status_code == 200, r.text
+    url = r.json()["avatar"]
+    assert url.startswith("/api/img/")
+    img = a.get(url)
+    assert img.status_code == 200 and img.headers["content-type"] == "image/webp"
+    assert img.headers["x-content-type-options"] == "nosniff"
+    assert Image.open(BytesIO(img.content)).size == (320, 320)
+    assert a.get("/api/profile/alice").json()["avatar"] == url
+    # a new one replaces the old one for good
+    new = put_avatar(a, make_image("JPEG")).json()["avatar"]
+    assert new != url and a.get(url).status_code == 404
+    gone = a.delete("/api/me/avatar").json()
+    assert gone["avatar"] == "" and a.get(new).status_code == 404
+
+
+def test_uploads_must_be_real_pictures(client):
+    a = signup(client, "alice")
+    bad = [
+        b"",
+        b"hello there",
+        b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        b"<html><script>alert(1)</script></html>",
+        b"GIF89a" + b"\x00" * 4,  # looks like a gif for a second, then isn't
+        make_image("BMP"),  # a real picture, but not one of the allowed kinds
+    ]
+    for data in bad:
+        assert put_avatar(a, data).status_code == 400, data[:20]
+        assert add_photo(a, data).status_code == 400, data[:20]
+    assert a.get("/api/profile/alice").json()["photos"] == []
+
+
+def test_upload_size_limit(client):
+    a = signup(client, "alice")
+    assert put_avatar(a, b"x" * (5 * 1024 * 1024 + 1)).status_code == 413
+    assert add_photo(a, b"x" * (4 * 1024 * 1024 + 1)).status_code == 413
+    # too many pixels, even though the file itself is tiny
+    assert add_photo(a, make_image("PNG", size=(9000, 10))).status_code == 400
+
+
+def test_pictures_need_a_login(client):
+    a = signup(client, "alice")
+    url = put_avatar(a, make_image()).json()["avatar"]
+    assert client.get(url).status_code == 401
+    assert client.put("/api/me/avatar", content=make_image(), headers=RAW).status_code == 401
+
+
+def test_photo_metadata_is_stripped(client):
+    a = signup(client, "alice")
+    img = Image.new("RGB", (50, 50), (10, 200, 10))
+    exif = Image.Exif()
+    exif[0x010F] = "secret camera make"
+    buf = BytesIO()
+    img.save(buf, "JPEG", exif=exif)
+    assert b"secret camera make" in buf.getvalue()
+    photos = add_photo(a, buf.getvalue()).json()["photos"]
+    served = a.get(photos[0]["url"]).content
+    assert b"secret camera make" not in served
+    assert len(Image.open(BytesIO(served)).getexif()) == 0
+
+
+def test_gallery_add_caption_delete_and_limit(client):
+    a = signup(client, "alice")
+    big = add_photo(a, make_image("PNG", size=(3000, 2000))).json()["photos"][0]
+    assert max(big["width"], big["height"]) == 1600 and not big["animated"]
+    gif = make_image(frames=4)
+    photos = add_photo(a, gif).json()["photos"]
+    moving = photos[1]
+    assert moving["animated"] is True
+    # animated gifs are kept byte for byte so they keep moving
+    served = a.get(moving["url"])
+    assert served.headers["content-type"] == "image/gif" and served.content == gif
+    cap = a.patch(f"/api/me/photos/{moving['id']}", json={"caption": "  my cat  "})
+    assert cap.json()["photos"][1]["caption"] == "my cat"
+    assert a.patch(f"/api/me/photos/{moving['id']}", json={"caption": "x" * 61}).status_code == 400
+    for _ in range(10):
+        assert add_photo(a, make_image()).status_code == 200
+    assert add_photo(a, make_image()).status_code == 400  # 12 is the limit
+    left = a.delete(f"/api/me/photos/{big['id']}").json()["photos"]
+    assert len(left) == 11 and a.get(big["url"]).status_code == 404
+    assert add_photo(a, make_image()).status_code == 200
+
+
+def test_you_can_only_touch_your_own_photos(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    photo = add_photo(a, make_image()).json()["photos"][0]
+    assert b.delete(f"/api/me/photos/{photo['id']}").status_code == 400
+    assert b.patch(f"/api/me/photos/{photo['id']}", json={"caption": "mine now"}).status_code == 400
+    assert a.get(photo["url"]).status_code == 200
+    # but anyone logged in can see them on her profile
+    assert b.get("/api/profile/alice").json()["photos"][0]["id"] == photo["id"]
+    assert b.get(photo["url"]).status_code == 200
+
+
+def test_stickers_and_background(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    one = add_photo(a, make_image()).json()["photos"][0]
+    two = add_photo(a, make_image(frames=3)).json()["photos"][1]
+    theirs = add_photo(b, make_image()).json()["photos"][0]
+    stickers = [
+        {"img": one["id"], "x": 10, "y": 20.556, "w": 18, "r": -10},
+        {"img": two["id"], "x": 90, "y": 95, "w": 30},
+    ]
+    r = a.put("/api/profile", json={"stickers": stickers, "bg_image": one["id"], "custom": {"bg_mode": "cover", "avatar_shape": "hexagon", "font": "script"}})
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert [s["img"] for s in p["stickers"]] == [one["id"], two["id"]]
+    assert p["stickers"][0]["url"] == one["url"] and p["stickers"][0]["y"] == 20.56
+    assert p["stickers"][1]["r"] == 0
+    assert p["bg_image"] == one["id"] and p["bg_url"] == one["url"]
+    assert p["custom"]["avatar_shape"] == "hexagon"
+    # other people see the same thing
+    seen = b.get("/api/profile/alice").json()
+    assert len(seen["stickers"]) == 2 and seen["bg_url"] == one["url"]
+    bad = [
+        [{"img": theirs["id"], "x": 5, "y": 5, "w": 10}],  # somebody else's picture
+        [{"img": 99999, "x": 5, "y": 5, "w": 10}],
+        [{"img": one["id"], "x": 101, "y": 5, "w": 10}],
+        [{"img": one["id"], "x": 5, "y": -1, "w": 10}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 3}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 46}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 10, "r": 90}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 10}] * 9,
+    ]
+    for body in bad:
+        assert a.put("/api/profile", json={"stickers": body}).status_code == 400, body
+    assert a.put("/api/profile", json={"bg_image": theirs["id"]}).status_code == 400
+    # nothing changed after all those failures
+    assert len(a.get("/api/profile/alice").json()["stickers"]) == 2
+    assert a.put("/api/profile", json={"stickers": [], "bg_image": 0}).json()["bg_url"] == ""
+
+
+def test_deleting_a_picture_removes_its_stickers_and_background(client):
+    a = signup(client, "alice")
+    one = add_photo(a, make_image()).json()["photos"][0]
+    two = add_photo(a, make_image()).json()["photos"][1]
+    a.put("/api/profile", json={"bg_image": one["id"], "stickers": [
+        {"img": one["id"], "x": 5, "y": 5, "w": 10}, {"img": two["id"], "x": 50, "y": 50, "w": 10}]})
+    after = a.delete(f"/api/me/photos/{one['id']}").json()
+    assert after["bg_image"] == 0 and [s["img"] for s in after["stickers"]] == [two["id"]]
+    assert [s["img"] for s in a.get("/api/profile/alice").json()["stickers"]] == [two["id"]]
+
+
+def test_someone_who_blocked_you_does_not_show_you_their_pictures(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    url = put_avatar(a, make_image()).json()["avatar"]
+    a.post("/api/blocks/bob")
+    assert b.get(url).status_code == 404
+    assert a.get(url).status_code == 200 and c.get(url).status_code == 200
+
+
+def test_bad_custom_style_values_still_rejected(client):
+    a = signup(client, "alice")
+    for custom in ({"avatar_shape": "star"}, {"bg_mode": "fixed"}, {"font": "papyrus"}):
+        assert a.put("/api/profile", json={"custom": custom}).status_code == 400
