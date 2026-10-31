@@ -736,3 +736,150 @@ def test_bad_custom_style_values_still_rejected(client):
     a = signup(client, "alice")
     for custom in ({"avatar_shape": "star"}, {"bg_mode": "fixed"}, {"font": "papyrus"}):
         assert a.put("/api/profile", json={"custom": custom}).status_code == 400
+
+
+# ---------- message requests (settings: what happens before a friend request is accepted) ----------
+
+
+def say(ws, to, cid="c1"):
+    ws.send_json({"type": "msg", "to": to, "iv": "aaaa", "ct": "bbbb", "cid": cid})
+    return ws.receive_json()
+
+
+def test_message_policy_setting(client):
+    a = signup(client, "alice")
+    assert a.get("/api/settings").json() == {"message_policy": "allow"}
+    for bad in ("nope", "", "ASK"):
+        assert a.put("/api/settings", json={"message_policy": bad}).status_code == 400
+    assert a.put("/api/settings", json={"message_policy": "ask"}).json() == {"message_policy": "ask"}
+    assert a.get("/api/settings").json() == {"message_policy": "ask"}
+    assert client.__class__(client.app).get("/api/settings").status_code == 401
+
+
+def test_ask_policy_holds_messages_until_the_request_is_accepted(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        echo = say(wa, "bob")
+        assert echo["type"] == "msg" and echo["held"] is True and echo["delivered"] is False
+        # bob sees that something is waiting, but not the message itself
+        row = b.get("/api/contacts").json()[0]
+        assert row["held"] == 1 and row["unread"] == 0
+        assert b.get("/api/messages/alice").json() == []
+        # alice sees her own message, marked as waiting
+        mine = a.get("/api/messages/bob").json()
+        assert len(mine) == 1 and mine[0]["held"] is True
+        # accepting lets it through, and alice is told it was delivered
+        assert b.post("/api/friends/alice/accept").status_code == 200
+        assert wa.receive_json() == {"type": "receipt", "id": echo["id"], "status": "delivered"}
+        assert wa.receive_json()["event"] == "accepted"
+    row = b.get("/api/contacts").json()[0]
+    assert row["held"] == 0 and row["unread"] == 1
+    got = b.get("/api/messages/alice").json()
+    assert len(got) == 1 and got[0]["from"] == "alice" and got[0]["held"] is False
+    assert a.get("/api/messages/bob").json()[0]["delivered"] is True
+
+
+def test_wait_policy_refuses_messages_before_accepting(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "wait"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob", "x1") == {"type": "msg-rejected", "to": "bob", "cid": "x1", "reason": "wait"}
+    assert a.get("/api/messages/bob").json() == []
+    assert b.get("/api/contacts").json()[0]["held"] == 0
+    # once they accept, talking is fine
+    b.post("/api/friends/alice/accept")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob")["type"] == "msg"
+
+
+def test_held_messages_are_limited(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        for n in range(3):
+            assert say(wa, "bob", f"m{n}")["held"] is True
+        assert say(wa, "bob", "m3")["reason"] == "limit"
+    assert b.get("/api/contacts").json()[0]["held"] == 3
+
+
+def test_declining_a_request_throws_away_the_waiting_messages(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        say(wa, "bob")
+    assert b.delete("/api/friends/alice").status_code == 200
+    # even if they become friends later, the old messages stay hidden
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    assert b.get("/api/messages/alice").json() == []
+    assert b.get("/api/contacts").json()[0]["unread"] == 0
+
+
+def test_switching_to_allow_lets_waiting_messages_through(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        say(wa, "bob")
+        b.put("/api/settings", json={"message_policy": "allow"})
+        assert wa.receive_json()["type"] == "receipt"
+    assert len(b.get("/api/messages/alice").json()) == 1
+
+
+def test_default_policy_still_lets_a_pending_request_talk(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        echo = say(wa, "bob")
+        assert echo["held"] is False
+    assert len(b.get("/api/messages/alice").json()) == 1
+
+
+def test_the_person_who_got_the_request_can_always_answer(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.put("/api/settings", json={"message_policy": "wait"})
+    b.post("/api/friends/alice")  # bob asked, alice hasn't answered
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob")["type"] == "msg"
+
+
+def test_no_messages_between_people_who_are_not_friends(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob")["reason"] == "not_friends"
+    assert b.get("/api/messages/alice").json() == []
+
+
+def test_blocked_senders_are_not_told_about_policies(client):
+    # a block stays invisible to the person who was blocked, whatever the setting is
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/blocks/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        echo = say(wa, "bob")
+        assert echo["type"] == "msg" and echo["held"] is False
+
+
+def test_every_bundled_font_has_a_file_and_a_font_face():
+    css = (WEB / "fonts.css").read_text()
+    files = re.findall(r'url\("fonts/([a-z0-9-]+\.woff2)"\)', css)
+    assert len(files) >= 11
+    for name in files:
+        assert (WEB / "fonts" / name).stat().st_size > 1000, name
+    js = (WEB / "profile.js").read_text()
+    for family in re.findall(r'font-family: "([^"]+)"', css):
+        assert family in js, f"{family} is bundled but the editor never uses it"
