@@ -217,6 +217,11 @@ function renderBuddies() {
     shown += rows.length;
   }
   $("buddy-empty").hidden = shown > 0 || q !== "";
+  // number of friend requests waiting for me, on the Requests button
+  let waiting = 0;
+  for (const c of state.contacts.values()) if (c.friend === "incoming" && !c.blocked) waiting++;
+  $("req-count").textContent = String(waiting);
+  $("req-count").hidden = waiting === 0;
   const n = totalUnread();
   document.title = (n ? "(" + n + ") " : "") + "cipher-chat";
 }
@@ -529,6 +534,7 @@ async function handleWS(data) {
     } else if (data.event === "accepted") {
       toast(who + " accepted your friend request", () => openProfile(data.from));
     }
+    if (typeof refreshLists === "function") refreshLists();
     // keep a profile that's open on that person up to date
     if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
       openProfile(data.from);
@@ -693,6 +699,13 @@ async function setBlocked(username, on) {
   try {
     await api("/api/blocks/" + encodeURIComponent(username), { method: on ? "POST" : "DELETE" });
     await loadContacts();
+    if (!on) {
+      // blocking ended the friendship, so after unblocking they're not in the buddy list any
+      // more. Close the chat that's still showing "you blocked them" and say what happened.
+      if (state.open === username && !state.contacts.has(username)) $("back").onclick();
+      toast("Unblocked " + shownName(c) + ". You're not friends any more, send a new request from their profile.", () => openProfile(username));
+    }
+    if (typeof refreshLists === "function") refreshLists();
   } catch {
     setConn(false, "couldn't change the block, try again");
   }
