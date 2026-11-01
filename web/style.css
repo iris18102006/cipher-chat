@@ -657,7 +657,8 @@ h2 {
 
 /* ---------- settings ---------- */
 
-#settings-overlay {
+#settings-overlay,
+#lists-overlay {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -669,7 +670,8 @@ h2 {
   background: rgba(10, 25, 55, 0.65);
 }
 
-#settings-card {
+#settings-card,
+#lists-card {
   width: 100%;
   max-width: 480px;
   background: #fff;
@@ -677,7 +679,8 @@ h2 {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
 
-#settings-bar {
+#settings-bar,
+#lists-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -689,13 +692,15 @@ h2 {
   border-bottom: 3px solid #ff9933;
 }
 
-#settings-close {
+#settings-close,
+#lists-close {
   padding: 0 8px;
   font-size: 16px;
   line-height: 20px;
 }
 
-#settings-body {
+#settings-body,
+#lists-body {
   padding: 12px;
 }
 
@@ -737,4 +742,90 @@ h2 {
 
 #settings-status.bad {
   color: #b00020;
+}
+
+
+/* ---------- requests / blocked panels ---------- */
+
+.count {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: #e8590c;
+  border-radius: 8px;
+}
+
+#lists-body h3 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  color: #17407f;
+}
+
+#lists-body h3:first-child {
+  margin-top: 0;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #dde3ee;
+}
+
+.list-row .who {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-row .who b,
+.list-row .who small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row .who small {
+  color: #556;
+}
+
+.list-row .btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.list-empty {
+  margin: 8px 0;
+  color: #556;
+  font-style: italic;
+}
+
+#lists-error {
+  min-height: 14px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #b00020;
+}
+
+/* the top bar has five buttons now: let it wrap on small screens instead of running off the side */
+@media (max-width: 700px) {
+  #top {
+    flex-wrap: wrap;
+    padding: 8px 10px;
+  }
+
+  #top-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #top-right > span:not(#conn) {
+    width: 100%;
+  }
 }
