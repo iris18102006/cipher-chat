@@ -13,6 +13,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Message history that survives refreshes (stored encrypted, decrypted in your browser)
 - Key-change warning: if a friend's key changes, the composer locks until you trust the new key
 - Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", a profile photo, 8 themes with previews, an accent colour (presets or any colour you pick), 12 bundled fonts, avatar shapes, real heart and star patterns, border and corner controls, with a live preview while you edit
+- Requests and Blocked buttons in the top bar: answer friend requests (with a count) and see or unblock the people you blocked, without hunting through the buddy list
 - Settings: choose what happens to messages from someone whose friend request you haven't accepted yet: let them through, hold them until you accept (up to 3, you only see a count), or make them wait. You answer the request right from the chat
 - Pictures: upload a profile photo, a gallery of up to 12 photos and GIFs (click to view full size), a background picture, and stickers you drag around a small copy of your page. All without writing code
 - Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
@@ -85,6 +86,6 @@ This is a learning project, not Signal.
 - [ ] Forward secrecy with a ratchet
 - [ ] Group chats
 - [ ] Chat themes for each conversation
-- [ ] Fix: unblocking someone does nothing
-- [ ] Separate button for friend requests
-- [ ] Separate button that lists who you blocked
+- [x] Fix: unblocking someone does nothing
+- [x] Separate button for friend requests
+- [x] Separate button that lists who you blocked

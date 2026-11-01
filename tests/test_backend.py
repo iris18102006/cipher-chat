@@ -883,3 +883,12 @@ def test_every_bundled_font_has_a_file_and_a_font_face():
     js = (WEB / "profile.js").read_text()
     for family in re.findall(r'font-family: "([^"]+)"', css):
         assert family in js, f"{family} is bundled but the editor never uses it"
+
+
+def test_top_bar_has_the_requests_and_blocked_panels():
+    html = (WEB / "index.html").read_text()
+    for needle in ("requests-btn", "req-count", "blocked-btn", "lists-overlay", 'src="lists.js"'):
+        assert needle in html, needle
+    # two scripts share one global namespace, so the helpers must not share names
+    names = lambda f: set(re.findall(r"^(?:async )?function (\w+)", (WEB / f).read_text(), re.M))
+    assert not names("lists.js") & (names("profile.js") | names("app.js") | names("friends.js") | names("settings.js"))
