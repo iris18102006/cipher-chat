@@ -748,3 +748,185 @@ async def set_avatar(request: Request, user=Depends(current_user), conn=Depends(
         conn.execute("DELETE FROM images WHERE id = ? AND owner_id = ?", (old, user["id"]))
     conn.commit()
     return media_response(conn, user["id"])
+
+
+@app.delete("/api/me/avatar")
+def remove_avatar(user=Depends(current_user), conn=Depends(get_conn)):
+    old = conn.execute("SELECT avatar_id FROM users WHERE id = ?", (user["id"],)).fetchone()["avatar_id"]
+    conn.execute("UPDATE users SET avatar_id = NULL WHERE id = ?", (user["id"],))
+    if old:
+        conn.execute("DELETE FROM images WHERE id = ? AND owner_id = ?", (old, user["id"]))
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.post("/api/me/photos")
+async def add_photo(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    have = conn.execute(
+        "SELECT COUNT(*) FROM images WHERE owner_id = ? AND kind = 'photo'", (user["id"],)
+    ).fetchone()[0]
+    if have >= MAX_PHOTOS:
+        raise HTTPException(400, f"you can have up to {MAX_PHOTOS} pictures, remove one first")
+    raw = await read_body(request, MAX_PHOTO_UPLOAD)
+    img = await run_in_threadpool(process_image, raw, "photo")
+    conn.execute(
+        "INSERT INTO images (owner_id, kind, mime, data, width, height, animated) "
+        "VALUES (?, 'photo', ?, ?, ?, ?, ?)",
+        (user["id"], img["mime"], img["data"], img["width"], img["height"], img["animated"]),
+    )
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.patch("/api/me/photos/{image_id}")
+def caption_photo(image_id: int, body: CaptionBody, user=Depends(current_user), conn=Depends(get_conn)):
+    own_photo(conn, user["id"], image_id)
+    caption = clean_text(body.caption, CAPTION_LIMIT, "caption")
+    conn.execute("UPDATE images SET caption = ? WHERE id = ?", (caption, image_id))
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+@app.delete("/api/me/photos/{image_id}")
+def delete_photo(image_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    own_photo(conn, user["id"], image_id)
+    conn.execute("DELETE FROM images WHERE id = ?", (image_id,))
+    purge_image_refs(conn, user["id"], image_id)
+    conn.commit()
+    return media_response(conn, user["id"])
+
+
+# ---------- friends ----------
+
+
+def friend_status(conn, me_id: int, other_id: int) -> str:
+    """none | friends | outgoing (I asked) | incoming (they asked me)"""
+    row = conn.execute(
+        "SELECT requester_id, status FROM friendships "
+        "WHERE (requester_id = :a AND addressee_id = :b) "
+        "   OR (requester_id = :b AND addressee_id = :a)",
+        {"a": me_id, "b": other_id},
+    ).fetchone()
+    if not row:
+        return "none"
+    if row["status"] == "accepted":
+        return "friends"
+    return "outgoing" if row["requester_id"] == me_id else "incoming"
+
+
+async def release_held(conn, recipient_id: int, sender_id: int | None = None):
+    """Let messages that were waiting for a decision through. They count as delivered
+    now, and the senders find out."""
+    rows = conn.execute(
+        "SELECT m.id, u.username FROM messages m JOIN users u ON u.id = m.sender_id "
+        "WHERE m.recipient_id = :r AND m.hidden = :held AND (:s IS NULL OR m.sender_id = :s)",
+        {"r": recipient_id, "s": sender_id, "held": HELD},
+    ).fetchall()
+    if not rows:
+        return
+    ids = [r["id"] for r in rows]
+    marks = ",".join("?" * len(ids))
+    conn.execute(
+        f"UPDATE messages SET hidden = 0, delivered_at = datetime('now') WHERE id IN ({marks})",
+        ids,
+    )
+    conn.commit()
+    for r in rows:
+        await manager.send_user(r["username"], {"type": "receipt", "id": r["id"], "status": "delivered"})
+
+
+def drop_held(conn, a: int, b: int):
+    """The request was declined, cancelled or blocked: waiting messages are never shown."""
+    conn.execute(
+        "UPDATE messages SET hidden = 1 WHERE hidden = :held AND "
+        "((sender_id = :a AND recipient_id = :b) OR (sender_id = :b AND recipient_id = :a))",
+        {"a": a, "b": b, "held": HELD},
+    )
+
+
+def friend_ids(conn, user_id: int) -> set[int]:
+    rows = conn.execute(
+        "SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END "
+        "FROM friendships WHERE status = 'accepted' "
+        "AND (requester_id = :me OR addressee_id = :me)",
+        {"me": user_id},
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
+def other_user(conn, user, username: str):
+    peer = get_peer(conn, username)
+    if peer["id"] == user["id"]:
+        raise HTTPException(400, "that's you")
+    return peer
+
+
+@app.get("/api/friends")
+def list_friends(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        """
+        SELECT u.username, u.display_name, u.avatar_id, f.status,
+               f.requester_id = :me AS mine
+        FROM friendships f
+        JOIN users u ON u.id = CASE WHEN f.requester_id = :me
+                                    THEN f.addressee_id ELSE f.requester_id END
+        WHERE f.requester_id = :me OR f.addressee_id = :me
+        ORDER BY u.username
+        """,
+        {"me": user["id"]},
+    ).fetchall()
+    out = {"friends": [], "incoming": [], "outgoing": []}
+    for r in rows:
+        item = {
+            "username": r["username"],
+            "display_name": r["display_name"],
+            "avatar": avatar_url(r["avatar_id"]),
+        }
+        if r["status"] == "accepted":
+            out["friends"].append(item)
+        elif r["mine"]:
+            out["outgoing"].append(item)
+        else:
+            out["incoming"].append(item)
+    return out
+
+
+@app.post("/api/friends/{username}")
+async def add_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    if blocked_either_way(conn, user["id"], peer["id"]):
+        raise HTTPException(403, "you can't send a friend request to this user")
+    status = friend_status(conn, user["id"], peer["id"])
+    if status == "incoming":
+        # they already asked me, so asking back just means yes
+        return await accept_friend(username, user, conn)
+    if status == "none":
+        conn.execute(
+            "INSERT INTO friendships (requester_id, addressee_id) VALUES (?, ?)",
+            (user["id"], peer["id"]),
+        )
+        conn.commit()
+        status = "outgoing"
+        await manager.send_user(
+            peer["username"], {"type": "social", "event": "request", "from": user["username"]}
+        )
+    return {"status": status}
+
+
+@app.post("/api/friends/{username}/accept")
+async def accept_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    cur = conn.execute(
+        "UPDATE friendships SET status = 'accepted' "
+        "WHERE requester_id = ? AND addressee_id = ? AND status = 'pending'",
+        (peer["id"], user["id"]),
+    )
+    conn.commit()
+    if cur.rowcount == 0 and friend_status(conn, user["id"], peer["id"]) != "friends":
+        raise HTTPException(404, "no friend request from that user")
+    if cur.rowcount:
+        await release_held(conn, user["id"], peer["id"])
+        await manager.send_user(
+            peer["username"], {"type": "social", "event": "accepted", "from": user["username"]}
+        )
+    return {"status": "friends"}
