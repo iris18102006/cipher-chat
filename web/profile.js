@@ -593,3 +593,114 @@ function renderEditor(p) {
   });
   enumRow("Border style", "border_style", BORDER_STYLES, "solid");
   enumRow("Background pattern", "pattern", PATTERNS, "none");
+
+  function rangeRow(label, key, min, max, fallback) {
+    const row = el("label", "pf-style-row");
+    const value = el("b");
+    const left = el("span");
+    left.append(label + " ", value);
+    const input = el("input");
+    input.type = "range";
+    input.min = String(min);
+    input.max = String(max);
+    input.oninput = () => {
+      look.custom[key] = Number(input.value);
+      value.textContent = input.value;
+      preview();
+    };
+    syncers.push(() => {
+      input.value = String(look.custom[key] ?? fallback);
+      value.textContent = input.value;
+    });
+    row.append(left, input);
+    shapes.append(row);
+  }
+  rangeRow("Border width", "border_width", 0, 6, 2);
+  rangeRow("Corner roundness", "radius", 0, 24, 0);
+
+  const marquee = el("label", "pf-style-row check");
+  const marqueeInput = el("input");
+  marqueeInput.type = "checkbox";
+  marqueeInput.onchange = () => {
+    look.custom.marquee = marqueeInput.checked;
+    preview();
+  };
+  syncers.push(() => (marqueeInput.checked = !!look.custom.marquee));
+  marquee.append(el("span", "", "Scrolling display name"), marqueeInput);
+  shapes.append(marquee);
+
+  // ---- pictures, background, stickers (profile-media.js)
+  mountLibraryEditor(group("Pictures and GIFs"), media);
+  mountBackgroundEditor(group("Background picture"), media, look, preview);
+  mountStickerEditor(group("Stickers"), media, look);
+
+  // ---- top friends: tap friends in the order you want them, up to 8
+  const top = (p.top_friends || []).map((f) => f.username);
+  const tf = choiceRow("Top friends", "max 8");
+  tf.box.textContent = "loading...";
+  group("Top friends").append(tf.row);
+  api("/api/friends")
+    .then(({ friends }) => {
+      const paint = () => {
+        tf.box.replaceChildren();
+        if (!friends.length) {
+          tf.box.textContent = "add some friends first, then pick your top 8 here";
+          return;
+        }
+        for (const f of friends) {
+          const at = top.indexOf(f.username);
+          const b = el("button", "pf-choice text with-avatar" + (at >= 0 ? " on" : ""));
+          b.type = "button";
+          b.append(avatarNode(f, "tiny"), (at >= 0 ? at + 1 + ". " : "") + shownName(f));
+          b.onclick = () => {
+            if (at >= 0) top.splice(at, 1);
+            else if (top.length < 8) top.push(f.username);
+            paint();
+          };
+          tf.box.append(b);
+        }
+      };
+      paint();
+      tf.box.dataset.ready = "1";
+    })
+    .catch(() => (tf.box.textContent = "couldn't load your friends"));
+
+  form.append(err, actionBar());
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    err.textContent = "";
+    for (const b of saveButtons) b.disabled = true;
+    const changes = {};
+    for (const [field] of TEXT_FIELDS) changes[field] = inputs[field].value;
+    changes.theme = look.theme;
+    changes.accent = look.accent || "";
+    changes.custom = look.custom;
+    changes.bg_image = look.bg_image || 0;
+    changes.stickers = look.stickers.map((s) => ({ img: s.img, x: round2(s.x), y: round2(s.y), w: s.w, r: s.r }));
+    // only send top friends once the list loaded, so a failed load can't wipe them
+    if (tf.box.dataset.ready) changes.top_friends = top;
+    try {
+      pfCurrent = await saveProfile(changes);
+      renderProfile(pfCurrent);
+    } catch (ex) {
+      err.textContent = ex.message;
+      for (const b of saveButtons) b.disabled = false;
+    }
+  };
+  body.append(form);
+  syncAll();
+  inputs.display_name.focus();
+}
+
+// ---------- wiring ----------
+
+$("pf-close").onclick = closeProfile;
+$("profile-overlay").addEventListener("click", (e) => {
+  if (e.target === $("profile-overlay")) closeProfile();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("profile-overlay").hidden) closeProfile();
+});
+$("my-profile").onclick = () => openProfile(state.me);
+$("view-profile").onclick = () => state.open && openProfile(state.open);
