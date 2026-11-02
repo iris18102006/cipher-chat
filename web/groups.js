@@ -450,3 +450,141 @@ async function createGroup(name, usernames) {
   await loadGroups();
   return d;
 }
+
+async function addToGroup(gid, username) {
+  const d = await loadGroupDetail(gid);
+  if (d.members.some((m) => m.username === username)) return;
+  const c = state.contacts.get(username);
+  const members = [...membersWithPubs(d), { username, pub: c && !c.changed ? c.pub : null }];
+  // a brand new key, so the new person can only read from now on
+  const key = await generateGroupKey();
+  const keys = await wrapForMembers(members, key);
+  await gapi("/api/groups/" + gid + "/members", "POST", { username, version: d.key_version + 1, keys });
+}
+
+async function leaveOrRemove(gid, username) {
+  await gapi("/api/groups/" + gid + "/members/" + encodeURIComponent(username), "DELETE");
+  await loadGroups();
+}
+
+// ---------- the panel ----------
+
+let groupPanel = null; // { mode: "new" | "info", id }
+let groupPanelReturnFocus = null;
+
+function closeGroupPanel() {
+  $("groups-overlay").hidden = true;
+  groupPanel = null;
+  if (groupPanelReturnFocus && document.contains(groupPanelReturnFocus)) groupPanelReturnFocus.focus();
+  groupPanelReturnFocus = null;
+}
+
+async function openGroupPanel(mode, gid) {
+  if ($("groups-overlay").hidden) groupPanelReturnFocus = document.activeElement;
+  groupPanel = { mode, id: gid };
+  $("groups-title").textContent = mode === "new" ? "New group" : "Group";
+  $("groups-overlay").hidden = false;
+  $("groups-close").focus();
+  await paintGroupPanel();
+}
+
+async function paintGroupPanel() {
+  if (!groupPanel) return;
+  if (groupPanel.mode === "new") paintNewGroup();
+  else await paintGroupInfo();
+}
+
+// a row with a checkbox: pick who to put in the group
+function pickRow(c, picks, note) {
+  const row = el("label", "list-row pick-row");
+  const box = el("input");
+  box.type = "checkbox";
+  box.disabled = !!note;
+  box.onchange = () => (box.checked ? picks.add(c.username) : picks.delete(c.username));
+  const who = el("div", "who");
+  who.append(el("b", "", shownName(c)), el("small", "", "@" + c.username + (note ? " - " + note : "")));
+  row.append(box, avatarNode(c, "small"), who);
+  return row;
+}
+
+function friendsToPick(exclude) {
+  return [...state.contacts.values()].filter(
+    (c) => c.friend === "friends" && !c.blocked && !exclude.has(c.username)
+  );
+}
+
+function pickNote(c) {
+  if (!c.pub) return "no key yet";
+  if (c.changed) return "key changed";
+  return "";
+}
+
+function paintNewGroup() {
+  const body = $("groups-body");
+  const picks = new Set();
+  const name = el("input");
+  name.type = "text";
+  name.id = "group-name";
+  name.maxLength = GROUP_NAME_MAX;
+  name.placeholder = "group name";
+  name.setAttribute("aria-label", "group name");
+  const err = el("p");
+  err.id = "groups-error";
+  const friends = friendsToPick(new Set());
+  const go = el("button", "", "Create group");
+  go.type = "button";
+  go.onclick = async () => {
+    err.textContent = "";
+    if (!name.value.trim()) {
+      err.textContent = "give the group a name";
+      return;
+    }
+    if (!picks.size) {
+      err.textContent = "pick at least one friend";
+      return;
+    }
+    go.disabled = true;
+    try {
+      const d = await createGroup(name.value.trim(), [...picks]);
+      closeGroupPanel();
+      openGroupChat(d.id);
+    } catch (ex) {
+      err.textContent = ex.message;
+      go.disabled = false;
+    }
+  };
+  body.replaceChildren(
+    name,
+    listSection("Pick friends", friends.map((c) => pickRow(c, picks, pickNote(c))), "You need to be friends with people before you can put them in a group."),
+    el("p", "list-empty", "Messages are encrypted in your browser. Only the people in the group can read them."),
+    go,
+    err
+  );
+  name.focus();
+}
+
+async function paintGroupInfo() {
+  const body = $("groups-body");
+  const gid = groupPanel.id;
+  let d;
+  try {
+    d = await loadGroupDetail(gid);
+  } catch {
+    body.replaceChildren(el("p", "list-empty", "couldn't load this group, close it and try again."));
+    return;
+  }
+  $("groups-title").textContent = d.name;
+  const err = el("p");
+  err.id = "groups-error";
+  const iOwn = d.owner === state.me;
+  // run one action, then repaint so the panel matches the server
+  const act = (fn) => async () => {
+    err.textContent = "";
+    try {
+      await fn();
+      await loadGroups();
+      await paintGroupPanel();
+    } catch (ex) {
+      err.textContent = ex.message;
+    }
+  };
