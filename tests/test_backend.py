@@ -317,3 +317,159 @@ def test_friend_edge_cases(client):
     assert a.post("/api/friends/alice").status_code == 400
     assert a.post("/api/friends/ghost").status_code == 404
     assert client.post("/api/friends/alice").status_code == 401
+
+
+# ---------- blocking ----------
+
+
+def test_block_unblock_and_list(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    assert a.post("/api/blocks/bob").json() == {"blocked": True}
+    assert [x["username"] for x in a.get("/api/blocks").json()] == ["bob"]
+    # blocking ends the friendship for both
+    assert a.get("/api/friends").json()["friends"] == []
+    assert b.get("/api/friends").json()["friends"] == []
+    assert a.post("/api/blocks/bob").status_code == 200  # blocking twice is fine
+    assert a.delete("/api/blocks/bob").json() == {"blocked": False}
+    assert a.get("/api/blocks").json() == []
+    assert a.post("/api/blocks/alice").status_code == 400
+
+
+def test_friend_requests_cant_cross_a_block(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    assert a.post("/api/friends/bob").status_code == 403
+    assert b.post("/api/friends/alice").status_code == 403
+
+
+def test_blocked_user_cant_see_profile_blocker_still_can(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    assert b.get("/api/profile/alice").status_code == 404
+    p = a.get("/api/profile/bob").json()
+    assert p["blocked"] is True
+
+
+def test_contacts_show_relationship_and_hide_presence_from_blockers(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.put("/api/profile", json={"display_name": "Ali"})
+    avatar = put_avatar(a, make_image()).json()["avatar"]
+    a.post("/api/friends/bob")
+    row = b.get("/api/contacts").json()[0]
+    assert row["display_name"] == "Ali" and row["avatar"] == avatar
+    assert row["friend"] == "incoming" and row["blocked"] is False
+    assert a.get("/api/contacts").json()[0]["friend"] == "outgoing"
+    b.post("/api/blocks/alice")
+    assert b.get("/api/contacts").json()[0]["blocked"] is True
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        wb.receive_json()
+        # once bob blocks alice, the friendship is removed. Alice does not get
+        # a ghost contact or any presence information for bob.
+        assert a.get("/api/contacts").json() == []
+
+
+def test_messages_to_someone_who_blocked_you_are_hidden(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/blocks/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+            wb.receive_json()
+            wa.send_json({"type": "typing", "to": "bob", "state": True})
+            wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+            echo = wa.receive_json()
+            # alice isn't told anything, it just looks sent
+            assert echo["type"] == "msg" and echo["delivered"] is False
+            # bob's socket got nothing, the next frame he sees is his own pong
+            wb.send_json({"type": "ping"})
+            assert wb.receive_json() == {"type": "pong"}
+    assert len(a.get("/api/messages/bob").json()) == 1
+    assert b.get("/api/messages/alice").json() == []
+    assert b.get("/api/contacts").json()[0]["unread"] == 0
+
+
+def test_cant_send_to_someone_you_blocked(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+        wa.send_json({"type": "ping"})
+        assert wa.receive_json() == {"type": "pong"}
+    assert a.get("/api/messages/bob").json() == []
+
+
+def test_unblocking_does_not_reveal_old_hidden_messages(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/blocks/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q="})
+        wa.receive_json()
+    b.delete("/api/blocks/alice")
+    assert b.get("/api/messages/alice").json() == []
+
+
+# ---------- top friends, visitors ----------
+
+
+def befriend(a, b, an, bn):
+    a.post(f"/api/friends/{bn}")
+    b.post(f"/api/friends/{an}/accept")
+
+
+def test_top_friends_must_be_friends_and_keep_order(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    befriend(a, b, "alice", "bob")
+    # carol is not a friend yet
+    assert a.put("/api/profile", json={"top_friends": ["bob", "carol"]}).status_code == 400
+    befriend(a, c, "alice", "carol")
+    p = a.put("/api/profile", json={"top_friends": ["carol", "bob", "carol"]}).json()
+    assert [f["username"] for f in p["top_friends"]] == ["carol", "bob"]
+
+
+def test_top_friends_limit(client):
+    a = signup(client, "alice")
+    names = []
+    for i in range(9):
+        n = f"friend{i}"
+        names.append(n)
+        befriend(a, signup(client, n), "alice", n)
+    assert a.put("/api/profile", json={"top_friends": names}).status_code == 400
+    assert a.put("/api/profile", json={"top_friends": names[:8]}).status_code == 200
+
+
+def test_top_friends_drop_out_after_unfriend_or_block(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    befriend(a, b, "alice", "bob")
+    befriend(a, c, "alice", "carol")
+    a.put("/api/profile", json={"top_friends": ["bob", "carol"]})
+    a.delete("/api/friends/bob")
+    assert [f["username"] for f in c.get("/api/profile/alice").json()["top_friends"]] == ["carol"]
+    # carol blocks herself out of what bob sees of alice's top friends
+    befriend(a, b, "alice", "bob")
+    a.put("/api/profile", json={"top_friends": ["bob", "carol"]})
+    b.post("/api/blocks/carol")
+    assert [f["username"] for f in b.get("/api/profile/alice").json()["top_friends"]] == ["bob"]
+
+
+def test_visitor_counter_counts_people_not_refreshes(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    for _ in range(3):
+        b.get("/api/profile/alice")
+    c.get("/api/profile/alice")
+    assert a.get("/api/profile/alice").json()["visitors"] == 2
+    # looking at your own profile doesn't count
+    assert a.get("/api/profile/alice").json()["visitors"] == 2
+
+
+def test_profile_shows_friend_status_and_mutual_friends(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    befriend(a, c, "alice", "carol")
+    befriend(b, c, "bob", "carol")
+    p = b.get("/api/profile/alice").json()
+    assert p["friend"] == "none" and p["mutual_friends"] == 1 and p["friend_count"] == 1
+    a.post("/api/friends/bob")
+    assert b.get("/api/profile/alice").json()["friend"] == "incoming"
