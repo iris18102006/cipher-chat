@@ -224,3 +224,147 @@ def detail(conn, gid: int, user) -> dict:
         for k in keys
     ]
     return out
+
+
+# ---------- routes ----------
+
+
+@router.post("/api/groups")
+async def create_group(body: NewGroup, user=Depends(current_user), conn=Depends(get_conn)):
+    name = clean_text(body.name, NAME_LIMIT, "group name")
+    if not name:
+        raise HTTPException(400, "give the group a name")
+    names = {n.lower() for n in body.members}
+    names.discard(user["username"])
+    if not names:
+        raise HTTPException(400, "pick at least one friend")
+    if len(names) + 1 > MAX_MEMBERS:
+        raise HTTPException(400, f"a group can have {MAX_MEMBERS} people at most")
+    mine = conn.execute(
+        "SELECT COUNT(*) FROM chat_group_members WHERE user_id = ?", (user["id"],)
+    ).fetchone()[0]
+    if mine >= MAX_GROUPS:
+        raise HTTPException(400, f"you're already in {MAX_GROUPS} groups")
+
+    others = []
+    for n in sorted(names):
+        p = get_peer(conn, n)
+        if friend_status(conn, user["id"], p["id"]) != "friends" or blocked_either_way(conn, user["id"], p["id"]):
+            raise HTTPException(400, f"{n} isn't your friend, you can only add friends")
+        others.append(p)
+    me = conn.execute(
+        "SELECT id, username, public_key FROM users WHERE id = ?", (user["id"],)
+    ).fetchone()
+    pub = my_pub(conn, user["id"])
+    wraps = check_wraps(body.keys, [me, *others])
+
+    cur = conn.execute("INSERT INTO chat_groups (name, owner_id) VALUES (?, ?)", (name, user["id"]))
+    gid = cur.lastrowid
+    conn.executemany(
+        "INSERT INTO chat_group_members (group_id, user_id, joined_version) VALUES (?, ?, 1)",
+        [(gid, uid) for uid, _, _ in wraps],
+    )
+    store_wraps(conn, gid, 1, user["id"], pub, wraps)
+    conn.commit()
+    await notify_group(conn, gid, "updated")
+    return detail(conn, gid, user)
+
+
+@router.get("/api/groups")
+def list_groups(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        "SELECT g.id, g.name, g.owner_id, g.key_version, g.rekey_needed, o.username AS owner "
+        "FROM chat_group_members m JOIN chat_groups g ON g.id = m.group_id "
+        "JOIN users o ON o.id = g.owner_id WHERE m.user_id = ?",
+        (user["id"],),
+    ).fetchall()
+    return [summary(conn, r, user["id"], member_row(conn, r["id"], user["id"])) for r in rows]
+
+
+@router.get("/api/groups/{gid}")
+def get_group_detail(gid: int, user=Depends(current_user), conn=Depends(get_conn)):
+    return detail(conn, gid, user)
+
+
+@router.put("/api/groups/{gid}")
+async def rename_group(gid: int, body: RenameBody, user=Depends(current_user), conn=Depends(get_conn)):
+    row, _ = get_group(conn, gid, user)
+    if row["owner_id"] != user["id"]:
+        raise HTTPException(403, "only the owner can rename the group")
+    name = clean_text(body.name, NAME_LIMIT, "group name")
+    if not name:
+        raise HTTPException(400, "give the group a name")
+    conn.execute("UPDATE chat_groups SET name = ? WHERE id = ?", (name, gid))
+    conn.commit()
+    await notify_group(conn, gid, "updated")
+    return detail(conn, gid, user)
+
+
+@router.post("/api/groups/{gid}/members")
+async def add_member(gid: int, body: AddMember, user=Depends(current_user), conn=Depends(get_conn)):
+    row, _ = get_group(conn, gid, user)
+    target = get_peer(conn, body.username)
+    if target["id"] == user["id"] or member_row(conn, gid, target["id"]):
+        raise HTTPException(409, "they're already in this group")
+    if friend_status(conn, user["id"], target["id"]) != "friends" or blocked_either_way(
+        conn, user["id"], target["id"]
+    ):
+        raise HTTPException(403, "you can only add your friends")
+    current = members_of(conn, gid)
+    if len(current) + 1 > MAX_MEMBERS:
+        raise HTTPException(400, f"a group can have {MAX_MEMBERS} people at most")
+    if body.version != row["key_version"] + 1:
+        raise HTTPException(409, "the group changed while you were adding them, try again")
+    target_full = conn.execute(
+        "SELECT id, username, public_key FROM users WHERE id = ?", (target["id"],)
+    ).fetchone()
+    wraps = check_wraps(body.keys, [*current, target_full])
+    pub = my_pub(conn, user["id"])
+
+    # the version check is also the lock: if two people change the key at once, one loses
+    won = conn.execute(
+        "UPDATE chat_groups SET key_version = ?, rekey_needed = 0 WHERE id = ? AND key_version = ?",
+        (body.version, gid, row["key_version"]),
+    ).rowcount
+    if won != 1:
+        conn.rollback()
+        raise HTTPException(409, "the group changed while you were adding them, try again")
+    conn.execute(
+        "INSERT INTO chat_group_members (group_id, user_id, joined_version, last_read_id) "
+        "VALUES (?, ?, ?, ?)",
+        (gid, target["id"], body.version, max_message_id(conn, gid)),
+    )
+    store_wraps(conn, gid, body.version, user["id"], pub, wraps)
+    conn.commit()
+    await notify_group(conn, gid, "updated")
+    return detail(conn, gid, user)
+
+
+@router.delete("/api/groups/{gid}/members/{username}")
+async def remove_member(gid: int, username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    row, _ = get_group(conn, gid, user)
+    target = get_peer(conn, username)
+    if not member_row(conn, gid, target["id"]):
+        raise HTTPException(404, "they're not in this group")
+    leaving = target["id"] == user["id"]
+    if not leaving and row["owner_id"] != user["id"]:
+        raise HTTPException(403, "only the owner can remove people")
+
+    conn.execute(
+        "DELETE FROM chat_group_members WHERE group_id = ? AND user_id = ?", (gid, target["id"])
+    )
+    conn.execute("DELETE FROM chat_group_keys WHERE group_id = ? AND user_id = ?", (gid, target["id"]))
+    left = members_of(conn, gid)
+    if not left:
+        conn.execute("DELETE FROM chat_groups WHERE id = ?", (gid,))
+        conn.commit()
+        await manager.send_user(target["username"], {"type": "group", "event": "removed", "group": gid})
+        return {"deleted": True}
+    if row["owner_id"] == target["id"]:
+        conn.execute("UPDATE chat_groups SET owner_id = ? WHERE id = ?", (left[0]["id"], gid))
+    # whoever is left has to pick a new key, so the person who just went can't read on
+    conn.execute("UPDATE chat_groups SET rekey_needed = 1 WHERE id = ?", (gid,))
+    conn.commit()
+    await manager.send_user(target["username"], {"type": "group", "event": "removed", "group": gid})
+    await notify_group(conn, gid, "updated")
+    return {"deleted": False}
