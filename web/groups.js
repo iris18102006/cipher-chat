@@ -401,3 +401,52 @@ async function handleGroupWS(data) {
     if (data.reason === "bad_key" && state.groups.has(gid)) loadGroupDetail(gid).catch(() => {});
   }
 }
+
+// somebody who just wrote isn't typing any more
+function setGroupTypingQuiet(g, user) {
+  clearTimeout(g.typing.get(user));
+  g.typing.delete(user);
+}
+
+// ---------- replacing the key after someone left ----------
+
+const rekeying = new Set();
+
+function maybeRekey(g) {
+  if (!g.rekey_needed || rekeying.has(g.id)) return;
+  rekeying.add(g.id);
+  // the owner goes first; everyone else waits a moment so they don't all do it at once
+  const wait = g.owner === state.me ? 0 : 500 + Math.random() * 2500;
+  setTimeout(async () => {
+    try {
+      await rekeyGroup(g.id);
+    } catch {
+      // someone else got there first, or a member's key needs verifying: nothing to do here
+    } finally {
+      rekeying.delete(g.id);
+    }
+  }, wait);
+}
+
+async function rekeyGroup(gid) {
+  const d = await loadGroupDetail(gid);
+  if (!d.rekey_needed) return;
+  const key = await generateGroupKey();
+  const keys = await wrapForMembers(membersWithPubs(d), key);
+  await gapi("/api/groups/" + gid + "/rekey", "POST", { version: d.key_version + 1, keys });
+}
+
+// ---------- making a group, adding people ----------
+
+async function createGroup(name, usernames) {
+  const members = [{ username: state.me, pub: state.myPub }];
+  for (const u of usernames) {
+    const c = state.contacts.get(u);
+    members.push({ username: u, pub: c && !c.changed ? c.pub : null });
+  }
+  const key = await generateGroupKey();
+  const keys = await wrapForMembers(members, key);
+  const d = await gapi("/api/groups", "POST", { name, members: usernames, keys });
+  await loadGroups();
+  return d;
+}
