@@ -304,3 +304,256 @@ function mountLibraryEditor(box, media) {
     add.disabled = false;
     status.textContent = media.photos.length + " of " + MAX_PHOTOS;
   };
+
+  media.on(() => {
+    grid.replaceChildren();
+    if (!add.disabled) status.textContent = media.photos.length + " of " + MAX_PHOTOS;
+    for (const photo of media.photos) {
+      const item = el("div", "pf-lib-item");
+      const pic = el("div", "pic");
+      pic.append(pictureImg(photo));
+      if (photo.animated) pic.append(el("span", "pf-gif-tag", "GIF"));
+      const cap = el("input");
+      cap.type = "text";
+      cap.maxLength = 60;
+      cap.placeholder = "caption (optional)";
+      cap.value = photo.caption || "";
+      cap.setAttribute("aria-label", "caption");
+      // saved on the spot; the list isn't redrawn so tabbing to the next caption keeps working
+      cap.onchange = async () => {
+        err.textContent = "";
+        try {
+          const data = await sendJson("/api/me/photos/" + photo.id, "PATCH", { caption: cap.value });
+          const saved = data.photos.find((x) => x.id === photo.id);
+          if (saved) {
+            photo.caption = saved.caption;
+            cap.value = saved.caption;
+          }
+        } catch (ex) {
+          err.textContent = ex.message;
+        }
+      };
+      const del = el("button", "", "Remove");
+      del.type = "button";
+      del.onclick = async () => {
+        if (!confirm("Remove this picture? It also comes off your stickers and background.")) return;
+        err.textContent = "";
+        try {
+          media.apply(await sendJson("/api/me/photos/" + photo.id, "DELETE"));
+        } catch (ex) {
+          err.textContent = ex.message;
+        }
+      };
+      item.append(pic, cap, del);
+      grid.append(item);
+    }
+  });
+}
+
+// ---------- editor: background picture ----------
+
+function mountBackgroundEditor(box, media, look, preview) {
+  const wrap = el("div");
+  box.append(wrap);
+  media.on(() => {
+    wrap.replaceChildren();
+    if (!media.photos.length) {
+      wrap.append(el("p", "pf-hint", "Upload a picture in Pictures and GIFs first, then pick it here."));
+      return;
+    }
+    wrap.append(el("p", "pf-hint", "Shows behind your page. Your boxes stay solid so people can still read everything."));
+    const fit = choiceRow("Fit");
+    const pick = choiceRow("Picture");
+    choiceButton(pick.box, "none", !look.bg_image, () => {
+      look.bg_image = 0;
+      fit.row.hidden = true;
+      preview();
+    }, "text");
+    for (const photo of media.photos) {
+      const b = choiceButton(pick.box, "", look.bg_image === photo.id, () => {
+        look.bg_image = photo.id;
+        fit.row.hidden = false;
+        preview();
+      }, "thumb");
+      b.title = photo.caption || "use as background";
+      b.append(pictureImg(photo));
+    }
+    for (const [value, label] of BG_MODES) {
+      choiceButton(fit.box, label, (look.custom.bg_mode || "tile") === value, () => {
+        look.custom.bg_mode = value;
+        preview();
+      }, "text");
+    }
+    fit.row.hidden = !look.bg_image;
+    wrap.append(pick.row, fit.row);
+  });
+}
+
+// ---------- editor: stickers ----------
+
+// what the little board shows, to help you picture where things land: [name, how tall]
+const BOARD_BLOCKS = [
+  ["picture and name", 14], ["about me", 16], ["interests", 10],
+  ["pictures", 16], ["top friends", 14], ["wall", 22],
+];
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+function mountStickerEditor(box, media, look) {
+  const wrap = el("div");
+  box.append(wrap);
+  let selected = null; // the sticker object being edited
+
+  const urlOf = (id) => {
+    const photo = media.photos.find((x) => x.id === id);
+    return photo ? photo.url : "";
+  };
+
+  function paint() {
+    wrap.replaceChildren();
+    if (!media.photos.length) {
+      wrap.append(el("p", "pf-hint", "Upload a picture or GIF in Pictures and GIFs first, then stick it on your profile here."));
+      return;
+    }
+    if (selected && !look.stickers.includes(selected)) selected = null;
+    wrap.append(el("p", "pf-hint", "Tap a picture to stick it on, then drag it where you want it. The board is a small copy of your page. Up to " + MAX_STICKERS + " stickers, and they need Save."));
+
+    // the pictures you can stick on
+    const pick = el("div", "pf-pick");
+    for (const photo of media.photos) {
+      const b = el("button", "pf-choice thumb");
+      b.type = "button";
+      b.title = photo.caption || "add as a sticker";
+      b.append(pictureImg(photo));
+      b.disabled = look.stickers.length >= MAX_STICKERS;
+      b.onclick = () => {
+        look.stickers.push({ img: photo.id, x: 50, y: 30, w: 22, r: 0 });
+        selected = look.stickers[look.stickers.length - 1];
+        paint();
+      };
+      pick.append(b);
+    }
+    wrap.append(pick);
+
+    // the board
+    const board = el("div", "pf-board");
+    for (const [label, grow] of BOARD_BLOCKS) {
+      const block = el("div", "pf-board-block", label);
+      block.style.flexGrow = String(grow);
+      board.append(block);
+    }
+    board.onpointerdown = (e) => {
+      if (e.target === board || e.target.classList.contains("pf-board-block")) select(null, null);
+    };
+    wrap.append(board);
+
+    // size and tilt of the selected sticker
+    const ctl = el("div", "pf-sticker-controls");
+    const sliders = {};
+    function slider(label, key, min, max) {
+      const row = el("label", "pf-style-row");
+      const value = el("b");
+      const left = el("span");
+      left.append(label + " ", value);
+      const input = el("input");
+      input.type = "range";
+      input.min = String(min);
+      input.max = String(max);
+      input.oninput = () => {
+        if (!selected) return;
+        selected[key] = Number(input.value);
+        value.textContent = input.value;
+        const node = board.querySelector(".pf-sticker.selected");
+        if (node) placeSticker(node, selected);
+      };
+      row.append(left, input);
+      ctl.append(row);
+      sliders[key] = { input, value };
+    }
+    slider("Size", "w", 4, 45);
+    slider("Tilt", "r", -45, 45);
+    const remove = el("button", "", "Remove this sticker");
+    remove.type = "button";
+    remove.onclick = () => {
+      if (!selected) return;
+      look.stickers.splice(look.stickers.indexOf(selected), 1);
+      selected = null;
+      paint();
+    };
+    ctl.append(remove);
+    wrap.append(ctl);
+
+    function syncControls() {
+      for (const key of Object.keys(sliders)) {
+        const { input, value } = sliders[key];
+        input.disabled = !selected;
+        input.value = String(selected ? selected[key] : key === "w" ? 22 : 0);
+        value.textContent = input.value;
+      }
+      remove.disabled = !selected;
+    }
+
+    // pick a sticker (or nothing); the one you pick goes on top of the others
+    function select(s, node) {
+      selected = s;
+      if (s && node) {
+        look.stickers.splice(look.stickers.indexOf(s), 1);
+        look.stickers.push(s);
+        board.append(node);
+      }
+      for (const n of board.querySelectorAll(".pf-sticker")) n.classList.toggle("selected", n === node);
+      syncControls();
+    }
+
+    function addSticker(s) {
+      const img = el("img", "pf-sticker");
+      img.src = safeImg(urlOf(s.img));
+      img.alt = "sticker";
+      img.draggable = false;
+      img.tabIndex = 0;
+      placeSticker(img, s);
+      if (s === selected) img.classList.add("selected");
+
+      img.onpointerdown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        select(s, img);
+        const rect = board.getBoundingClientRect();
+        // keep the spot you grabbed under your finger instead of jumping to the centre
+        const dx = ((e.clientX - rect.left) / rect.width) * 100 - s.x;
+        const dy = ((e.clientY - rect.top) / rect.height) * 100 - s.y;
+        img.setPointerCapture(e.pointerId);
+        img.onpointermove = (ev) => {
+          s.x = clamp(((ev.clientX - rect.left) / rect.width) * 100 - dx, 0, 100);
+          s.y = clamp(((ev.clientY - rect.top) / rect.height) * 100 - dy, 0, 100);
+          placeSticker(img, s);
+        };
+        const stop = () => (img.onpointermove = null);
+        img.onpointerup = stop;
+        img.onpointercancel = stop;
+      };
+      // keyboard: arrows nudge it, Delete removes it
+      img.onkeydown = (e) => {
+        const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+        if (step) {
+          e.preventDefault();
+          select(s, null);
+          img.classList.add("selected");
+          s.x = clamp(s.x + step[0], 0, 100);
+          s.y = clamp(s.y + step[1], 0, 100);
+          placeSticker(img, s);
+        } else if (e.key === "Delete" || e.key === "Backspace") {
+          e.preventDefault();
+          look.stickers.splice(look.stickers.indexOf(s), 1);
+          selected = null;
+          paint();
+        }
+      };
+      board.append(img);
+    }
+
+    for (const s of look.stickers) addSticker(s);
+    syncControls();
+  }
+
+  media.on(paint);
+}
