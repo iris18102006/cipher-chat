@@ -219,3 +219,118 @@ function wallSection(p) {
     }
   };
   box.append(form);
+
+  const list = el("div", "pf-wall-list");
+  if (!p.wall || !p.wall.length) {
+    list.append(el("div", "pf-content empty", "no comments yet"));
+  } else {
+    for (const c of p.wall) {
+      const item = el("div", "pf-wall-item");
+      const head = el("div", "pf-wall-head");
+      const who = el("button", "pf-wall-who");
+      who.type = "button";
+      who.append(avatarNode(c, "tiny"), shownName(c));
+      who.onclick = () => openProfile(c.username);
+      head.append(who, el("span", "", parseTs(c.created_at).toLocaleString()));
+      if (c.mine || p.me) {
+        const del = el("button", "pf-wall-delete", "delete");
+        del.type = "button";
+        del.onclick = async () => {
+          try {
+            await api("/api/profile/" + encodeURIComponent(p.username) + "/wall/" + c.id, { method: "DELETE" });
+            await openProfile(p.username);
+          } catch {}
+        };
+        head.append(del);
+      }
+      item.append(head, el("div", "pf-wall-body", c.body));
+      list.append(item);
+    }
+  }
+  box.append(list);
+  return box;
+}
+
+function renderProfile(p) {
+  applyTheme($("profile-card"), p);
+  $("pf-title").textContent = p.me ? "My profile" : shownName(p) + "'s profile";
+  const body = $("pf-body");
+  body.replaceChildren();
+
+  const hero = el("div", "pf-hero");
+  hero.append(avatarNode(p));
+  const who = el("div", "pf-who");
+  who.append(el("h2", "pf-name", shownName(p)));
+  who.append(el("div", "pf-handle", "@" + p.username));
+  if (p.mood) who.append(el("div", "pf-mood", "mood: " + p.mood));
+  if (p.headline) who.append(el("div", "pf-headline", p.headline));
+  const presence = el("div", "pf-presence");
+  presence.append(el("span", "dot " + (p.online ? "on" : "off")), lastSeenText(p));
+  who.append(presence);
+  hero.append(who);
+  body.append(hero);
+
+  // buttons (add friend, block...) get added to this row by their own features
+  const actions = el("div", "pf-actions");
+  if (p.me) {
+    const edit = el("button", "", "Edit profile");
+    edit.type = "button";
+    edit.onclick = () => renderEditor(p);
+    actions.append(edit);
+  }
+  addSocialButtons(p, actions);
+  body.append(actions);
+
+  body.append(section("About me", p.about_me));
+  body.append(section("Interests", p.interests));
+  if (p.song) body.append(section("Now playing", p.song));
+  if (p.photos.length) body.append(gallerySection(p));
+  else if (p.me) body.append(section("Pictures", ""));
+  if (p.top_friends.length || p.me) body.append(topFriendsSection(p));
+  if (p.location) body.append(section("Location", p.location));
+  body.append(wallSection(p));
+
+  const stats = el("div", "pf-stats");
+  stats.append(stat("friends", p.friend_count));
+  stats.append(stat("profile visitors", p.visitors));
+  if (!p.me) stats.append(stat("mutual friends", p.mutual_friends));
+  stats.append(el("span", "", "joined " + parseTs(p.joined).toLocaleDateString()));
+  body.append(stats);
+
+  body.append(stickerLayer(p.stickers));
+}
+
+// ---------- editing ----------
+
+// [field, label, max length, multiline, placeholder]
+const TEXT_FIELDS = [
+  ["display_name", "Display name", 30, false, "what your friends call you"],
+  ["mood", "Mood", 40, false, "like: sleepy"],
+  ["headline", "Headline", 80, false, "a short line under your name"],
+  ["about_me", "About me", 600, true, "tell people who you are"],
+  ["interests", "Interests", 200, false, "music, games, anything"],
+  ["location", "Location", 40, false, "where are you from?"],
+  ["song", "Now playing", 80, false, "artist - song"],
+];
+
+function textRow(container, [field, label, max, multiline, hint], value) {
+  const row = el("div", "pf-row");
+  const id = "pf-in-" + field;
+  const lab = el("label", "", label);
+  lab.htmlFor = id;
+  const input = el(multiline ? "textarea" : "input");
+  input.id = id;
+  input.name = field;
+  input.maxLength = max;
+  input.placeholder = hint;
+  input.value = value || "";
+  if (multiline) input.rows = 5;
+  else input.type = "text";
+  const count = el("span", "pf-count");
+  const update = () => (count.textContent = input.value.length + "/" + max);
+  input.addEventListener("input", update);
+  update();
+  row.append(lab, input, count);
+  container.append(row);
+  return input;
+}
