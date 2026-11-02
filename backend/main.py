@@ -1294,3 +1294,167 @@ async def websocket_endpoint(ws: WebSocket):
                     row["username"],
                     {"type": "receipt", "id": row["id"], "status": "delivered"},
                 )
+
+        await ws.send_text(json.dumps({"type": "ready", "me": me}))
+
+        while True:
+            try:
+                data = json.loads(await ws.receive_text())
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(data, dict):
+                continue
+            kind = data.get("type")
+            to = str(data.get("to", "")).lower()
+
+            if kind == "ping":
+                await ws.send_text(json.dumps({"type": "pong"}))
+                continue
+
+            # group chat events (messages, typing, read marks) live in groups.py
+            if await groups.handle_ws(conn, my_id, me, data):
+                continue
+
+            peer = conn.execute(
+                "SELECT id, username FROM users WHERE username = ?", (to,)
+            ).fetchone()
+            if not peer or peer["id"] == my_id:
+                continue
+
+            if kind == "typing":
+                if blocked_either_way(conn, my_id, peer["id"]):
+                    continue
+                await manager.send_user(
+                    peer["username"],
+                    {"type": "typing", "from": me, "state": bool(data.get("state"))},
+                )
+
+            elif kind == "msg":
+                iv, ct = data.get("iv"), data.get("ct")
+                if not (isinstance(iv, str) and isinstance(ct, str)):
+                    continue
+                if len(iv) > 32 or not ct or len(ct) > MAX_CT_LEN:
+                    continue
+                if i_blocked(conn, my_id, peer["id"]):
+                    continue  # you blocked them, unblock to talk again
+                # if they blocked me the message is kept (my history stays whole)
+                # but hidden from them, and I'm not told
+                hidden = 1 if i_blocked(conn, peer["id"], my_id) else 0
+                if not hidden:
+                    hidden, why = message_rule(conn, my_id, peer["id"])
+                    if why:
+                        await manager.send_user(
+                            me,
+                            {"type": "msg-rejected", "to": peer["username"], "cid": data.get("cid"), "reason": why},
+                        )
+                        continue
+                cur = conn.execute(
+                    "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (my_id, peer["id"], iv, ct, hidden),
+                )
+                msg_id = cur.lastrowid
+                conn.commit()
+                row = conn.execute(
+                    "SELECT created_at FROM messages WHERE id = ?", (msg_id,)
+                ).fetchone()
+                payload = {
+                    "type": "msg",
+                    "id": msg_id,
+                    "from": me,
+                    "to": peer["username"],
+                    "iv": iv,
+                    "ct": ct,
+                    "ts": row["created_at"],
+                    "cid": data.get("cid"),
+                }
+                got = 0 if hidden else await manager.send_user(peer["username"], payload)
+                delivered = got > 0
+                # waiting for the friend request to be accepted: tell my tabs, not them
+                waiting = hidden == HELD
+                if delivered:
+                    conn.execute(
+                        "UPDATE messages SET delivered_at = datetime('now') WHERE id = ?",
+                        (msg_id,),
+                    )
+                    conn.commit()
+                # echo to every tab of the sender so they all stay in sync
+                await manager.send_user(me, {**payload, "delivered": delivered, "held": waiting})
+
+            elif kind == "read":
+                rows = conn.execute(
+                    "SELECT id FROM messages WHERE sender_id = ? AND recipient_id = ? "
+                    "AND read_at IS NULL AND hidden = 0",
+                    (peer["id"], my_id),
+                ).fetchall()
+                if rows:
+                    conn.execute(
+                        "UPDATE messages SET read_at = datetime('now'), "
+                        "delivered_at = COALESCE(delivered_at, datetime('now')) "
+                        "WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL "
+                        "AND hidden = 0",
+                        (peer["id"], my_id),
+                    )
+                    conn.commit()
+                    await manager.send_user(
+                        peer["username"],
+                        {
+                            "type": "read",
+                            "by": me,
+                            "ids": [r["id"] for r in rows],
+                        },
+                    )
+                # other tabs of mine should clear their unread badge too
+                await manager.send_user(me, {"type": "read-sync", "peer": to})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        # bad frame or db hiccup: drop this socket, don't take the server down
+        log.exception("websocket error")
+    finally:
+        try:
+            username = locals().get("me")
+            if username:
+                manager.sockets[username].discard(ws)
+                if not manager.sockets[username]:
+                    manager.sockets.pop(username, None)
+                    now = utc_now_sql(conn)
+                    conn.execute(
+                        "UPDATE users SET last_seen = ? WHERE id = ?",
+                        (now, my_id),
+                    )
+                    conn.commit()
+                    await manager.send_many(
+                        presence_audience(conn, my_id) - blocked_names(conn, my_id),
+                        {
+                            "type": "presence",
+                            "user": username,
+                            "online": False,
+                            "last_seen": now,
+                        },
+                    )
+        finally:
+            conn.close()
+
+
+# ---------- group chats ----------
+# imported down here because groups.py uses helpers from this file
+
+from . import groups  # noqa: E402
+
+app.include_router(groups.router)
+
+
+# ---------- pages ----------
+
+
+@app.get("/")
+@app.get("/index.html")
+def index(session: str | None = Cookie(default=None), conn=Depends(get_conn)):
+    # redirect on the server so a logged-out visitor never sees the chat flash up
+    if not user_from_token(conn, session):
+        return RedirectResponse("/login.html", status_code=302)
+    return FileResponse(WEB_DIR / "index.html")
+
+
+app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
