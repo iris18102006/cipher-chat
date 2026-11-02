@@ -626,3 +626,157 @@ def test_pictures_need_a_login(client):
     url = put_avatar(a, make_image()).json()["avatar"]
     assert client.get(url).status_code == 401
     assert client.put("/api/me/avatar", content=make_image(), headers=RAW).status_code == 401
+
+
+def test_photo_metadata_is_stripped(client):
+    a = signup(client, "alice")
+    img = Image.new("RGB", (50, 50), (10, 200, 10))
+    exif = Image.Exif()
+    exif[0x010F] = "secret camera make"
+    buf = BytesIO()
+    img.save(buf, "JPEG", exif=exif)
+    assert b"secret camera make" in buf.getvalue()
+    photos = add_photo(a, buf.getvalue()).json()["photos"]
+    served = a.get(photos[0]["url"]).content
+    assert b"secret camera make" not in served
+    assert len(Image.open(BytesIO(served)).getexif()) == 0
+
+
+def test_gallery_add_caption_delete_and_limit(client):
+    a = signup(client, "alice")
+    big = add_photo(a, make_image("PNG", size=(3000, 2000))).json()["photos"][0]
+    assert max(big["width"], big["height"]) == 1600 and not big["animated"]
+    gif = make_image(frames=4)
+    photos = add_photo(a, gif).json()["photos"]
+    moving = photos[1]
+    assert moving["animated"] is True
+    # animated gifs are kept byte for byte so they keep moving
+    served = a.get(moving["url"])
+    assert served.headers["content-type"] == "image/gif" and served.content == gif
+    cap = a.patch(f"/api/me/photos/{moving['id']}", json={"caption": "  my cat  "})
+    assert cap.json()["photos"][1]["caption"] == "my cat"
+    assert a.patch(f"/api/me/photos/{moving['id']}", json={"caption": "x" * 61}).status_code == 400
+    for _ in range(10):
+        assert add_photo(a, make_image()).status_code == 200
+    assert add_photo(a, make_image()).status_code == 400  # 12 is the limit
+    left = a.delete(f"/api/me/photos/{big['id']}").json()["photos"]
+    assert len(left) == 11 and a.get(big["url"]).status_code == 404
+    assert add_photo(a, make_image()).status_code == 200
+
+
+def test_you_can_only_touch_your_own_photos(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    photo = add_photo(a, make_image()).json()["photos"][0]
+    assert b.delete(f"/api/me/photos/{photo['id']}").status_code == 400
+    assert b.patch(f"/api/me/photos/{photo['id']}", json={"caption": "mine now"}).status_code == 400
+    assert a.get(photo["url"]).status_code == 200
+    # but anyone logged in can see them on her profile
+    assert b.get("/api/profile/alice").json()["photos"][0]["id"] == photo["id"]
+    assert b.get(photo["url"]).status_code == 200
+
+
+def test_stickers_and_background(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    one = add_photo(a, make_image()).json()["photos"][0]
+    two = add_photo(a, make_image(frames=3)).json()["photos"][1]
+    theirs = add_photo(b, make_image()).json()["photos"][0]
+    stickers = [
+        {"img": one["id"], "x": 10, "y": 20.556, "w": 18, "r": -10},
+        {"img": two["id"], "x": 90, "y": 95, "w": 30},
+    ]
+    r = a.put("/api/profile", json={"stickers": stickers, "bg_image": one["id"], "custom": {"bg_mode": "cover", "avatar_shape": "hexagon", "font": "script"}})
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert [s["img"] for s in p["stickers"]] == [one["id"], two["id"]]
+    assert p["stickers"][0]["url"] == one["url"] and p["stickers"][0]["y"] == 20.56
+    assert p["stickers"][1]["r"] == 0
+    assert p["bg_image"] == one["id"] and p["bg_url"] == one["url"]
+    assert p["custom"]["avatar_shape"] == "hexagon"
+    # other people see the same thing
+    seen = b.get("/api/profile/alice").json()
+    assert len(seen["stickers"]) == 2 and seen["bg_url"] == one["url"]
+    bad = [
+        [{"img": theirs["id"], "x": 5, "y": 5, "w": 10}],  # somebody else's picture
+        [{"img": 99999, "x": 5, "y": 5, "w": 10}],
+        [{"img": one["id"], "x": 101, "y": 5, "w": 10}],
+        [{"img": one["id"], "x": 5, "y": -1, "w": 10}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 3}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 46}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 10, "r": 90}],
+        [{"img": one["id"], "x": 5, "y": 5, "w": 10}] * 9,
+    ]
+    for body in bad:
+        assert a.put("/api/profile", json={"stickers": body}).status_code == 400, body
+    assert a.put("/api/profile", json={"bg_image": theirs["id"]}).status_code == 400
+    # nothing changed after all those failures
+    assert len(a.get("/api/profile/alice").json()["stickers"]) == 2
+    assert a.put("/api/profile", json={"stickers": [], "bg_image": 0}).json()["bg_url"] == ""
+
+
+def test_deleting_a_picture_removes_its_stickers_and_background(client):
+    a = signup(client, "alice")
+    one = add_photo(a, make_image()).json()["photos"][0]
+    two = add_photo(a, make_image()).json()["photos"][1]
+    a.put("/api/profile", json={"bg_image": one["id"], "stickers": [
+        {"img": one["id"], "x": 5, "y": 5, "w": 10}, {"img": two["id"], "x": 50, "y": 50, "w": 10}]})
+    after = a.delete(f"/api/me/photos/{one['id']}").json()
+    assert after["bg_image"] == 0 and [s["img"] for s in after["stickers"]] == [two["id"]]
+    assert [s["img"] for s in a.get("/api/profile/alice").json()["stickers"]] == [two["id"]]
+
+
+def test_someone_who_blocked_you_does_not_show_you_their_pictures(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    url = put_avatar(a, make_image()).json()["avatar"]
+    a.post("/api/blocks/bob")
+    assert b.get(url).status_code == 404
+    assert a.get(url).status_code == 200 and c.get(url).status_code == 200
+
+
+def test_bad_custom_style_values_still_rejected(client):
+    a = signup(client, "alice")
+    for custom in ({"avatar_shape": "star"}, {"bg_mode": "fixed"}, {"font": "papyrus"}):
+        assert a.put("/api/profile", json={"custom": custom}).status_code == 400
+
+
+# ---------- message requests (settings: what happens before a friend request is accepted) ----------
+
+
+def say(ws, to, cid="c1"):
+    ws.send_json({"type": "msg", "to": to, "iv": "aaaa", "ct": "bbbb", "cid": cid})
+    return ws.receive_json()
+
+
+def test_message_policy_setting(client):
+    a = signup(client, "alice")
+    assert a.get("/api/settings").json() == {"message_policy": "allow"}
+    for bad in ("nope", "", "ASK"):
+        assert a.put("/api/settings", json={"message_policy": bad}).status_code == 400
+    assert a.put("/api/settings", json={"message_policy": "ask"}).json() == {"message_policy": "ask"}
+    assert a.get("/api/settings").json() == {"message_policy": "ask"}
+    assert client.__class__(client.app).get("/api/settings").status_code == 401
+
+
+def test_ask_policy_holds_messages_until_the_request_is_accepted(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        echo = say(wa, "bob")
+        assert echo["type"] == "msg" and echo["held"] is True and echo["delivered"] is False
+        # bob sees that something is waiting, but not the message itself
+        row = b.get("/api/contacts").json()[0]
+        assert row["held"] == 1 and row["unread"] == 0
+        assert b.get("/api/messages/alice").json() == []
+        # alice sees her own message, marked as waiting
+        mine = a.get("/api/messages/bob").json()
+        assert len(mine) == 1 and mine[0]["held"] is True
+        # accepting lets it through, and alice is told it was delivered
+        assert b.post("/api/friends/alice/accept").status_code == 200
+        assert wa.receive_json() == {"type": "receipt", "id": echo["id"], "status": "delivered"}
+        assert wa.receive_json()["event"] == "accepted"
+    row = b.get("/api/contacts").json()[0]
+    assert row["held"] == 0 and row["unread"] == 1
+    got = b.get("/api/messages/alice").json()
+    assert len(got) == 1 and got[0]["from"] == "alice" and got[0]["held"] is False
+    assert a.get("/api/messages/bob").json()[0]["delivered"] is True
