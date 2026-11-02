@@ -930,3 +930,204 @@ async def accept_friend(username: str, user=Depends(current_user), conn=Depends(
             peer["username"], {"type": "social", "event": "accepted", "from": user["username"]}
         )
     return {"status": "friends"}
+
+
+@app.delete("/api/friends/{username}")
+async def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    """Unfriend, cancel a request I sent, or decline one I got."""
+    peer = other_user(conn, user, username)
+    conn.execute(
+        "DELETE FROM friendships WHERE (requester_id = :a AND addressee_id = :b) "
+        "OR (requester_id = :b AND addressee_id = :a)",
+        {"a": user["id"], "b": peer["id"]},
+    )
+    drop_held(conn, user["id"], peer["id"])
+    conn.commit()
+    await manager.send_user(
+        peer["username"], {"type": "social", "event": "removed", "from": user["username"]}
+    )
+    return {"status": "none"}
+
+
+# ---------- blocking ----------
+
+
+def i_blocked(conn, me_id: int, other_id: int) -> bool:
+    return (
+        conn.execute(
+            "SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+            (me_id, other_id),
+        ).fetchone()
+        is not None
+    )
+
+
+def blocked_either_way(conn, a: int, b: int) -> bool:
+    return i_blocked(conn, a, b) or i_blocked(conn, b, a)
+
+
+def blocked_names(conn, user_id: int) -> set[str]:
+    """Usernames I blocked plus usernames that blocked me."""
+    rows = conn.execute(
+        "SELECT username FROM users WHERE id IN ("
+        "SELECT blocked_id FROM blocks WHERE blocker_id = :me "
+        "UNION SELECT blocker_id FROM blocks WHERE blocked_id = :me)",
+        {"me": user_id},
+    ).fetchall()
+    return {r["username"] for r in rows}
+
+
+async def notify_block_change(me: str, other: str):
+    """Tell my other tabs, and quietly nudge the other person to refresh their
+    buddy list (their view of my presence just changed). Nothing says who blocked."""
+    await manager.send_user(me, {"type": "social", "event": "refresh", "from": other})
+    await manager.send_user(other, {"type": "social", "event": "refresh", "from": me})
+
+
+@app.get("/api/blocks")
+def list_blocks(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        "SELECT u.username, u.display_name, u.avatar_id FROM blocks b "
+        "JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ? "
+        "ORDER BY u.username",
+        (user["id"],),
+    ).fetchall()
+    return [
+        {
+            "username": r["username"],
+            "display_name": r["display_name"],
+            "avatar": avatar_url(r["avatar_id"]),
+        }
+        for r in rows
+    ]
+
+
+@app.post("/api/blocks/{username}")
+async def block_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    conn.execute(
+        "INSERT OR IGNORE INTO blocks (blocker_id, blocked_id) VALUES (?, ?)",
+        (user["id"], peer["id"]),
+    )
+    # blocking someone also ends the friendship / any pending request
+    conn.execute(
+        "DELETE FROM friendships WHERE (requester_id = :a AND addressee_id = :b) "
+        "OR (requester_id = :b AND addressee_id = :a)",
+        {"a": user["id"], "b": peer["id"]},
+    )
+    drop_held(conn, user["id"], peer["id"])
+    conn.commit()
+    await notify_block_change(user["username"], peer["username"])
+    return {"blocked": True}
+
+
+@app.delete("/api/blocks/{username}")
+async def unblock_user(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    peer = other_user(conn, user, username)
+    conn.execute(
+        "DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+        (user["id"], peer["id"]),
+    )
+    conn.commit()
+    await notify_block_change(user["username"], peer["username"])
+    return {"blocked": False}
+
+
+# ---------- settings ----------
+
+
+@app.get("/api/settings")
+def get_settings(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute("SELECT msg_policy FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return {"message_policy": row["msg_policy"]}
+
+
+@app.put("/api/settings")
+async def put_settings(body: SettingsBody, user=Depends(current_user), conn=Depends(get_conn)):
+    if body.message_policy is not None:
+        if body.message_policy not in MESSAGE_POLICIES:
+            raise HTTPException(400, "pick allow, ask or wait")
+        conn.execute(
+            "UPDATE users SET msg_policy = ? WHERE id = ?", (body.message_policy, user["id"])
+        )
+        conn.commit()
+        if body.message_policy == "allow":
+            # you're fine with them now, so whatever was waiting comes through
+            await release_held(conn, user["id"])
+    return get_settings(user, conn)
+
+
+# ---------- keys, contacts, history ----------
+
+
+@app.put("/api/key")
+def put_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
+    if not valid_pub(body.pub):
+        raise HTTPException(400, "that doesn't look like a P-256 public key")
+    conn.execute(
+        "UPDATE users SET public_key = ? WHERE id = ?", (body.pub, user["id"])
+    )
+    conn.commit()
+    return {"ok": True}
+
+
+@app.get("/api/contacts")
+def contacts(user=Depends(current_user), conn=Depends(get_conn)):
+    rows = conn.execute(
+        """
+        SELECT u.id, u.username, u.public_key, u.last_seen,
+               u.display_name, u.avatar_id, u.mood,
+               (SELECT COUNT(*) FROM messages m
+                 WHERE m.sender_id = u.id AND m.recipient_id = :me
+                   AND m.read_at IS NULL AND m.hidden = 0) AS unread,
+               (SELECT COUNT(*) FROM messages m
+                 WHERE m.sender_id = u.id AND m.recipient_id = :me
+                   AND m.hidden = 2) AS held,
+               (SELECT MAX(m.id) FROM messages m
+                 WHERE (m.sender_id = u.id AND m.recipient_id = :me AND m.hidden = 0)
+                    OR (m.sender_id = :me AND m.recipient_id = u.id)) AS last_msg
+        FROM users u
+        WHERE u.id != :me
+          AND (
+              EXISTS (SELECT 1 FROM friendships f
+                      WHERE (f.requester_id = u.id AND f.addressee_id = :me)
+                         OR (f.requester_id = :me AND f.addressee_id = u.id))
+              OR EXISTS (SELECT 1 FROM blocks b
+                         WHERE b.blocker_id = :me AND b.blocked_id = u.id)
+          )
+        ORDER BY last_msg IS NULL, last_msg DESC, u.username
+        """,
+        {"me": user["id"]},
+    ).fetchall()
+    mine = {
+        r[0]
+        for r in conn.execute(
+            "SELECT blocked_id FROM blocks WHERE blocker_id = ?", (user["id"],)
+        )
+    }
+    theirs = {
+        r[0]
+        for r in conn.execute(
+            "SELECT blocker_id FROM blocks WHERE blocked_id = ?", (user["id"],)
+        )
+    }
+    out = []
+    for r in rows:
+        # someone who blocked me looks permanently offline, with no last seen
+        hidden = r["id"] in theirs
+        out.append(
+            {
+                "username": r["username"],
+                "display_name": r["display_name"],
+                "avatar": avatar_url(r["avatar_id"]),
+                "mood": r["mood"],
+                "pub": r["public_key"],
+                "last_seen": None if hidden else r["last_seen"],
+                "online": False if hidden else manager.is_online(r["username"]),
+                "unread": r["unread"],
+                "held": 0 if hidden else r["held"],
+                "friend": friend_status(conn, user["id"], r["id"]),
+                "blocked": r["id"] in mine,
+            }
+        )
+    return out
