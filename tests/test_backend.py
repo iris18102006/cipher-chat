@@ -168,3 +168,152 @@ def test_offline_message_delivered_on_connect(client):
             assert receipt["type"] == "receipt" and receipt["status"] == "delivered"
             assert wb.receive_json()["type"] == "ready"
     assert b.get("/api/contacts").json()[0]["unread"] == 1
+
+
+def test_oversized_and_self_messages_dropped(client):
+    a = signup(client, "alice")
+    signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "x" * 20000})
+        wa.send_json({"type": "msg", "to": "alice", "iv": "aXY=", "ct": "Y3Q="})
+        wa.send_json({"type": "ping"})
+        assert wa.receive_json() == {"type": "pong"}
+    assert a.get("/api/messages/bob").json() == []
+
+
+def test_last_seen_set_on_disconnect(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/friends/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+    people = b.get("/api/contacts").json()
+    assert people[0]["online"] is False and people[0]["last_seen"]
+
+
+
+
+def test_unrelated_users_never_appear_as_contacts(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    assert a.get("/api/contacts").json() == []
+    assert b.get("/api/contacts").json() == []
+    c.post("/api/friends/alice")
+    assert [row["username"] for row in a.get("/api/contacts").json()] == ["carol"]
+    assert b.get("/api/contacts").json() == []
+
+
+def test_custom_profile_style_is_saved_and_validated(client):
+    a = signup(client, "alice")
+    custom = {
+        "page": "#110011", "card": "#220022", "text": "#ffeeff",
+        "font": "comic", "pattern": "hearts", "border_style": "double",
+        "border_width": 5, "radius": 12, "name_effect": "glow", "marquee": True,
+    }
+    r = a.put("/api/profile", json={"custom": custom})
+    assert r.status_code == 200, r.text
+    assert r.json()["custom"] == custom
+    assert a.put("/api/profile", json={"custom": {"font": "javascript:evil"}}).status_code == 400
+    assert a.put("/api/profile", json={"custom": {"page": "red"}}).status_code == 400
+    assert a.put("/api/profile", json={"custom": {"border_width": 99}}).status_code == 400
+    assert a.put("/api/profile", json={"custom": {"raw_css": "body{}"}}).status_code == 400
+
+
+# ---------- profiles ----------
+
+
+def test_profile_defaults_and_update(client):
+    a = signup(client, "alice")
+    p = a.get("/api/profile/alice").json()
+    assert p["me"] is True and p["theme"] == "classic" and p["display_name"] == ""
+    r = a.put(
+        "/api/profile",
+        json={"display_name": "  Ali  ", "mood": "happy", "about_me": "line1\nline2", "theme": "emo", "accent": "#FF00AA"},
+    )
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert p["display_name"] == "Ali" and p["about_me"] == "line1\nline2"
+    assert p["avatar"] == "" and p["theme"] == "emo" and p["accent"] == "#ff00aa"
+
+
+def test_profile_partial_update_keeps_other_fields(client):
+    a = signup(client, "alice")
+    a.put("/api/profile", json={"mood": "chill", "song": "some song"})
+    p = a.put("/api/profile", json={"mood": "busy"}).json()
+    assert p["mood"] == "busy" and p["song"] == "some song"
+
+
+def test_profile_validation(client):
+    a = signup(client, "alice")
+    assert a.put("/api/profile", json={"theme": "nope"}).status_code == 400
+    assert a.put("/api/profile", json={"accent": "red"}).status_code == 400
+    assert a.put("/api/profile", json={"display_name": "x" * 31}).status_code == 400
+    assert a.put("/api/profile", json={"about_me": "x" * 601}).status_code == 400
+    # an empty accent resets back to the theme colour
+    assert a.put("/api/profile", json={"accent": ""}).status_code == 200
+
+
+def test_profile_text_is_stored_as_plain_text(client):
+    a = signup(client, "alice")
+    p = a.put("/api/profile", json={"headline": "<script>x</script>\x00hi"}).json()
+    # stored as typed (minus control chars), the browser renders it with textContent
+    assert p["headline"] == "<script>x</script>hi"
+
+
+def test_view_someone_elses_profile(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.put("/api/profile", json={"headline": "hello world"})
+    p = b.get("/api/profile/alice").json()
+    assert p["headline"] == "hello world" and p["me"] is False
+    assert b.get("/api/profile/ghost").status_code == 404
+    assert client.get("/api/profile/alice").status_code == 401
+    assert b.put("/api/profile", json={"mood": "x"}).status_code == 200
+
+
+# ---------- friends ----------
+
+
+def test_friend_request_flow(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    assert a.post("/api/friends/bob").json() == {"status": "outgoing"}
+    # asking twice changes nothing
+    assert a.post("/api/friends/bob").json() == {"status": "outgoing"}
+    assert [x["username"] for x in a.get("/api/friends").json()["outgoing"]] == ["bob"]
+    assert [x["username"] for x in b.get("/api/friends").json()["incoming"]] == ["alice"]
+    assert b.post("/api/friends/alice/accept").json() == {"status": "friends"}
+    assert [x["username"] for x in a.get("/api/friends").json()["friends"]] == ["bob"]
+    assert [x["username"] for x in b.get("/api/friends").json()["friends"]] == ["alice"]
+
+
+def test_friend_request_both_ways_becomes_friendship(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    assert b.post("/api/friends/alice").json() == {"status": "friends"}
+
+
+def test_only_the_addressee_can_accept(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    assert a.post("/api/friends/bob/accept").status_code == 404
+    assert b.post("/api/friends/alice/accept").status_code == 200
+    # accepting again is harmless
+    assert b.post("/api/friends/alice/accept").status_code == 200
+
+
+def test_decline_cancel_and_unfriend(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    assert b.delete("/api/friends/alice").json() == {"status": "none"}
+    assert a.get("/api/friends").json() == {"friends": [], "incoming": [], "outgoing": []}
+    a.post("/api/friends/bob")
+    assert a.delete("/api/friends/bob").status_code == 200  # cancel
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    assert a.delete("/api/friends/bob").status_code == 200  # unfriend
+    assert b.get("/api/friends").json()["friends"] == []
+
+
+def test_friend_edge_cases(client):
+    a = signup(client, "alice")
+    assert a.post("/api/friends/alice").status_code == 400
+    assert a.post("/api/friends/ghost").status_code == 404
+    assert client.post("/api/friends/alice").status_code == 401
