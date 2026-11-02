@@ -130,3 +130,128 @@ async function decryptFor(peer, iv, ct) {
     return { text: "can't decrypt this message (the key changed or it's corrupted)", failed: true };
   }
 }
+
+// ---------- contacts ----------
+
+async function loadContacts() {
+  const list = await api("/api/contacts");
+  const prev = state.contacts;
+  state.contacts = new Map();
+  state.order = [];
+  for (const row of list) {
+    const old = prev.get(row.username);
+    const c = {
+      username: row.username,
+      display_name: row.display_name,
+      avatar: row.avatar,
+      mood: row.mood,
+      friend: row.friend, // none | friends | outgoing | incoming
+      blocked: row.blocked,
+      pub: row.pub,
+      online: row.online,
+      last_seen: row.last_seen,
+      unread: row.unread,
+      held: row.held || 0, // messages from a friend request that wait for me to accept
+      typing: old ? old.typing : false,
+      changed: false,
+    };
+    checkKeyTrust(c);
+    state.contacts.set(c.username, c);
+    state.order.push(c.username);
+  }
+  renderBuddies();
+  if (state.open) renderChatHeader();
+}
+
+function bump(username) {
+  state.order = [username, ...state.order.filter((u) => u !== username)];
+}
+
+function totalUnread() {
+  let n = 0;
+  for (const c of state.contacts.values()) n += c.unread + c.held;
+  if (typeof totalGroupUnread === "function") n += totalGroupUnread();
+  return n;
+}
+
+// buddy list sections, in the order they're shown
+const BUDDY_GROUPS = [
+  ["requests", "Friend requests"],
+  ["friends", "Friends"],
+  ["people", "People"],
+  ["blocked", "Blocked"],
+];
+
+function groupOf(c) {
+  if (c.blocked) return "blocked";
+  if (c.friend === "incoming") return "requests";
+  if (c.friend === "friends") return "friends";
+  return "people";
+}
+
+function buddyRow(c) {
+  const li = el("li", c.username === state.open ? "active" : "");
+  li.dataset.user = c.username;
+  li.append(el("span", "dot " + (c.online ? "on" : "off")));
+  li.append(avatarNode(c, "tiny"));
+  const info = el("div", "buddy-info");
+  info.append(el("div", "buddy-name", shownName(c)));
+  info.append(el("div", "buddy-sub", c.typing ? "typing..." : c.online ? "online" : lastSeenText(c)));
+  if (c.mood) info.append(el("div", "buddy-mood", c.mood));
+  li.append(info);
+  if (c.unread > 0) li.append(el("span", "badge", c.unread > 99 ? "99+" : String(c.unread)));
+  else if (c.held > 0) {
+    const w = el("span", "badge held", String(c.held));
+    w.title = c.held + " message(s) waiting until you accept the request";
+    li.append(w);
+  }
+  li.onclick = () => openChat(c.username);
+  return li;
+}
+
+function renderBuddies() {
+  const q = $("search").value.trim().toLowerCase();
+  const ul = $("buddy-list");
+  ul.replaceChildren();
+  let shown = 0;
+  // group chats come first
+  if (typeof groupSection === "function") {
+    const g = groupSection(q);
+    ul.append(...g.nodes);
+    shown += g.count;
+  }
+  for (const [key, title] of BUDDY_GROUPS) {
+    const rows = state.order
+      .map((name) => state.contacts.get(name))
+      .filter((c) => groupOf(c) === key)
+      .filter((c) => !q || c.username.includes(q) || shownName(c).toLowerCase().includes(q));
+    if (!rows.length) continue;
+    ul.append(el("li", "group " + key, title + " (" + rows.length + ")"));
+    for (const c of rows) ul.append(buddyRow(c));
+    shown += rows.length;
+  }
+  $("buddy-empty").hidden = shown > 0 || q !== "";
+  // number of friend requests waiting for me, on the Requests button
+  let waiting = 0;
+  for (const c of state.contacts.values()) if (c.friend === "incoming" && !c.blocked) waiting++;
+  $("req-count").textContent = String(waiting);
+  $("req-count").hidden = waiting === 0;
+  const n = totalUnread();
+  document.title = (n ? "(" + n + ") " : "") + "cipher-chat";
+}
+
+// ---------- chat pane ----------
+
+function renderChatHeader() {
+  if (state.openGroup != null) return renderGroupHeader();
+  // back from a group chat: the 1:1 buttons come back, the group one goes
+  $("group-info").hidden = true;
+  for (const id of ["view-profile", "verify", "block"]) $(id).hidden = false;
+  $("msg").placeholder = "type a message (Enter to send, Shift+Enter for a new line)";
+  const c = state.contacts.get(state.open);
+  if (!c) return;
+  $("chat-name").textContent = shownName(c);
+  $("chat-name").title = "@" + c.username;
+  const status = c.typing ? "typing..." : lastSeenText(c);
+  $("chat-status").textContent = status;
+  $("chat-status").className = c.online ? "online" : "";
