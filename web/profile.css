@@ -347,3 +347,210 @@
   padding: 0;
   border-radius: 50%;
 }
+
+.pf-choice.on {
+  border-color: var(--p-accent);
+  box-shadow: 0 0 0 2px var(--p-accent);
+}
+
+/* friend buttons */
+
+.pf-actions button.static {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.pf-inline-error {
+  align-self: center;
+  font-size: 11px;
+  color: #c33;
+}
+
+/* ---------- phones ---------- */
+
+@media (max-width: 700px) {
+  #profile-overlay {
+    padding: 0;
+  }
+
+  #profile-card {
+    min-height: 100%;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .pf-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .pf-actions {
+    justify-content: center;
+  }
+
+  .pf-top {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* label on top of the field instead of beside it */
+  .pf-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .pf-row label {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+
+  .pf-row.wide .pf-picker {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- safe MySpace-style customization ---------- */
+/* fonts are set from profile.js (FONT_CHOICES), not here: a font class would lose to the theme's own */
+
+#profile-card.pattern-dots { background-image: radial-gradient(var(--p-border) 1px, transparent 1px); background-size: 12px 12px; }
+#profile-card.pattern-stripes { background-image: repeating-linear-gradient(90deg, transparent 0 14px, color-mix(in srgb, var(--p-border) 22%, transparent) 14px 21px); }
+#profile-card.pattern-checks { background-image: conic-gradient(color-mix(in srgb, var(--p-border) 18%, transparent) 25%, transparent 0 50%, color-mix(in srgb, var(--p-border) 18%, transparent) 0 75%, transparent 0); background-size: 24px 24px; }
+#profile-card.pattern-grid { background-image: linear-gradient(color-mix(in srgb, var(--p-border) 20%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--p-border) 20%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
+#profile-card.pattern-diagonal { background-image: repeating-linear-gradient(135deg, transparent 0 12px, color-mix(in srgb, var(--p-border) 20%, transparent) 12px 16px); }
+
+#profile-card.name-glow .pf-name { text-shadow: 0 0 4px var(--p-accent), 0 0 10px var(--p-accent); }
+#profile-card.name-shadow .pf-name { text-shadow: 3px 3px 0 color-mix(in srgb, var(--p-text) 35%, transparent); }
+#profile-card.name-rainbow .pf-name {
+  background: linear-gradient(90deg, #ff4d4d, #ffb84d, #ffe44d, #55dd77, #55aaff, #aa66ff, #ff66bb);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#profile-card.pf-marquee .pf-name {
+  display: inline-block;
+  white-space: nowrap;
+  animation: pf-marquee 7s linear infinite alternate;
+}
+@keyframes pf-marquee { from { transform: translateX(0); } to { transform: translateX(28px); } }
+@media (prefers-reduced-motion: reduce) { #profile-card.pf-marquee .pf-name { animation: none; } }
+
+.pf-style-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.pf-style-color { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px; background: var(--p-card); border: 1px solid var(--p-border); font-size: 10px; }
+.pf-style-color input[type="color"] { width: 32px; height: 24px; padding: 0; border: 0; background: transparent; }
+.pf-style-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 8px; margin-bottom: 7px; }
+.pf-style-row select, .pf-style-row input[type="range"] { width: 100%; min-width: 0; }
+.pf-style-row.check input { justify-self: start; }
+.pf-reset-style { margin: 2px 0 10px; }
+
+@media (max-width: 700px) { .pf-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pf-style-row { grid-template-columns: 1fr; } }
+
+
+/* ---------- profile wall ---------- */
+.pf-wall-form { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 8px; }
+.pf-wall-form textarea { grid-column: 1 / -1; resize: vertical; padding: 6px; font: inherit; color: var(--p-text); background: var(--p-page); border: 1px solid var(--p-border); }
+.pf-wall-list { border-top: 1px solid var(--p-border); }
+.pf-wall-item { padding: 8px 10px; border-bottom: 1px solid var(--p-border); background: var(--p-card); }
+.pf-wall-item:last-child { border-bottom: 0; }
+.pf-wall-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 10px; color: var(--p-muted); }
+.pf-wall-who, .pf-wall-delete { padding: 0; border: 0; background: none; color: var(--p-accent); font: inherit; font-weight: bold; }
+.pf-wall-delete { margin-left: auto; color: var(--p-muted); }
+.pf-wall-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+
+/* ---------- editor groups ---------- */
+
+.pf-group {
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: var(--p-card);
+  border: var(--p-line) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
+}
+
+.pf-group > summary {
+  padding: 5px 8px;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--p-head-text);
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+}
+
+.pf-group-body {
+  padding: 10px 8px 4px;
+}
+
+.pf-hint {
+  margin: 0 0 8px;
+  font-size: 10px;
+  color: var(--p-muted);
+}
+
+/* theme picker: a little preview of each theme */
+
+.pf-row.wide .pf-themes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pf-theme-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px;
+  font-size: 10px;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 2px solid var(--p-border);
+}
+
+.pf-theme-btn:hover:not(:disabled) {
+  background: var(--p-card);
+  border-color: var(--p-accent);
+}
+
+.pf-theme-btn.on {
+  border-color: var(--p-accent);
+  box-shadow: 0 0 0 2px var(--p-accent);
+}
+
+.pf-swatch {
+  position: relative;
+  display: block;
+  height: 42px;
+  overflow: hidden;
+  background: var(--p-page);
+  border: 1px solid var(--p-border);
+}
+
+.pf-swatch::before {
+  content: "";
+  display: block;
+  height: 11px;
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+  border-bottom: 2px solid var(--p-accent);
+}
+
+.pf-swatch::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 5px;
+  height: 12px;
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+/* little shapes on the avatar shape buttons */
+
+.pf-shape {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--p-accent);
+}
+
+.pf-shape.shape-circle { border-radius: 50%; }
+.pf-shape.shape-rounded { border-radius: 24%; }
+.pf-shape.shape-diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.pf-shape.shape-hexagon { clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
