@@ -39,3 +39,66 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 3. The key moves to a new version whenever someone **joins**, so a new member can only read from the moment they were added, and whenever someone **leaves or is removed**, so they can't read what comes after. After a removal the owner's browser makes the new key (or another member's, if the owner is offline). Two people changing the key at once is settled by the server: one of them wins and the other is told to retry.
 4. You can only add people who are your friends and haven't blocked you (or you them). A key the person already trusted is checked the same way as in 1:1 chats: if a member's key changed, nobody wraps a new group key for them until you verify it in the Members panel.
 5. If you block someone (or they block you) you don't see their messages in groups and they don't see yours, and nobody is told.
+
+## Profiles, friends and blocking
+
+- Profiles are plain text plus pictures. Nothing you type is ever rendered as html, so there's no way to inject code through a profile.
+- Uploads: png, jpg, gif and webp only (no svg). Profile photos are cropped square and every still picture is re-saved as a resized webp, which also removes hidden data like GPS from photos. Animated GIFs are checked and kept as they are so they keep moving. Limits: 5 MB for a profile photo, 4 MB and 12 per person for the gallery, 8 stickers. Pictures are stored in the database, only logged-in people can load them, and someone who blocked you doesn't show you theirs.
+- Pictures are **not** encrypted, same as the rest of a profile. Only messages are.
+- Themes are presets (`web/themes.css`), they only change a handful of colour variables.
+- Anyone logged in can look at a profile. Profiles are **not** encrypted, only messages are, so don't put secrets in your about me.
+- You can message anyone who hasn't blocked you, friends or not. Friends just get their own section in the buddy list and can go in your top friends.
+- When someone blocks you, your messages to them are still saved (so your own history stays complete) but they are never delivered or shown to them, and you're not told. They also see you as permanently offline. Blocking someone also ends your friendship.
+
+The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` header, so other sites and logged-out visitors can't connect.
+
+## Run it
+
+    python3 -m venv .venv
+    source .venv/bin/activate.fish   # bash/zsh: source .venv/bin/activate
+    pip install -r requirements.txt
+    python server.py
+
+Open `http://127.0.0.1:8000`, sign up, then open a second browser profile (or a private window) and sign up as someone else.
+
+If you serve it over https, set `CIPHER_SECURE_COOKIES=1` so the session cookie is only sent over https.
+
+## Tests
+
+    pip install -r requirements-dev.txt
+    python -m pytest tests
+
+## Limitations
+
+This is a learning project, not Signal.
+
+- Your private key lives in one browser. Logging in from a new browser creates a new key, so old history can't be decrypted there and friends get a key-change warning.
+- Clearing site data deletes your private key and with it your ability to read old messages.
+- No forward secrecy, a stolen private key decrypts everything
+- The server still sees metadata: who talks to whom, when, message sizes, and online status
+- Message settings only cover people who sent you a friend request. Nobody can message someone they have no friend request or friendship with. Being refused ("wait") is shown to the sender, unlike a block
+- Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
+- The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
+- Login rate limiting is in memory and resets when the server restarts
+- Group messages share one key, so any member could write something that looks like it came from another member (the server shows who sent it, but the server isn't trusted). Nothing signs messages yet
+- If a member loses their private key (clears site data, new browser) they can't read the group until someone removes them and adds them again, or the key is next replaced
+- The server knows who is in which group, when messages are sent and how big they are
+- Group "seen by" and typing are visible to every member who hasn't blocked you
+- Someone who was removed keeps what they already read and the keys they already held, a new key only protects what's said afterwards
+
+## Roadmap
+
+- [x] HKDF key derivation
+- [x] Accounts, buddy list, history
+- [x] Typing, online / last seen, delivered / read
+- [x] Profiles you can customize (no code needed)
+- [x] Friends and blocking
+- [x] Profile comments / a wall
+- [x] Image avatars, gallery, GIFs and stickers
+- [x] Message requests and a settings page
+- [ ] Forward secrecy with a ratchet
+- [x] Group chats
+- [ ] Chat themes for each conversation
+- [x] Fix: unblocking someone does nothing
+- [x] Separate button for friend requests
+- [x] Separate button that lists who you blocked
