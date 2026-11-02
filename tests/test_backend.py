@@ -473,3 +473,156 @@ def test_profile_shows_friend_status_and_mutual_friends(client):
     assert p["friend"] == "none" and p["mutual_friends"] == 1 and p["friend_count"] == 1
     a.post("/api/friends/bob")
     assert b.get("/api/profile/alice").json()["friend"] == "incoming"
+
+
+# ---------- live social events ----------
+
+
+def test_friend_events_pushed_live(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        assert wb.receive_json()["type"] == "ready"
+        a.post("/api/friends/bob")
+        assert wb.receive_json() == {"type": "social", "event": "request", "from": "alice"}
+        a.delete("/api/friends/bob")
+        assert wb.receive_json() == {"type": "social", "event": "removed", "from": "alice"}
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        b.post("/api/friends/alice/accept")
+        assert wa.receive_json() == {"type": "social", "event": "accepted", "from": "bob"}
+
+
+def test_block_sends_a_neutral_refresh_to_both_sides(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        wb.receive_json()
+        a.post("/api/blocks/bob")
+        # bob only learns to refresh, the frame doesn't say anyone was blocked
+        assert wb.receive_json() == {"type": "social", "event": "refresh", "from": "alice"}
+
+
+def test_me_includes_display_name_and_avatar(client):
+    a = signup(client, "alice")
+    a.put("/api/profile", json={"display_name": "Ali"})
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": ""}
+    avatar = put_avatar(a, make_image()).json()["avatar"]
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": avatar}
+
+
+
+
+def test_profile_wall_post_and_delete_permissions(client):
+    a, b, c = signup(client, "alice"), signup(client, "bob"), signup(client, "carol")
+    r = b.post("/api/profile/alice/wall", json={"body": " hi alice! "})
+    assert r.status_code == 200, r.text
+    comment_id = r.json()["id"]
+    wall = a.get("/api/profile/alice").json()["wall"]
+    assert wall[0]["body"] == "hi alice!" and wall[0]["username"] == "bob"
+    assert c.delete(f"/api/profile/alice/wall/{comment_id}").status_code == 403
+    assert a.delete(f"/api/profile/alice/wall/{comment_id}").status_code == 200
+    assert a.get("/api/profile/alice").json()["wall"] == []
+
+
+def test_profile_wall_respects_blocks(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/blocks/bob")
+    assert b.post("/api/profile/alice/wall", json={"body": "nope"}).status_code == 404
+
+
+# ---------- the frontend and backend agree ----------
+
+WEB = Path(__file__).parent.parent / "web"
+
+
+def test_every_theme_has_css_and_a_picker_button():
+    from backend import main
+
+    css = (WEB / "themes.css").read_text()
+    js = (WEB / "profile.js").read_text()
+    block = js.split("const THEME_CHOICES = [", 1)[1].split("];", 1)[0]
+    in_js = re.findall(r'\["([a-z]+)",\s*"', block)
+    for theme in main.THEMES:
+        assert f"#profile-card.theme-{theme}" in css, f"themes.css is missing {theme}"
+        assert f".pf-swatch.theme-{theme}" in css, f"themes.css has no picker preview for {theme}"
+    assert sorted(in_js) == sorted(main.THEMES)
+
+
+def test_every_accent_in_the_picker_is_a_valid_colour():
+    from backend import main
+
+    js = (WEB / "profile.js").read_text()
+    line = [l for l in js.splitlines() if l.startswith("const ACCENTS")][0]
+    colours = re.findall(r'"(#[0-9a-fA-F]+)"', line)
+    assert colours
+    assert all(main.ACCENT_RE.match(c) for c in colours)
+
+
+def test_the_web_files_have_no_emoji():
+    # profile pictures are uploaded photos now, nothing in the ui should be an emoji
+    bad = re.compile("[\U0001F000-\U0001FAFF\u2190-\u2BFF\uFE0F]")
+    for path in WEB.iterdir():
+        if path.suffix in (".js", ".html", ".css"):
+            found = bad.findall(path.read_text())
+            assert not found, f"{path.name} has emoji: {found[:5]}"
+
+
+def test_every_style_option_has_a_button_in_the_editor():
+    from backend import main
+
+    js = (WEB / "profile.js").read_text()
+    for key, values in main.CUSTOM_CHOICES.items():
+        for value in values:
+            assert f'"{value}"' in js, f"the editor has no button for {key} = {value}"
+
+
+# ---------- pictures ----------
+
+
+def test_avatar_upload_is_resized_and_served(client):
+    a = signup(client, "alice")
+    r = put_avatar(a, make_image("PNG", size=(1000, 600)))
+    assert r.status_code == 200, r.text
+    url = r.json()["avatar"]
+    assert url.startswith("/api/img/")
+    img = a.get(url)
+    assert img.status_code == 200 and img.headers["content-type"] == "image/webp"
+    assert img.headers["x-content-type-options"] == "nosniff"
+    assert Image.open(BytesIO(img.content)).size == (320, 320)
+    assert a.get("/api/profile/alice").json()["avatar"] == url
+    # a new one replaces the old one for good
+    new = put_avatar(a, make_image("JPEG")).json()["avatar"]
+    assert new != url and a.get(url).status_code == 404
+    gone = a.delete("/api/me/avatar").json()
+    assert gone["avatar"] == "" and a.get(new).status_code == 404
+
+
+def test_uploads_must_be_real_pictures(client):
+    a = signup(client, "alice")
+    bad = [
+        b"",
+        b"hello there",
+        b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        b"<html><script>alert(1)</script></html>",
+        b"GIF89a" + b"\x00" * 4,  # looks like a gif for a second, then isn't
+        make_image("BMP"),  # a real picture, but not one of the allowed kinds
+    ]
+    for data in bad:
+        assert put_avatar(a, data).status_code == 400, data[:20]
+        assert add_photo(a, data).status_code == 400, data[:20]
+    assert a.get("/api/profile/alice").json()["photos"] == []
+
+
+def test_upload_size_limit(client):
+    a = signup(client, "alice")
+    assert put_avatar(a, b"x" * (5 * 1024 * 1024 + 1)).status_code == 413
+    assert add_photo(a, b"x" * (4 * 1024 * 1024 + 1)).status_code == 413
+    # too many pixels, even though the file itself is tiny
+    assert add_photo(a, make_image("PNG", size=(9000, 10))).status_code == 400
+
+
+def test_pictures_need_a_login(client):
+    a = signup(client, "alice")
+    url = put_avatar(a, make_image()).json()["avatar"]
+    assert client.get(url).status_code == 401
+    assert client.put("/api/me/avatar", content=make_image(), headers=RAW).status_code == 401
