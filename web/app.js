@@ -468,3 +468,127 @@ function connect() {
       }
     } catch {}
   };
+
+  ws.onmessage = (e) => {
+    let data;
+    try {
+      data = JSON.parse(e.data);
+    } catch {
+      return;
+    }
+    handleWS(data).catch(() => {});
+  };
+
+  ws.onclose = (e) => {
+    if (e.code === 4401 || e.code === 4403) {
+      location.href = "/login.html";
+      return;
+    }
+    for (const c of state.contacts.values()) c.typing = false;
+    for (const g of state.groups.values()) g.typing.clear();
+    setConn(false, "reconnecting...");
+    const wait = Math.min(1000 * 2 ** state.retry, 10000);
+    state.retry++;
+    setTimeout(connect, wait);
+  };
+}
+
+const typingTimers = new Map();
+
+function setTyping(peer, on) {
+  const c = state.contacts.get(peer);
+  if (!c) return;
+  c.typing = on;
+  clearTimeout(typingTimers.get(peer));
+  if (on) typingTimers.set(peer, setTimeout(() => setTyping(peer, false), 5000));
+  renderBuddies();
+  if (state.open === peer) {
+    renderChatHeader();
+    if (on && nearBottom()) scrollBottom();
+  }
+}
+
+async function handleWS(data) {
+  if (typeof GROUP_EVENTS !== "undefined" && GROUP_EVENTS.includes(data.type)) {
+    return handleGroupWS(data);
+  }
+  if (data.type === "presence") {
+    const c = state.contacts.get(data.user);
+    if (!c) return loadContacts();
+    c.online = data.online;
+    if (data.last_seen) c.last_seen = data.last_seen;
+    if (!data.online) c.typing = false;
+    renderBuddies();
+    if (state.open === data.user) renderChatHeader();
+  } else if (data.type === "typing") {
+    setTyping(data.from, data.state);
+  } else if (data.type === "msg") {
+    const peer = data.from === state.me ? data.to : data.from;
+    if (!state.contacts.has(peer)) await loadContacts();
+    const c = state.contacts.get(peer);
+    if (!c) return;
+    const list = state.msgs.get(peer);
+    const mine = data.from === state.me;
+    if (list && !list.some((m) => m.id === data.id)) {
+      const { text, failed } = await decryptFor(peer, data.iv, data.ct);
+      list.push({ id: data.id, from: data.from, text, failed, ts: data.ts, delivered: !!data.delivered, read: false, held: !!data.held });
+    }
+    if (!mine) {
+      c.typing = false;
+      if (state.open === peer && document.visibilityState === "visible") {
+        if (list) renderMessages();
+        markRead(peer);
+      } else {
+        c.unread++;
+        if (state.open === peer && list) renderMessages();
+      }
+    } else if (state.open === peer) {
+      renderMessages();
+      scrollBottom();
+    }
+    bump(peer);
+    renderBuddies();
+    if (state.open === peer) renderChatHeader();
+  } else if (data.type === "receipt") {
+    for (const list of state.msgs.values()) {
+      const m = list.find((x) => x.id === data.id);
+      if (m) {
+        m.delivered = true;
+        m.held = false;
+      }
+    }
+    if (state.open) renderMessages();
+  } else if (data.type === "read") {
+    const list = state.msgs.get(data.by) || [];
+    for (const m of list) if (data.ids.includes(m.id)) m.delivered = m.read = true;
+    if (state.open === data.by) renderMessages();
+  } else if (data.type === "social") {
+    // friend request / accepted / removed / block changed: reload the lists
+    await loadContacts();
+    const from = state.contacts.get(data.from);
+    const who = from ? shownName(from) : data.from;
+    if (data.event === "request") {
+      toast(who + " sent you a friend request", () => openProfile(data.from));
+    } else if (data.event === "accepted") {
+      toast(who + " accepted your friend request", () => openProfile(data.from));
+    }
+    if (typeof refreshLists === "function") refreshLists();
+    // keep a profile that's open on that person up to date
+    if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
+      openProfile(data.from);
+    }
+  } else if (data.type === "msg-rejected") {
+    const REASONS = {
+      wait: "They want you to wait until they accept your friend request.",
+      limit: "You can only leave a few messages until they accept your request.",
+      not_friends: "You're not friends with them any more, so that message wasn't sent.",
+    };
+    toast(REASONS[data.reason] || "That message wasn't sent.");
+  } else if (data.type === "read-sync") {
+    const c = state.contacts.get(data.peer);
+    if (c) {
+      c.unread = 0;
+      renderBuddies();
+    }
+  }
+}
