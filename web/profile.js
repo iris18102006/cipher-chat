@@ -109,3 +109,113 @@ const AVATAR_SHAPES = [
   ["diamond", "Diamond"], ["hexagon", "Hexagon"],
 ];
 const BG_MODES = [["tile", "Tile it"], ["cover", "Fill the page"], ["center", "Centre"]];
+
+// look = { theme, accent, custom, bg_url }. A profile from the server has all of those.
+function applyTheme(card, look) {
+  const custom = look.custom || {};
+  card.className = "theme-" + (look.theme || "classic");
+  for (const variable of [
+    ...Object.values(CUSTOM_COLOR_VARS), "--p-accent", "--p-font",
+    "--p-border-width", "--p-radius", "--p-border-style",
+  ]) {
+    card.style.removeProperty(variable);
+  }
+  for (const prop of ["background-image", "background-size", "background-repeat", "background-position"]) {
+    card.style.removeProperty(prop);
+  }
+
+  if (look.accent) card.style.setProperty("--p-accent", look.accent);
+  for (const [key, variable] of Object.entries(CUSTOM_COLOR_VARS)) {
+    if (custom[key]) card.style.setProperty(variable, custom[key]);
+  }
+  const font = FONT_CHOICES.find((f) => f[0] === custom.font);
+  const legacy = LEGACY_FONTS.find((f) => f[0] === custom.font);
+  if (font) card.style.setProperty("--p-font", font[2]);
+  else if (legacy) card.style.setProperty("--p-font", legacy[1]);
+  if (custom.pattern && custom.pattern !== "none") card.classList.add("pattern-" + custom.pattern);
+  if (custom.name_effect && custom.name_effect !== "none") card.classList.add("name-" + custom.name_effect);
+  if (custom.avatar_shape) card.classList.add("av-" + custom.avatar_shape);
+  if (custom.marquee) card.classList.add("pf-marquee");
+  if (Number.isInteger(custom.border_width)) card.style.setProperty("--p-border-width", custom.border_width + "px");
+  if (Number.isInteger(custom.radius)) card.style.setProperty("--p-radius", custom.radius + "px");
+  if (custom.border_style) card.style.setProperty("--p-border-style", custom.border_style);
+
+  // a background picture goes over the pattern
+  const bg = safeImg(look.bg_url);
+  if (bg) {
+    const mode = custom.bg_mode || "tile";
+    card.style.backgroundImage = 'url("' + bg + '")';
+    card.style.backgroundRepeat = mode === "tile" ? "repeat" : "no-repeat";
+    card.style.backgroundSize = mode === "cover" ? "cover" : "auto";
+    card.style.backgroundPosition = mode === "tile" ? "0 0" : "center top";
+  }
+}
+
+// ---------- viewing ----------
+
+function section(title, text) {
+  const box = el("div", "pf-section");
+  box.append(el("h3", "", title));
+  const body = el("div", "pf-content" + (text ? "" : " empty"), text || "nothing here yet");
+  box.append(body);
+  return box;
+}
+
+function topFriendsSection(p) {
+  const box = el("div", "pf-section");
+  box.append(el("h3", "", "Top friends"));
+  if (!p.top_friends.length) {
+    box.append(el("div", "pf-content empty", "pick up to 8 friends with Edit profile"));
+    return box;
+  }
+  const grid = el("div", "pf-top");
+  for (const f of p.top_friends) {
+    const item = el("div", "pf-top-item");
+    item.tabIndex = 0;
+    item.append(avatarNode(f, "small"), el("span", "", shownName(f)));
+    const open = () => openProfile(f.username);
+    item.onclick = open;
+    item.onkeydown = (e) => {
+      if (e.key === "Enter") open();
+    };
+    grid.append(item);
+  }
+  box.append(grid);
+  return box;
+}
+
+function stat(label, value) {
+  const s = el("span");
+  s.append(el("b", "", String(value)), " " + label);
+  return s;
+}
+
+function wallSection(p) {
+  const box = el("div", "pf-section pf-wall");
+  box.append(el("h3", "", "Profile wall"));
+
+  const form = el("form", "pf-wall-form");
+  const input = el("textarea");
+  input.maxLength = 300;
+  input.rows = 3;
+  input.placeholder = p.me ? "write something on your wall..." : "leave a comment...";
+  const send = el("button", "", "Post");
+  send.type = "submit";
+  const err = el("span", "pf-inline-error");
+  form.append(input, send, err);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const body = input.value.trim();
+    if (!body) return;
+    send.disabled = true; err.textContent = "";
+    try {
+      await api("/api/profile/" + encodeURIComponent(p.username) + "/wall", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }),
+      });
+      await openProfile(p.username);
+    } catch {
+      err.textContent = "couldn't post comment";
+      send.disabled = false;
+    }
+  };
+  box.append(form);
