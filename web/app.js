@@ -255,3 +255,115 @@ function renderChatHeader() {
   const status = c.typing ? "typing..." : lastSeenText(c);
   $("chat-status").textContent = status;
   $("chat-status").className = c.online ? "online" : "";
+
+  const warn = $("key-warning");
+  if (!c.pub) {
+    warn.hidden = false;
+    $("key-warning-text").textContent =
+      c.username + " hasn't opened cipher-chat since encryption was set up, so there's no key yet. You can message them once they log in.";
+    $("trust").hidden = true;
+  } else if (c.changed) {
+    warn.hidden = false;
+    $("key-warning-text").textContent =
+      "Heads up: " + c.username + "'s encryption key changed. It could be a new device, or someone tampering. Check the key with them before trusting it.";
+    $("trust").hidden = false;
+  } else {
+    warn.hidden = true;
+  }
+  $("block-banner").hidden = !c.blocked;
+  if (c.blocked) {
+    $("block-banner-text").textContent =
+      "You blocked " + shownName(c) + ". They can't message you and they can't see when you're online.";
+  }
+  // a friend request that's waiting on someone: say so, and let the person answer it right here
+  const banner = $("request-banner");
+  banner.hidden = c.blocked || (c.friend !== "incoming" && c.friend !== "outgoing");
+  if (!banner.hidden) {
+    const incoming = c.friend === "incoming";
+    $("req-accept").hidden = $("req-decline").hidden = !incoming;
+    $("request-banner-text").textContent = incoming
+      ? shownName(c) + " sent you a friend request." +
+        (c.held > 0 ? " They wrote " + c.held + " message" + (c.held > 1 ? "s" : "") + ", accept the request to read " + (c.held > 1 ? "them" : "it") + "." : "")
+      : "Waiting for " + shownName(c) + " to accept your friend request.";
+  }
+  $("block").textContent = c.blocked ? "Unblock" : "Block";
+  $("typing").hidden = !c.typing;
+  $("typing-name").textContent = c.typing ? c.username + " is typing" : "";
+  const locked = !c.pub || c.changed || c.blocked;
+  $("msg").disabled = locked;
+  $("send").disabled = locked;
+}
+
+async function renderVerify() {
+  const c = state.contacts.get(state.open);
+  const box = $("verify-box");
+  box.replaceChildren();
+  box.append(el("p", "", "Compare these with " + c.username + " on a call or in person. If they match, nobody is sitting in the middle."));
+  const mine = el("div", "fp");
+  mine.append(el("b", "", "your key: "), el("code", "", await fingerprintOf(state.myPub)));
+  box.append(mine);
+  if (c.pub) {
+    const theirs = el("div", "fp");
+    theirs.append(el("b", "", c.username + "'s key: "), el("code", "", await fingerprintOf(c.pub)));
+    box.append(theirs);
+  }
+}
+
+function nearBottom() {
+  const log = $("log");
+  return log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+}
+
+function scrollBottom() {
+  const log = $("log");
+  log.scrollTop = log.scrollHeight;
+}
+
+function tickFor(m) {
+  if (m.held) return { text: "\u2713 sent, waiting for them to accept", cls: "tick" };
+  if (m.read) return { text: "\u2713\u2713 read", cls: "tick read" };
+  if (m.delivered) return { text: "\u2713\u2713 delivered", cls: "tick" };
+  return { text: "\u2713 sent", cls: "tick" };
+}
+
+function renderMessages(keepScroll) {
+  const box = $("messages");
+  const log = $("log");
+  const stick = !keepScroll && nearBottom();
+  const before = log.scrollHeight - log.scrollTop;
+  box.replaceChildren();
+  const inGroup = state.openGroup != null;
+  const list = (inGroup ? state.gmsgs.get(state.openGroup) : state.msgs.get(state.open)) || [];
+  let lastDay = "";
+  let prev = null;
+  for (const m of list) {
+    const d = parseTs(m.ts);
+    const label = dayLabel(d);
+    if (label !== lastDay) {
+      box.append(el("div", "day", label));
+      lastDay = label;
+      prev = null;
+    }
+    const mine = m.from === state.me;
+    const row = el("div", "msg " + (mine ? "me" : "them") + (m.failed ? " failed" : "") + (prev && prev.from === m.from ? " cont" : ""));
+    // in a group, say who wrote it (once per run of messages from the same person)
+    if (inGroup && !mine && !(prev && prev.from === m.from)) {
+      row.append(el("div", "sender", memberName(state.openGroup, m.from)));
+    }
+    row.append(el("div", "text", m.text));
+    const meta = el("div", "meta");
+    meta.append(el("span", "time", clock(d)));
+    if (mine) {
+      const t = inGroup ? groupTick(m) : tickFor(m);
+      const tick = el("span", t.cls, t.text);
+      if (t.title) tick.title = t.title;
+      meta.append(tick);
+    }
+    row.append(meta);
+    box.append(row);
+    prev = m;
+  }
+  $("older").hidden = !(inGroup ? state.gHasOlder.get(state.openGroup) : state.hasOlder.get(state.open));
+  if (keepScroll) log.scrollTop = log.scrollHeight - before;
+  else if (stick) scrollBottom();
+}
