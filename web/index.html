@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cipher-chat</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="profile.css">
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="fonts.css">
+</head>
+<body>
+  <header id="top">
+    <h1>cipher-chat</h1>
+    <div id="top-right">
+      <span id="conn" class="conn off">connecting...</span>
+      <span>logged in as <b id="me-name">...</b></span>
+      <button id="my-profile" type="button">My profile</button>
+      <button id="requests-btn" type="button">Requests <span id="req-count" class="count" hidden>0</span></button>
+      <button id="blocked-btn" type="button">Blocked</button>
+      <button id="settings-btn" type="button">Settings</button>
+      <button id="logout" type="button">Log out</button>
+    </div>
+  </header>
+
+  <div id="app">
+    <aside id="buddies">
+      <h2>Buddy List</h2>
+      <form id="add-user-form" autocomplete="off">
+        <input id="add-username" type="text" maxlength="20" placeholder="add by username..." aria-label="add by username">
+        <button type="submit">Find</button>
+      </form>
+      <p id="add-user-error" hidden></p>
+      <button id="new-group" type="button">+ New group</button>
+      <input id="search" type="text" placeholder="filter buddies..." autocomplete="off">
+      <ul id="buddy-list"></ul>
+      <p id="buddy-empty" hidden>nobody here yet. invite a friend to sign up!</p>
+      <p id="my-key" title="your public key fingerprint"></p>
+    </aside>
+
+    <section id="chat">
+      <div id="chat-empty">
+        <p>pick a buddy on the left to start chatting.</p>
+        <p class="small">messages are encrypted in your browser before they leave it.</p>
+      </div>
+
+      <div id="chat-pane" hidden>
+        <div id="chat-head">
+          <button id="back" type="button" aria-label="back to buddy list">&laquo;</button>
+          <div>
+            <div id="chat-name"></div>
+            <div id="chat-status"></div>
+          </div>
+          <button id="group-info" type="button" hidden>Members</button>
+          <button id="view-profile" type="button">Profile</button>
+          <button id="verify" type="button">Verify keys</button>
+          <button id="block" type="button">Block</button>
+        </div>
+
+        <div id="key-warning" hidden>
+          <span id="key-warning-text"></span>
+          <button id="trust" type="button">I verified it, trust new key</button>
+        </div>
+        <div id="block-banner" hidden>
+          <span id="block-banner-text"></span>
+          <button id="unblock" type="button">Unblock</button>
+        </div>
+        <div id="request-banner" hidden>
+          <span id="request-banner-text"></span>
+          <button id="req-accept" type="button">Accept</button>
+          <button id="req-decline" type="button">Decline</button>
+        </div>
+        <div id="verify-box" hidden></div>
+
+        <div id="log">
+          <button id="older" type="button" hidden>load older messages</button>
+          <div id="messages"></div>
+        </div>
+        <div id="typing" hidden><span></span><span></span><span></span> <em id="typing-name"></em></div>
+
+        <form id="composer" autocomplete="off">
+          <textarea id="msg" rows="1" maxlength="4000" placeholder="type a message (Enter to send, Shift+Enter for a new line)"></textarea>
+          <button id="send" type="submit">Send</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- friend requests and blocked people, filled in by lists.js -->
+  <div id="lists-overlay" hidden>
+    <div id="lists-card" role="dialog" aria-modal="true" aria-labelledby="lists-title">
+      <div id="lists-bar">
+        <span id="lists-title"></span>
+        <button id="lists-close" type="button" aria-label="close">&times;</button>
+      </div>
+      <div id="lists-body"></div>
+    </div>
+  </div>
+
+  <!-- making a group and managing its members, filled in by groups.js -->
+  <div id="groups-overlay" hidden>
+    <div id="groups-card" role="dialog" aria-modal="true" aria-labelledby="groups-title">
+      <div id="groups-bar">
+        <span id="groups-title"></span>
+        <button id="groups-close" type="button" aria-label="close">&times;</button>
+      </div>
+      <div id="groups-body"></div>
+    </div>
+  </div>
+
+  <!-- settings, filled in by settings.js -->
+  <div id="settings-overlay" hidden>
+    <div id="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div id="settings-bar">
+        <span id="settings-title">Settings</span>
+        <button id="settings-close" type="button" aria-label="close settings">&times;</button>
+      </div>
+      <div id="settings-body"></div>
+    </div>
+  </div>
+
+  <!-- profile page, filled in by profile.js -->
+  <div id="profile-overlay" hidden>
+    <div id="profile-card" class="theme-classic" role="dialog" aria-modal="true" aria-labelledby="pf-title">
+      <div id="pf-bar">
+        <span id="pf-title">Profile</span>
+        <button id="pf-close" type="button" aria-label="close profile">&times;</button>
+      </div>
+      <div id="pf-body"></div>
+    </div>
+  </div>
+
+  <script src="crypto.js"></script>
+  <script src="app.js"></script>
+  <script src="profile.js"></script>
+  <script src="profile-media.js"></script>
+  <script src="friends.js"></script>
+  <script src="settings.js"></script>
+  <script src="lists.js"></script>
+  <script src="groups.js"></script>
+</body>
+</html>
