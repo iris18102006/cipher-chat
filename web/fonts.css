@@ -1,0 +1,13 @@
+/* Fonts for profiles, bundled so they look the same everywhere (see fonts/LICENSE.txt).
+   The names here have to match FONT_CHOICES in profile.js. */
+@font-face { font-family: "Comic Neue"; src: url("fonts/comic-neue.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Anton"; src: url("fonts/anton.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Dancing Script"; src: url("fonts/dancing-script.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Courier Prime"; src: url("fonts/courier-prime.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Lora"; src: url("fonts/lora.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Playfair Display"; src: url("fonts/playfair-display.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Nunito"; src: url("fonts/nunito.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Press Start 2P"; src: url("fonts/press-start-2p.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "VT323"; src: url("fonts/vt323.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Special Elite"; src: url("fonts/special-elite.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Pirata One"; src: url("fonts/pirata-one.woff2") format("woff2"); font-display: swap; }
