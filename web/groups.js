@@ -234,3 +234,170 @@ function renderGroupHeader() {
     ? "type a message (Enter to send, Shift+Enter for a new line)"
     : "you don't have this group's key yet...";
 }
+
+async function openGroupChat(gid) {
+  stopTyping();
+  state.open = null;
+  state.openGroup = gid;
+  document.body.classList.add("in-chat");
+  $("chat-empty").hidden = true;
+  $("chat-pane").hidden = false;
+  $("verify-box").hidden = true;
+  $("msg").value = "";
+  autosize();
+  renderChatHeader();
+  renderBuddies();
+  try {
+    await loadGroupHistory(gid);
+  } catch {
+    return;
+  }
+  if (state.openGroup !== gid) return; // clicked something else while loading
+  renderChatHeader();
+  renderMessages();
+  scrollBottom();
+  markGroupRead(gid);
+  if (!$("msg").disabled) $("msg").focus();
+}
+
+// leave the group view (the group is gone, or we're going back to the list)
+function closeGroupChat() {
+  stopTyping();
+  state.openGroup = null;
+  $("group-info").hidden = true;
+  $("chat-pane").hidden = true;
+  $("chat-empty").hidden = false;
+  document.body.classList.remove("in-chat");
+}
+
+function markGroupRead(gid) {
+  const g = state.groups.get(gid);
+  if (!g) return;
+  if (g.unread === 0) return;
+  g.unread = 0;
+  sendWS({ type: "gread", group: gid });
+  renderBuddies();
+}
+
+async function sendGroupMessage() {
+  const gid = state.openGroup;
+  const text = $("msg").value.trim();
+  const g = state.groups.get(gid);
+  const d = state.gDetail.get(gid);
+  if (gid == null || !text || !g || !d) return;
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+    setConn(false, "offline, message not sent");
+    return;
+  }
+  const key = await groupKey(gid, d.key_version);
+  if (!key) {
+    toast("you don't have this group's key yet, give it a second");
+    return;
+  }
+  const { iv, ct } = await encryptText(key, text);
+  if (sendWS({ type: "gmsg", group: gid, v: d.key_version, iv, ct, cid: crypto.randomUUID() })) {
+    $("msg").value = "";
+    autosize();
+    stopTyping();
+  }
+}
+
+// "sent" -> "seen by 2" under my own messages
+function groupTick(m) {
+  const gid = state.openGroup;
+  const d = state.gDetail.get(gid);
+  const others = d ? d.members.length - 1 : 0;
+  if (!m.seen || m.seen.size === 0) return { text: "\u2713 sent", cls: "tick" };
+  const all = others > 0 && m.seen.size >= others;
+  return {
+    text: "\u2713\u2713 seen by " + (all ? "everyone" : m.seen.size),
+    cls: "tick read",
+    title: [...m.seen].map((u) => memberName(gid, u)).join(", "),
+  };
+}
+
+// ---------- live events ----------
+
+function setGroupTyping(gid, user, on) {
+  const g = state.groups.get(gid);
+  if (!g) return;
+  clearTimeout(g.typing.get(user));
+  if (on) g.typing.set(user, setTimeout(() => setGroupTyping(gid, user, false), 5000));
+  else g.typing.delete(user);
+  renderBuddies();
+  if (state.openGroup === gid) {
+    renderGroupHeader();
+    if (on && nearBottom()) scrollBottom();
+  }
+}
+
+async function handleGroupWS(data) {
+  const gid = data.group;
+  if (data.type === "gmsg") {
+    if (!state.groups.has(gid)) await loadGroups();
+    const g = state.groups.get(gid);
+    if (!g) return;
+    const mine = data.from === state.me;
+    const list = state.gmsgs.get(gid);
+    if (list && !list.some((m) => m.id === data.id)) {
+      // a message with a key version we haven't fetched yet (the key was just replaced)
+      if (!(await groupKey(gid, data.v))) await loadGroupDetail(gid);
+      const [msg] = await decryptGroupRows(gid, [{ ...data, seen_by: [] }]);
+      list.push(msg);
+    }
+    g.last_msg = data.id;
+    if (!mine) {
+      setGroupTypingQuiet(g, data.from);
+      if (state.openGroup === gid && document.visibilityState === "visible") {
+        if (list) renderMessages();
+        g.unread++;
+        markGroupRead(gid);
+      } else {
+        g.unread++;
+        if (state.openGroup === gid && list) renderMessages();
+      }
+    } else if (state.openGroup === gid) {
+      renderMessages();
+      scrollBottom();
+    }
+    renderBuddies();
+    if (state.openGroup === gid) renderGroupHeader();
+  } else if (data.type === "gtyping") {
+    setGroupTyping(gid, data.from, data.state);
+  } else if (data.type === "gseen") {
+    const list = state.gmsgs.get(gid) || [];
+    for (const m of list) if (m.from === state.me && m.id <= data.upto) m.seen.add(data.by);
+    if (state.openGroup === gid) renderMessages();
+  } else if (data.type === "gread-sync") {
+    const g = state.groups.get(gid);
+    if (g) {
+      g.unread = 0;
+      renderBuddies();
+    }
+  } else if (data.type === "group") {
+    if (data.event === "removed") {
+      const name = state.groups.has(gid) ? state.groups.get(gid).name : "that group";
+      state.groups.delete(gid);
+      state.gDetail.delete(gid);
+      state.gmsgs.delete(gid);
+      if (state.openGroup === gid) {
+        closeGroupChat();
+        toast("You're not in " + name + " any more");
+      }
+      if (groupPanel && groupPanel.id === gid) closeGroupPanel();
+      renderBuddies();
+    } else {
+      await loadGroups();
+      if (state.openGroup === gid) {
+        await loadGroupDetail(gid);
+        const g = state.groups.get(gid);
+        if (g) g.canWrite = !!(await groupKey(gid, g.key_version));
+        renderGroupHeader();
+      }
+      if (groupPanel && groupPanel.id === gid) await paintGroupPanel();
+    }
+  } else if (data.type === "gmsg-rejected") {
+    toast(data.reason === "not_member" ? "You're not in that group any more." : "That message wasn't sent, the group key just changed. Try again.");
+    if (data.reason === "bad_key" && state.groups.has(gid)) loadGroupDetail(gid).catch(() => {});
+  }
+}
