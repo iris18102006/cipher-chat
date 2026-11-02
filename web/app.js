@@ -733,3 +733,93 @@ $("req-decline").onclick = async () => {
     toast("couldn't decline that, try again");
   }
 };
+
+$("verify").onclick = async () => {
+  const box = $("verify-box");
+  box.hidden = !box.hidden;
+  if (!box.hidden) await renderVerify();
+};
+
+async function setBlocked(username, on) {
+  const c = state.contacts.get(username);
+  if (!c) return;
+  if (on && !confirm("Block " + shownName(c) + "? They won't be able to message you or see when you're online, and you'll stop being friends.")) {
+    return;
+  }
+  try {
+    await api("/api/blocks/" + encodeURIComponent(username), { method: on ? "POST" : "DELETE" });
+    await loadContacts();
+    if (!on) {
+      // blocking ended the friendship, so after unblocking they're not in the buddy list any
+      // more. Close the chat that's still showing "you blocked them" and say what happened.
+      if (state.open === username && !state.contacts.has(username)) $("back").onclick();
+      toast("Unblocked " + shownName(c) + ". You're not friends any more, send a new request from their profile.", () => openProfile(username));
+    }
+    if (typeof refreshLists === "function") refreshLists();
+  } catch {
+    setConn(false, "couldn't change the block, try again");
+  }
+}
+
+$("block").onclick = () => {
+  const c = state.contacts.get(state.open);
+  if (c) setBlocked(c.username, !c.blocked);
+};
+$("unblock").onclick = () => state.open && setBlocked(state.open, false);
+
+$("trust").onclick = async () => {
+  const c = state.contacts.get(state.open);
+  if (!c || !c.pub) return;
+  try {
+    localStorage.setItem(knownSlot(c.username), c.pub);
+  } catch {}
+  c.changed = false;
+  await loadHistory(c.username);
+  renderChatHeader();
+  renderMessages();
+};
+
+$("logout").onclick = async () => {
+  try {
+    await fetch("/api/logout", { method: "POST" });
+  } catch {}
+  location.href = "/login.html";
+};
+
+function markOpenRead() {
+  if (state.open) markRead(state.open);
+  else if (state.openGroup != null) markGroupRead(state.openGroup);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") markOpenRead();
+});
+window.addEventListener("focus", markOpenRead);
+
+// keepalive so idle proxies don't drop the socket
+setInterval(() => sendWS({ type: "ping" }), 25000);
+// pick up new signups and fresh last-seen times
+setInterval(() => {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) loadContacts().catch(() => {});
+}, 30000);
+
+(async function boot() {
+  try {
+    const me = await api("/api/me");
+    state.me = me.username;
+    $("me-name").textContent = me.username;
+    state.identity = await loadOrCreateIdentity(me.username);
+    state.myPub = await exportPub(state.identity.publicKey);
+    // publish our public key so friends can derive the shared secret
+    await api("/api/key", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pub: state.myPub }),
+    });
+    $("my-key").textContent = "your key: " + (await fingerprintOf(state.myPub));
+    connect();
+  } catch (err) {
+    if (state.me) setConn(false, "couldn't start, check the console");
+    console.error(err);
+  }
+})();
