@@ -120,3 +120,117 @@ async function loadGroups() {
   if (state.openGroup != null) renderChatHeader();
   for (const g of state.groups.values()) maybeRekey(g);
 }
+
+async function loadGroupDetail(gid) {
+  const d = await api("/api/groups/" + gid);
+  state.gDetail.set(gid, d);
+  const g = state.groups.get(gid);
+  if (g) {
+    g.name = d.name;
+    g.owner = d.owner;
+    g.key_version = d.key_version;
+    g.rekey_needed = d.rekey_needed;
+    g.members = d.members.length;
+  }
+  return d;
+}
+
+async function decryptGroupRows(gid, rows) {
+  const out = [];
+  for (const r of rows) {
+    let text;
+    let failed = false;
+    try {
+      const key = await groupKey(gid, r.v);
+      if (!key) throw new Error("no key");
+      text = await decryptText(key, r.iv, r.ct);
+    } catch {
+      text = "can't decrypt this message (missing key, or the sender's key changed)";
+      failed = true;
+    }
+    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, v: r.v, seen: new Set(r.seen_by || []) });
+  }
+  return out;
+}
+
+async function loadGroupHistory(gid) {
+  await loadGroupDetail(gid);
+  const rows = await api("/api/groups/" + gid + "/messages?limit=" + PAGE);
+  state.gmsgs.set(gid, await decryptGroupRows(gid, rows));
+  state.gHasOlder.set(gid, rows.length === PAGE);
+  const g = state.groups.get(gid);
+  if (g) g.canWrite = !!(await groupKey(gid, g.key_version));
+}
+
+async function loadOlderGroup() {
+  const gid = state.openGroup;
+  const list = state.gmsgs.get(gid) || [];
+  if (gid == null || !list.length) return;
+  const rows = await api("/api/groups/" + gid + "/messages?limit=" + PAGE + "&before=" + list[0].id);
+  state.gmsgs.set(gid, [...(await decryptGroupRows(gid, rows)), ...list]);
+  state.gHasOlder.set(gid, rows.length === PAGE);
+  renderMessages(true);
+}
+
+// ---------- buddy list ----------
+
+function groupTypingText(g) {
+  const names = [...g.typing.keys()].map((u) => memberName(g.id, u));
+  if (!names.length) return "";
+  if (names.length === 1) return names[0] + " is typing";
+  if (names.length === 2) return names[0] + " and " + names[1] + " are typing";
+  return "several people are typing";
+}
+
+function groupRow(g) {
+  const li = el("li", g.id === state.openGroup ? "active" : "");
+  li.dataset.group = String(g.id);
+  li.append(groupNode(g));
+  const info = el("div", "buddy-info");
+  info.append(el("div", "buddy-name", g.name));
+  const typing = groupTypingText(g);
+  info.append(el("div", "buddy-sub", typing ? typing + "..." : g.members + " members"));
+  li.append(info);
+  if (g.unread > 0) li.append(el("span", "badge", g.unread > 99 ? "99+" : String(g.unread)));
+  li.onclick = () => openGroupChat(g.id);
+  return li;
+}
+
+// the "Groups" section at the top of the buddy list: { nodes, count }
+function groupSection(q) {
+  const rows = [...state.groups.values()]
+    .filter((g) => !q || g.name.toLowerCase().includes(q))
+    // most recent conversation first, groups nobody wrote in yet by name
+    .sort((a, b) => (b.last_msg || 0) - (a.last_msg || 0) || a.name.localeCompare(b.name));
+  if (!rows.length) return { nodes: [], count: 0 };
+  return { nodes: [el("li", "group groups", "Groups (" + rows.length + ")"), ...rows.map(groupRow)], count: rows.length };
+}
+
+function totalGroupUnread() {
+  let n = 0;
+  for (const g of state.groups.values()) n += g.unread;
+  return n;
+}
+
+// ---------- the chat pane in group mode ----------
+
+function renderGroupHeader() {
+  const g = state.groups.get(state.openGroup);
+  if (!g) return;
+  $("chat-name").textContent = g.name;
+  $("chat-name").title = "";
+  const typing = groupTypingText(g);
+  $("chat-status").textContent = typing ? typing + "..." : g.members + " members";
+  $("chat-status").className = "";
+  for (const id of ["view-profile", "verify", "block"]) $(id).hidden = true;
+  $("group-info").hidden = false;
+  for (const id of ["key-warning", "block-banner", "request-banner", "verify-box"]) $(id).hidden = true;
+  $("typing").hidden = !typing;
+  $("typing-name").textContent = typing;
+  // waiting on a new key (someone just left, or just joined): can't write until it arrives
+  $("msg").disabled = !g.canWrite;
+  $("send").disabled = !g.canWrite;
+  $("msg").placeholder = g.canWrite
+    ? "type a message (Enter to send, Shift+Enter for a new line)"
+    : "you don't have this group's key yet...";
+}
