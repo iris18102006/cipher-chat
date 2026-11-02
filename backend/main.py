@@ -604,3 +604,147 @@ def top_friends_for(conn, row, viewer_id: int) -> list[dict]:
             }
         )
     return out
+
+
+@app.get("/api/profile/{username}")
+def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        f"SELECT {PROFILE_COLUMNS} FROM users WHERE username = ?", (username.lower(),)
+    ).fetchone()
+    if not row or i_blocked(conn, row["id"], user["id"]):
+        raise HTTPException(404, "no such user")
+    out = profile_dict(row, user["id"])
+    out["blocked"] = i_blocked(conn, user["id"], row["id"])
+    out["top_friends"] = top_friends_for(conn, row, user["id"])
+    theirs = friend_ids(conn, row["id"])
+    out["friend_count"] = len(theirs)
+    if row["id"] != user["id"]:
+        out["friend"] = friend_status(conn, user["id"], row["id"])
+        out["mutual_friends"] = len(theirs & friend_ids(conn, user["id"]))
+        # one row per visitor, so refreshing doesn't inflate the counter
+        conn.execute(
+            "INSERT INTO profile_visits (profile_id, visitor_id) VALUES (?, ?) "
+            "ON CONFLICT (profile_id, visitor_id) DO UPDATE SET last_visit = CURRENT_TIMESTAMP",
+            (row["id"], user["id"]),
+        )
+        conn.commit()
+    out["visitors"] = conn.execute(
+        "SELECT COUNT(*) FROM profile_visits WHERE profile_id = ?", (row["id"],)
+    ).fetchone()[0]
+    out["wall"] = wall_for(conn, row["id"], user["id"])
+    out.update(media_for(conn, row))
+    return out
+
+
+@app.post("/api/profile/{username}/wall")
+def post_wall_comment(username: str, body: CommentBody, user=Depends(current_user), conn=Depends(get_conn)):
+    profile = conn.execute("SELECT id, username FROM users WHERE username = ?", (username.lower(),)).fetchone()
+    if not profile or blocked_either_way(conn, user["id"], profile["id"]):
+        raise HTTPException(404, "no such user")
+    text = clean_text(body.body, 300, "comment", multiline=True)
+    if not text:
+        raise HTTPException(400, "comment can't be empty")
+    cur = conn.execute(
+        "INSERT INTO profile_comments (profile_id, author_id, body) VALUES (?, ?, ?)",
+        (profile["id"], user["id"], text),
+    )
+    conn.commit()
+    return {"id": cur.lastrowid, "ok": True}
+
+
+@app.delete("/api/profile/{username}/wall/{comment_id}")
+def delete_wall_comment(username: str, comment_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    profile = conn.execute("SELECT id FROM users WHERE username = ?", (username.lower(),)).fetchone()
+    if not profile:
+        raise HTTPException(404, "no such user")
+    row = conn.execute(
+        "SELECT author_id FROM profile_comments WHERE id = ? AND profile_id = ?",
+        (comment_id, profile["id"]),
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "no such comment")
+    if user["id"] not in (row["author_id"], profile["id"]):
+        raise HTTPException(403, "you can't delete that comment")
+    conn.execute("DELETE FROM profile_comments WHERE id = ?", (comment_id,))
+    conn.commit()
+    return {"ok": True}
+
+
+@app.put("/api/profile")
+def put_profile(body: ProfileBody, user=Depends(current_user), conn=Depends(get_conn)):
+    changes = body.model_dump(exclude_unset=True)
+    updates: dict = {}
+    for field, value in changes.items():
+        if value is None:
+            continue
+        if field in PROFILE_LIMITS:
+            updates[field] = clean_text(
+                value, PROFILE_LIMITS[field], field, multiline=field == "about_me"
+            )
+        elif field == "theme":
+            if value not in THEMES:
+                raise HTTPException(400, "unknown theme")
+            updates[field] = value
+        elif field == "accent":
+            if value and not ACCENT_RE.fullmatch(value):
+                raise HTTPException(400, "accent must look like #ff9933")
+            updates[field] = value.lower()
+        elif field == "custom":
+            updates["custom_theme"] = json.dumps(clean_custom(value), separators=(",", ":"))
+        elif field == "top_friends":
+            updates[field] = json.dumps(top_friend_names(conn, user["id"], value))
+        elif field == "bg_image":
+            if value:
+                own_photo(conn, user["id"], value)
+            updates["bg_image_id"] = value or None
+        elif field == "stickers":
+            updates["stickers"] = json.dumps(
+                clean_stickers(conn, user["id"], body.stickers), separators=(",", ":")
+            )
+    if updates:
+        # column names come from the fixed set above, never from the request
+        sets = ", ".join(f"{col} = ?" for col in updates)
+        conn.execute(
+            f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"])
+        )
+        conn.commit()
+    return get_profile(user["username"], user, conn)
+
+
+# ---------- pictures: profile picture, gallery, serving ----------
+
+
+@app.get("/api/img/{image_id}")
+def get_image(image_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        "SELECT owner_id, mime, data FROM images WHERE id = ?", (image_id,)
+    ).fetchone()
+    # someone who blocked you doesn't show you their pictures either
+    if not row or (row["owner_id"] != user["id"] and i_blocked(conn, row["owner_id"], user["id"])):
+        raise HTTPException(404, "no such picture")
+    return Response(
+        content=bytes(row["data"]),
+        media_type=row["mime"],
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
+
+
+@app.put("/api/me/avatar")
+async def set_avatar(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    raw = await read_body(request, MAX_AVATAR_UPLOAD)
+    img = await run_in_threadpool(process_image, raw, "avatar")
+    old = conn.execute("SELECT avatar_id FROM users WHERE id = ?", (user["id"],)).fetchone()["avatar_id"]
+    cur = conn.execute(
+        "INSERT INTO images (owner_id, kind, mime, data, width, height, animated) "
+        "VALUES (?, 'avatar', ?, ?, ?, ?, ?)",
+        (user["id"], img["mime"], img["data"], img["width"], img["height"], img["animated"]),
+    )
+    conn.execute("UPDATE users SET avatar_id = ? WHERE id = ?", (cur.lastrowid, user["id"]))
+    if old:
+        conn.execute("DELETE FROM images WHERE id = ? AND owner_id = ?", (old, user["id"]))
+    conn.commit()
+    return media_response(conn, user["id"])
