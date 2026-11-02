@@ -458,3 +458,138 @@ function renderEditor(p) {
 
   // ---- profile picture
   mountAvatarEditor(group("Profile picture"), p, media);
+
+  // ---- theme and colours
+  const looks = group("Theme and colours");
+  const th = choiceRow("Theme", "colours reset to match");
+  th.box.classList.add("pf-themes");
+  const colorInputs = {};
+  for (const [id, label] of THEME_CHOICES) {
+    const b = el("button", "pf-theme-btn" + (look.theme === id ? " on" : ""));
+    b.type = "button";
+    b.append(el("span", "pf-swatch theme-" + id), label);
+    b.onclick = () => {
+      look.theme = id;
+      // a theme brings its own colours; leftovers from the old one would hide it
+      for (const key of Object.keys(CUSTOM_COLOR_VARS)) delete look.custom[key];
+      for (const other of th.box.children) other.classList.toggle("on", other === b);
+      preview();
+      syncAll();
+    };
+    th.box.append(b);
+  }
+  looks.append(th.row);
+
+  const ac = choiceRow("Accent colour", "or pick your own");
+  choiceButton(ac.box, "theme's own", !look.accent, () => {
+    look.accent = "";
+    preview();
+  }, "text");
+  for (const color of ACCENTS) {
+    const b = choiceButton(ac.box, "", look.accent === color, () => {
+      look.accent = color;
+      preview();
+    }, "swatch");
+    b.style.background = color;
+    b.title = color;
+    b.setAttribute("aria-label", "accent " + color);
+  }
+  // your own colour: a colour picker and a hex box that follow each other
+  const own = el("input");
+  own.type = "color";
+  own.title = "pick your own accent colour";
+  own.setAttribute("aria-label", "your own accent colour");
+  const hex = el("input");
+  hex.type = "text";
+  hex.maxLength = 7;
+  hex.placeholder = "#rrggbb";
+  hex.setAttribute("aria-label", "accent colour as hex");
+  hex.className = "pf-hex";
+  const useOwn = (color) => {
+    look.accent = color;
+    for (const b of ac.box.querySelectorAll(".pf-choice")) b.classList.remove("on");
+    own.value = color;
+    hex.value = color;
+    hex.classList.remove("bad");
+    preview();
+  };
+  own.oninput = () => useOwn(own.value.toLowerCase());
+  hex.oninput = () => {
+    const v = hex.value.trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(v)) useOwn(v);
+    else hex.classList.toggle("bad", v !== "");
+  };
+  if (look.accent && !ACCENTS.includes(look.accent)) {
+    own.value = look.accent;
+    hex.value = look.accent;
+  } else {
+    own.value = look.accent || "#ff9933";
+  }
+  ac.box.append(own, hex);
+  // choosing a preset or "theme's own" clears the hex box
+  ac.box.addEventListener("click", (e) => {
+    if (e.target.closest(".pf-choice")) hex.value = "";
+  });
+  looks.append(ac.row);
+
+  const colors = el("div", "pf-style-grid");
+  for (const [key, label] of COLOR_FIELDS) {
+    const wrap = el("label", "pf-style-color");
+    wrap.append(el("span", "", label));
+    const input = el("input");
+    input.type = "color";
+    input.oninput = () => {
+      look.custom[key] = input.value;
+      preview();
+    };
+    colorInputs[key] = input;
+    wrap.append(input);
+    colors.append(wrap);
+  }
+  syncers.push(() => {
+    for (const key of Object.keys(colorInputs)) colorInputs[key].value = effectiveColor(key);
+  });
+  looks.append(colors);
+
+  const reset = el("button", "pf-reset-style", "Reset fonts, shapes and colours");
+  reset.type = "button";
+  reset.onclick = () => {
+    look.custom = {};
+    preview();
+    syncAll();
+    media.refresh();
+  };
+  looks.append(reset);
+
+  // ---- fonts and shapes
+  const shapes = group("Fonts and shapes");
+
+  // a row of buttons for one style option. "" as a value means "not set" (the theme decides).
+  function enumRow(title, key, choices, fallback, decorate) {
+    const r = choiceRow(title);
+    for (const [value, label] of choices) {
+      const b = choiceButton(r.box, label, false, () => {
+        if (value === "") delete look.custom[key];
+        else look.custom[key] = value;
+        preview();
+      }, "text", value);
+      if (decorate) decorate(b, value);
+    }
+    syncers.push(() => {
+      const now = look.custom[key] || fallback;
+      for (const b of r.box.children) b.classList.toggle("on", b.dataset.value === now);
+    });
+    shapes.append(r.row);
+  }
+
+  enumRow("Font", "font", [["", "Theme's own"], ...FONT_CHOICES], "", (b, value) => {
+    const font = FONT_CHOICES.find((f) => f[0] === value);
+    if (font) b.style.fontFamily = font[2];
+  });
+  enumRow("Name style", "name_effect", NAME_EFFECTS, "none");
+  enumRow("Picture shape", "avatar_shape", AVATAR_SHAPES, "circle", (b, value) => {
+    b.classList.add("with-icon");
+    b.prepend(el("span", "pf-shape shape-" + value));
+  });
+  enumRow("Border style", "border_style", BORDER_STYLES, "solid");
+  enumRow("Background pattern", "pattern", PATTERNS, "none");
