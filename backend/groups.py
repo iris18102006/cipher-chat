@@ -368,3 +368,163 @@ async def remove_member(gid: int, username: str, user=Depends(current_user), con
     await manager.send_user(target["username"], {"type": "group", "event": "removed", "group": gid})
     await notify_group(conn, gid, "updated")
     return {"deleted": False}
+
+
+@router.post("/api/groups/{gid}/rekey")
+async def rekey_group(gid: int, body: Rekey, user=Depends(current_user), conn=Depends(get_conn)):
+    row, _ = get_group(conn, gid, user)
+    if body.version != row["key_version"] + 1:
+        raise HTTPException(409, "somebody else already did it")
+    wraps = check_wraps(body.keys, members_of(conn, gid))
+    pub = my_pub(conn, user["id"])
+    won = conn.execute(
+        "UPDATE chat_groups SET key_version = ?, rekey_needed = 0 WHERE id = ? AND key_version = ?",
+        (body.version, gid, row["key_version"]),
+    ).rowcount
+    if won != 1:
+        conn.rollback()
+        raise HTTPException(409, "somebody else already did it")
+    store_wraps(conn, gid, body.version, user["id"], pub, wraps)
+    conn.commit()
+    await notify_group(conn, gid, "updated")
+    return detail(conn, gid, user)
+
+
+@router.get("/api/groups/{gid}/messages")
+def group_history(
+    gid: int,
+    before: int | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    _, mem = get_group(conn, gid, user)
+    rows = conn.execute(
+        f"SELECT m.id, m.sender_id, u.username AS sender, m.key_version, m.iv, m.ct, m.created_at "
+        f"FROM chat_group_messages m JOIN users u ON u.id = m.sender_id "
+        f"WHERE {VISIBLE} AND (:before IS NULL OR m.id < :before) "
+        f"ORDER BY m.id DESC LIMIT :limit",
+        {"g": gid, "joined": mem["joined_version"], "me": user["id"], "before": before, "limit": limit},
+    ).fetchall()
+    # who has read up to where, so my own messages can say "seen by ..."
+    blocked = blocked_ids(conn, user["id"])
+    readers = [
+        (m["username"], m["last_read_id"])
+        for m in members_of(conn, gid)
+        if m["id"] != user["id"] and m["id"] not in blocked
+    ]
+    out = []
+    for r in reversed(rows):
+        mine = r["sender_id"] == user["id"]
+        out.append(
+            {
+                "id": r["id"],
+                "from": r["sender"],
+                "v": r["key_version"],
+                "iv": r["iv"],
+                "ct": r["ct"],
+                "ts": r["created_at"],
+                "seen_by": [n for n, last in readers if last >= r["id"]] if mine else [],
+            }
+        )
+    return out
+
+
+# ---------- websocket: called from main.py's socket loop ----------
+
+
+async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
+    """Handle group messages, typing and read marks. Returns False if it isn't a group event."""
+    kind = data.get("type")
+    if kind not in WS_KINDS:
+        return False
+    gid = data.get("group")
+    if not isinstance(gid, int) or isinstance(gid, bool):
+        return True
+    mem = member_row(conn, gid, me_id)
+    if not mem:
+        if kind == "gmsg":
+            await manager.send_user(
+                me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "not_member"}
+            )
+        return True
+
+    blocked = blocked_ids(conn, me_id)
+
+    def audience(version: int = 10**9) -> set[str]:
+        """Everyone else in the group who can read key `version` (default: everyone)."""
+        rows = conn.execute(
+            "SELECT u.id, u.username FROM chat_group_members m JOIN users u ON u.id = m.user_id "
+            "WHERE m.group_id = ? AND m.user_id != ? AND m.joined_version <= ?",
+            (gid, me_id, version),
+        ).fetchall()
+        return {r["username"] for r in rows if r["id"] not in blocked}
+
+    if kind == "gtyping":
+        for name in audience():
+            await manager.send_user(
+                name, {"type": "gtyping", "group": gid, "from": me, "state": bool(data.get("state"))}
+            )
+
+    elif kind == "gmsg":
+        v, iv, ct = data.get("v"), data.get("iv"), data.get("ct")
+        if not (isinstance(v, int) and isinstance(iv, str) and isinstance(ct, str)) or isinstance(v, bool):
+            return True
+        if len(iv) > 32 or not ct or len(ct) > MAX_CT_LEN:
+            return True
+        current = conn.execute("SELECT key_version FROM chat_groups WHERE id = ?", (gid,)).fetchone()[0]
+        # you can only write with a key version you actually hold
+        holds = conn.execute(
+            "SELECT 1 FROM chat_group_keys WHERE group_id = ? AND user_id = ? AND version = ?",
+            (gid, me_id, v),
+        ).fetchone()
+        if v > current or not holds:
+            await manager.send_user(
+                me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "bad_key"}
+            )
+            return True
+        cur = conn.execute(
+            "INSERT INTO chat_group_messages (group_id, sender_id, key_version, iv, ct) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (gid, me_id, v, iv, ct),
+        )
+        msg_id = cur.lastrowid
+        # writing means I've read everything up to here
+        conn.execute(
+            "UPDATE chat_group_members SET last_read_id = MAX(last_read_id, ?) "
+            "WHERE group_id = ? AND user_id = ?",
+            (msg_id, gid, me_id),
+        )
+        conn.commit()
+        ts = conn.execute(
+            "SELECT created_at FROM chat_group_messages WHERE id = ?", (msg_id,)
+        ).fetchone()[0]
+        payload = {
+            "type": "gmsg",
+            "group": gid,
+            "id": msg_id,
+            "from": me,
+            "v": v,
+            "iv": iv,
+            "ct": ct,
+            "ts": ts,
+            "cid": data.get("cid"),
+        }
+        # people who joined after this key version can't read it, so they don't get it
+        for name in audience(v):
+            await manager.send_user(name, payload)
+        await manager.send_user(me, {**payload, "seen_by": []})
+
+    elif kind == "gread":
+        upto = max_message_id(conn, gid)
+        conn.execute(
+            "UPDATE chat_group_members SET last_read_id = MAX(last_read_id, ?) "
+            "WHERE group_id = ? AND user_id = ?",
+            (upto, gid, me_id),
+        )
+        conn.commit()
+        await manager.send_user(me, {"type": "gread-sync", "group": gid})
+        for name in audience():
+            await manager.send_user(name, {"type": "gseen", "group": gid, "by": me, "upto": upto})
+
+    return True
