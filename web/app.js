@@ -367,3 +367,104 @@ function renderMessages(keepScroll) {
   if (keepScroll) log.scrollTop = log.scrollHeight - before;
   else if (stick) scrollBottom();
 }
+
+async function decryptList(peer, rows) {
+  const out = [];
+  for (const r of rows) {
+    const { text, failed } = await decryptFor(peer, r.iv, r.ct);
+    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, delivered: r.delivered, read: r.read, held: !!r.held });
+  }
+  return out;
+}
+
+async function loadHistory(peer) {
+  const rows = await api("/api/messages/" + encodeURIComponent(peer) + "?limit=" + PAGE);
+  state.msgs.set(peer, await decryptList(peer, rows));
+  state.hasOlder.set(peer, rows.length === PAGE);
+}
+
+async function loadOlder() {
+  const peer = state.open;
+  const list = state.msgs.get(peer) || [];
+  if (!list.length) return;
+  const rows = await api("/api/messages/" + encodeURIComponent(peer) + "?limit=" + PAGE + "&before=" + list[0].id);
+  state.msgs.set(peer, [...(await decryptList(peer, rows)), ...list]);
+  state.hasOlder.set(peer, rows.length === PAGE);
+  renderMessages(true);
+}
+
+async function openChat(peer) {
+  stopTyping(); // tell whoever we were typing to that we stopped
+  state.openGroup = null;
+  state.open = peer;
+  document.body.classList.add("in-chat");
+  $("chat-empty").hidden = true;
+  $("chat-pane").hidden = false;
+  $("verify-box").hidden = true;
+  $("msg").value = "";
+  autosize();
+  renderChatHeader();
+  renderBuddies();
+  try {
+    await loadHistory(peer);
+  } catch {
+    return;
+  }
+  if (state.open !== peer) return; // clicked someone else while loading
+  renderMessages();
+  scrollBottom();
+  markRead(peer);
+  if (!$("msg").disabled) $("msg").focus();
+}
+
+function markRead(peer) {
+  const c = state.contacts.get(peer);
+  if (!c) return;
+  const hasUnread = c.unread > 0 || (state.msgs.get(peer) || []).some((m) => m.from === peer && !m.read);
+  if (!hasUnread) return;
+  c.unread = 0;
+  for (const m of state.msgs.get(peer) || []) if (m.from === peer) m.read = true;
+  sendWS({ type: "read", to: peer });
+  renderBuddies();
+}
+
+// ---------- websocket ----------
+
+function sendWS(obj) {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+    state.ws.send(JSON.stringify(obj));
+    return true;
+  }
+  return false;
+}
+
+function setConn(ok, text) {
+  const n = $("conn");
+  n.textContent = text;
+  n.className = "conn " + (ok ? "on" : "off");
+}
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss://" : "ws://";
+  const ws = new WebSocket(proto + location.host + "/ws");
+  state.ws = ws;
+
+  ws.onopen = async () => {
+    state.retry = 0;
+    setConn(true, "connected");
+    try {
+      await loadContacts();
+      if (typeof loadGroups === "function") await loadGroups();
+      // catch up on anything we missed while disconnected
+      if (state.open) {
+        await loadHistory(state.open);
+        renderMessages();
+        markRead(state.open);
+      } else if (state.openGroup != null && state.groups.has(state.openGroup)) {
+        await loadGroupHistory(state.openGroup);
+        renderGroupHeader();
+        renderMessages();
+        markGroupRead(state.openGroup);
+      }
+    } catch {}
+  };
