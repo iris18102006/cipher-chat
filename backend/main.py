@@ -384,3 +384,223 @@ def check_rate_limit(key: str):
     _fails[key] = recent
     if len(recent) >= FAIL_LIMIT:
         raise HTTPException(429, "too many tries, wait a few minutes")
+
+
+# ---------- sessions ----------
+
+
+def start_session(conn, response: Response, user_id: int):
+    # clean out expired sessions while we're here
+    conn.execute(
+        "DELETE FROM sessions WHERE created_at < datetime('now', ?)",
+        (f"-{SESSION_DAYS} days",),
+    )
+    token = secrets.token_urlsafe(32)
+    conn.execute(
+        "INSERT INTO sessions (token, user_id) VALUES (?, ?)",
+        (hash_token(token), user_id),
+    )
+    conn.commit()
+    response.set_cookie(
+        COOKIE,
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=SECURE_COOKIES,
+        max_age=60 * 60 * 24 * SESSION_DAYS,
+    )
+
+
+def user_from_token(conn, token: str | None):
+    if not token:
+        return None
+    return conn.execute(
+        "SELECT users.id, users.username FROM sessions "
+        "JOIN users ON users.id = sessions.user_id "
+        "WHERE sessions.token = ? AND sessions.created_at >= datetime('now', ?)",
+        (hash_token(token), f"-{SESSION_DAYS} days"),
+    ).fetchone()
+
+
+def current_user(session: str | None = Cookie(default=None), conn=Depends(get_conn)):
+    row = user_from_token(conn, session)
+    if not row:
+        raise HTTPException(401, "not logged in")
+    return row
+
+
+def get_peer(conn, username: str):
+    peer = conn.execute(
+        "SELECT id, username, public_key, last_seen FROM users WHERE username = ?",
+        (username.lower(),),
+    ).fetchone()
+    if not peer:
+        raise HTTPException(404, "no such user")
+    return peer
+
+
+# ---------- auth routes ----------
+
+
+@app.post("/api/signup")
+def signup(creds: Credentials, response: Response, conn=Depends(get_conn)):
+    username = creds.username.strip().lower()
+    if not USERNAME_RE.match(username):
+        raise HTTPException(400, "username must be 3-20 chars: a-z, 0-9, _")
+    if not 8 <= len(creds.password) <= 128:
+        raise HTTPException(400, "password must be 8-128 characters")
+    try:
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            (username, ph.hash(creds.password)),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "that username is taken")
+    start_session(conn, response, cur.lastrowid)
+    return {"username": username}
+
+
+@app.post("/api/login")
+def login(
+    creds: Credentials, request: Request, response: Response, conn=Depends(get_conn)
+):
+    username = creds.username.strip().lower()
+    key = _fail_key(request.client.host if request.client else "?", username)
+    check_rate_limit(key)
+    row = conn.execute(
+        "SELECT id, password_hash FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    try:
+        ph.verify(row["password_hash"] if row else DUMMY_HASH, creds.password)
+        if not row:
+            raise VerifyMismatchError()
+    except VerifyMismatchError:
+        _fails[key].append(time.time())
+        raise HTTPException(401, "wrong username or password")
+    _fails.pop(key, None)
+    start_session(conn, response, row["id"])
+    return {"username": username}
+
+
+@app.post("/api/logout")
+def logout(
+    response: Response,
+    session: str | None = Cookie(default=None),
+    conn=Depends(get_conn),
+):
+    if session:
+        conn.execute("DELETE FROM sessions WHERE token = ?", (hash_token(session),))
+        conn.commit()
+    response.delete_cookie(COOKIE)
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def me(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        "SELECT display_name, avatar_id FROM users WHERE id = ?", (user["id"],)
+    ).fetchone()
+    return {
+        "username": user["username"],
+        "display_name": row["display_name"],
+        "avatar": avatar_url(row["avatar_id"]),
+    }
+
+
+# ---------- profiles ----------
+
+PROFILE_COLUMNS = (
+    "id, username, display_name, mood, headline, about_me, interests, "
+    "location, song, avatar_id, bg_image_id, stickers, theme, accent, custom_theme, "
+    "top_friends, created_at, last_seen"
+)
+
+
+def profile_dict(row, viewer_id: int) -> dict:
+    return {
+        "username": row["username"],
+        "display_name": row["display_name"],
+        "mood": row["mood"],
+        "headline": row["headline"],
+        "about_me": row["about_me"],
+        "interests": row["interests"],
+        "location": row["location"],
+        "song": row["song"],
+        "avatar": avatar_url(row["avatar_id"]),
+        "theme": row["theme"],
+        "accent": row["accent"],
+        "custom": custom_from_row(row),
+        "joined": row["created_at"],
+        "last_seen": row["last_seen"],
+        "online": manager.is_online(row["username"]),
+        "me": row["id"] == viewer_id,
+    }
+
+
+def top_friend_names(conn, user_id: int, names: list[str]) -> list[str]:
+    """Only real friends can be in your top friends, in the order you picked."""
+    picked: list[str] = []
+    allowed = friend_ids(conn, user_id)
+    for name in names:
+        name = name.strip().lower()
+        if name in picked:
+            continue
+        row = conn.execute("SELECT id FROM users WHERE username = ?", (name,)).fetchone()
+        if not row or row["id"] not in allowed:
+            raise HTTPException(400, f"{name} isn't one of your friends")
+        picked.append(name)
+    if len(picked) > MAX_TOP_FRIENDS:
+        raise HTTPException(400, f"you can only pick {MAX_TOP_FRIENDS} top friends")
+    return picked
+
+
+def wall_for(conn, profile_id: int, viewer_id: int) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT c.id, c.author_id, c.body, c.created_at,
+               u.username, u.display_name, u.avatar_id
+        FROM profile_comments c JOIN users u ON u.id = c.author_id
+        WHERE c.profile_id = ?
+        ORDER BY c.id DESC LIMIT 30
+        """,
+        (profile_id,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        if r["author_id"] != viewer_id and blocked_either_way(conn, viewer_id, r["author_id"]):
+            continue
+        out.append({
+            "id": r["id"], "username": r["username"],
+            "display_name": r["display_name"], "avatar": avatar_url(r["avatar_id"]),
+            "body": r["body"], "created_at": r["created_at"],
+            "mine": r["author_id"] == viewer_id,
+        })
+    return out
+
+
+def top_friends_for(conn, row, viewer_id: int) -> list[dict]:
+    try:
+        names = json.loads(row["top_friends"])
+    except (TypeError, ValueError):
+        return []
+    owner_friends = friend_ids(conn, row["id"])
+    out = []
+    for name in names:
+        f = conn.execute(
+            "SELECT id, username, display_name, avatar_id FROM users WHERE username = ?",
+            (name,),
+        ).fetchone()
+        # drop people who aren't friends any more, or who have a block with the viewer
+        if not f or f["id"] not in owner_friends:
+            continue
+        if f["id"] != viewer_id and blocked_either_way(conn, viewer_id, f["id"]):
+            continue
+        out.append(
+            {
+                "username": f["username"],
+                "display_name": f["display_name"],
+                "avatar": avatar_url(f["avatar_id"]),
+            }
+        )
+    return out
