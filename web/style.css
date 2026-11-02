@@ -633,3 +633,275 @@ h2 {
   border-radius: 6px;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
 }
+
+
+/* ---------- friend request banner, held-message badge ---------- */
+
+#request-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: #3d3a12;
+  background: #fff6c4;
+  border-bottom: 1px solid #d9c96a;
+}
+
+#request-banner span {
+  flex: 1;
+}
+
+.badge.held {
+  background: #b8860b;
+}
+
+/* ---------- settings ---------- */
+
+#settings-overlay,
+#lists-overlay,
+#groups-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 10px;
+  overflow-y: auto;
+  background: rgba(10, 25, 55, 0.65);
+}
+
+#settings-card,
+#lists-card,
+#groups-card {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border: 2px solid #7f9db9;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+#settings-bar,
+#lists-bar,
+#groups-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(#2a5da8, #17407f);
+  border-bottom: 3px solid #ff9933;
+}
+
+#settings-close,
+#lists-close,
+#groups-close {
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+#settings-body,
+#lists-body,
+#groups-body {
+  padding: 12px;
+}
+
+#settings-body fieldset {
+  margin: 0 0 12px;
+  padding: 8px 10px 10px;
+  border: 1px solid #7f9db9;
+}
+
+#settings-body legend {
+  padding: 0 6px;
+  font-weight: bold;
+  color: #17407f;
+}
+
+#settings-body .opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+#settings-body .opt input {
+  margin-top: 3px;
+}
+
+#settings-body .opt small {
+  display: block;
+  color: #556;
+}
+
+#settings-status {
+  min-height: 16px;
+  margin: 0;
+  font-size: 11px;
+  color: #556;
+}
+
+#settings-status.bad {
+  color: #b00020;
+}
+
+
+/* ---------- requests / blocked panels ---------- */
+
+.count {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: #e8590c;
+  border-radius: 8px;
+}
+
+#lists-body h3,
+#groups-body h3 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  color: #17407f;
+}
+
+#lists-body h3:first-child,
+#groups-body h3:first-child {
+  margin-top: 0;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #dde3ee;
+}
+
+.list-row .who {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-row .who b,
+.list-row .who small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row .who small {
+  color: #556;
+}
+
+.list-row .btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.list-empty {
+  margin: 8px 0;
+  color: #556;
+  font-style: italic;
+}
+
+#lists-error,
+#groups-error {
+  min-height: 14px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #b00020;
+}
+
+/* the top bar has five buttons now: let it wrap on small screens instead of running off the side */
+@media (max-width: 700px) {
+  #top {
+    flex-wrap: wrap;
+    padding: 8px 10px;
+  }
+
+  #top-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #top-right > span:not(#conn) {
+    width: 100%;
+  }
+}
+
+
+/* ---------- group chats ---------- */
+
+#new-group {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 4px 8px 6px;
+}
+
+/* buddy list header for the groups section */
+#buddy-list li.group.groups {
+  color: #fff;
+  background: var(--blue-light);
+}
+
+/* a group's picture: the first letter of its name, blue on a rounded square
+   (the avatar colours and shape come from these variables, see profile.css) */
+.pf-avatar.group {
+  --av-r: 24%;
+  --p-accent: var(--blue-light);
+  --p-page: var(--mist);
+}
+
+/* who wrote a message in a group */
+.msg .sender {
+  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  color: var(--blue-light);
+}
+
+#groups-body input[type="text"] {
+  width: 100%;
+  padding: 5px 6px;
+  font: 12px Verdana, Tahoma, sans-serif;
+  border: 1px solid var(--line);
+}
+
+#groups-body > button,
+#groups-body > .list-row + button {
+  margin-top: 10px;
+}
+
+.rename-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pick-row {
+  cursor: pointer;
+}
+
+.pick-row input {
+  margin: 0;
+}
+
+.fp-line {
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+}
+
+.list-row .who small.key-changed {
+  white-space: normal;
+  color: #b00020;
+  font-weight: bold;
+}
