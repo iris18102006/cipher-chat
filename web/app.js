@@ -592,3 +592,144 @@ async function handleWS(data) {
     }
   }
 }
+
+// ---------- composer ----------
+
+let lastTypingSent = 0;
+let typingStopTimer = null;
+
+// the typing message for whatever is open: a friend, or a group
+function typingFrame(on) {
+  if (state.openGroup != null) return { type: "gtyping", group: state.openGroup, state: on };
+  if (state.open) return { type: "typing", to: state.open, state: on };
+  return null;
+}
+
+function notifyTyping() {
+  if (!typingFrame(true)) return;
+  const now = Date.now();
+  if (now - lastTypingSent > 2500) {
+    sendWS(typingFrame(true));
+    lastTypingSent = now;
+  }
+  clearTimeout(typingStopTimer);
+  // aimed at the chat it was typed in, even if you switch chats before it fires
+  const off = typingFrame(false);
+  typingStopTimer = setTimeout(() => {
+    sendWS(off);
+    lastTypingSent = 0;
+  }, 3000);
+}
+
+function stopTyping() {
+  clearTimeout(typingStopTimer);
+  const frame = typingFrame(false);
+  if (frame && lastTypingSent) sendWS(frame);
+  lastTypingSent = 0;
+}
+
+function autosize() {
+  const t = $("msg");
+  t.style.height = "auto";
+  t.style.height = Math.min(t.scrollHeight, 120) + "px";
+}
+
+async function sendMessage() {
+  if (state.openGroup != null) return sendGroupMessage();
+  const peer = state.open;
+  const text = $("msg").value.trim();
+  if (!peer || !text) return;
+  const c = state.contacts.get(peer);
+  if (!c || !c.pub || c.changed) return;
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+    setConn(false, "offline, message not sent");
+    return;
+  }
+  const key = await sharedKeyFor(peer);
+  const { iv, ct } = await encryptText(key, text);
+  if (sendWS({ type: "msg", to: peer, iv, ct, cid: crypto.randomUUID() })) {
+    $("msg").value = "";
+    autosize();
+    stopTyping();
+  }
+}
+
+// ---------- wiring ----------
+
+$("composer").onsubmit = (e) => {
+  e.preventDefault();
+  sendMessage();
+};
+
+$("msg").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+$("msg").addEventListener("input", () => {
+  autosize();
+  notifyTyping();
+});
+
+$("search").addEventListener("input", renderBuddies);
+$("add-user-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const username = $("add-username").value.trim().toLowerCase();
+  const err = $("add-user-error");
+  err.hidden = true;
+  err.textContent = "";
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    err.textContent = "enter an exact username";
+    err.hidden = false;
+    return;
+  }
+  try {
+    await openProfile(username);
+    if (!pfCurrent) throw new Error();
+    $("add-username").value = "";
+  } catch {
+    err.textContent = "user not found";
+    err.hidden = false;
+  }
+};
+$("older").onclick = () => (state.openGroup != null ? loadOlderGroup() : loadOlder());
+
+$("back").onclick = () => {
+  stopTyping();
+  document.body.classList.remove("in-chat");
+  state.open = null;
+  state.openGroup = null;
+  $("group-info").hidden = true;
+  $("chat-pane").hidden = true;
+  $("chat-empty").hidden = false;
+  renderBuddies();
+};
+
+// answer a friend request from the chat itself
+$("req-accept").onclick = async () => {
+  const peer = state.open;
+  if (!peer) return;
+  try {
+    await api("/api/friends/" + encodeURIComponent(peer) + "/accept", { method: "POST" });
+    await loadContacts();
+    if (state.open !== peer) return;
+    await loadHistory(peer); // messages that were waiting are there now
+    renderMessages();
+    scrollBottom();
+    markRead(peer);
+  } catch {
+    toast("couldn't accept that, try again");
+  }
+};
+$("req-decline").onclick = async () => {
+  const peer = state.open;
+  if (!peer) return;
+  try {
+    await api("/api/friends/" + encodeURIComponent(peer), { method: "DELETE" });
+    await loadContacts();
+    $("back").onclick();
+  } catch {
+    toast("couldn't decline that, try again");
+  }
+};
