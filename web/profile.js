@@ -334,3 +334,127 @@ function textRow(container, [field, label, max, multiline, hint], value) {
   container.append(row);
   return input;
 }
+
+// [id, label], ids match THEMES in backend/main.py
+const THEME_CHOICES = [
+  ["classic", "Classic"], ["emo", "Emo"], ["kawaii", "Kawaii"], ["neon", "Neon"],
+  ["forest", "Forest"], ["sunset", "Sunset"], ["gothic", "Gothic"], ["terminal", "Terminal"],
+];
+const ACCENTS = ["#ff9933", "#ff2e93", "#39ff14", "#00b7ff", "#7a2cff", "#e6b800", "#e63946", "#2ec27e"];
+
+// a row of buttons where exactly one is selected
+function choiceRow(title, hint) {
+  const row = el("div", "pf-row wide");
+  row.append(el("label", "", title));
+  const box = el("div", "pf-picker");
+  row.append(box);
+  if (hint) row.append(el("span", "pf-count", hint));
+  return { row, box };
+}
+
+function choiceButton(box, label, selected, onPick, extraClass, value) {
+  const b = el("button", "pf-choice" + (extraClass ? " " + extraClass : "") + (selected ? " on" : ""), label);
+  b.type = "button";
+  if (value !== undefined) b.dataset.value = value;
+  b.onclick = () => {
+    for (const other of box.children) other.classList.remove("on");
+    b.classList.add("on");
+    onPick();
+  };
+  box.append(b);
+  return b;
+}
+
+async function saveProfile(changes) {
+  const res = await fetch("/api/profile", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(changes),
+  });
+  if (res.status === 401) {
+    location.href = "/login.html";
+    throw new Error("not logged in");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.detail === "string" ? data.detail : "couldn't save, try again");
+  }
+  return data;
+}
+
+// the colour a theme (or a custom colour) is really using right now, for the colour pickers
+function effectiveColor(key) {
+  const raw = getComputedStyle($("profile-card")).getPropertyValue(CUSTOM_COLOR_VARS[key]).trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(raw)) return raw;
+  if (/^#[0-9a-f]{3}$/.test(raw)) return "#" + [...raw.slice(1)].map((c) => c + c).join("");
+  return "#000000";
+}
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+function renderEditor(p) {
+  const body = $("pf-body");
+  body.replaceChildren();
+  const card = $("profile-card");
+  const form = el("form", "pf-form");
+  form.autocomplete = "off";
+  const inputs = {};
+
+  // what's picked so far, applied to the card live so you see it before saving
+  const look = {
+    theme: p.theme,
+    accent: p.accent,
+    custom: { ...(p.custom || {}) },
+    bg_image: p.bg_image || 0,
+    stickers: (p.stickers || []).map((s) => ({ img: s.img, x: s.x, y: s.y, w: s.w, r: s.r })),
+  };
+  const media = makeMedia(p);
+  const bgUrl = () => {
+    const ph = media.photos.find((x) => x.id === look.bg_image);
+    return ph ? ph.url : "";
+  };
+  const preview = () => applyTheme(card, { theme: look.theme, accent: look.accent, custom: look.custom, bg_url: bgUrl() });
+  // everything that has to be redrawn when the look changes behind its back (theme pick, reset)
+  const syncers = [];
+  const syncAll = () => syncers.forEach((fn) => fn());
+
+  // deleting a picture also takes it out of your unsaved stickers and background
+  media.on(() => {
+    const ids = new Set(media.photos.map((x) => x.id));
+    look.stickers = look.stickers.filter((s) => ids.has(s.img));
+    if (look.bg_image && !ids.has(look.bg_image)) look.bg_image = 0;
+    preview();
+  });
+
+  function group(title) {
+    const box = el("details", "pf-group");
+    box.open = true;
+    box.append(el("summary", "", title));
+    const inner = el("div", "pf-group-body");
+    box.append(inner);
+    form.append(box);
+    return inner;
+  }
+
+  // ---- save / cancel (at the top and the bottom, the page is long)
+  const err = el("p", "pf-error");
+  const saveButtons = [];
+  function actionBar() {
+    const bar = el("div", "pf-actions");
+    const save = el("button", "", "Save");
+    save.type = "submit";
+    const cancel = el("button", "", "Cancel");
+    cancel.type = "button";
+    cancel.onclick = () => renderProfile(pfCurrent);
+    bar.append(save, cancel);
+    saveButtons.push(save);
+    return bar;
+  }
+  form.append(actionBar());
+
+  // ---- about you
+  const about = group("About you");
+  for (const f of TEXT_FIELDS) inputs[f[0]] = textRow(about, f, p[f[0]]);
+
+  // ---- profile picture
+  mountAvatarEditor(group("Profile picture"), p, media);
