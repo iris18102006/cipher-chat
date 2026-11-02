@@ -1,0 +1,349 @@
+/* profile page. Every colour comes from a --p-* variable so a theme
+   (themes.css) can restyle the whole page by only changing those. */
+
+#profile-card {
+  --p-page: #eef3fb;
+  --p-card: #ffffff;
+  --p-text: #111111;
+  --p-muted: #667;
+  --p-head-a: #2a5da8;
+  --p-head-b: #17407f;
+  --p-head-text: #ffffff;
+  --p-accent: #ff9933;
+  --p-border: #7f9db9;
+  --p-font: Verdana, Tahoma, sans-serif;
+  --p-border-width: 2px;
+  --p-border-style: solid;
+  --p-radius: 0px;
+  /* boxes inside the page use half the page border, so the border slider changes them too */
+  --p-line: calc(var(--p-border-width) / 2);
+}
+
+#profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 10px;
+  overflow-y: auto;
+  background: rgba(10, 25, 55, 0.65);
+}
+
+#profile-card {
+  position: relative; /* the heart and star patterns are a layer inside it */
+  width: 100%;
+  max-width: 640px;
+  background: var(--p-page);
+  color: var(--p-text);
+  font-family: var(--p-font);
+  border: var(--p-border-width) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+#pf-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--p-head-text);
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+  border-bottom: 3px solid var(--p-accent);
+}
+
+#pf-close {
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+#pf-body {
+  position: relative; /* the stickers are placed on top of this */
+  padding: 12px;
+}
+
+/* ---------- top of the page ---------- */
+
+.pf-hero {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  background: var(--p-card);
+  border: var(--p-line) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
+}
+
+/* profile picture: a photo, or the first letter of the name when there isn't one.
+   The outer box is the accent coloured ring, the inner one is the picture, and both
+   follow the shape picked in the editor (the av-* classes below). */
+.pf-avatar {
+  display: block;
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  padding: 3px;
+  overflow: hidden;
+  background: var(--p-accent, #ff9933);
+  border-radius: var(--av-r, 50%);
+  clip-path: var(--av-clip, none);
+}
+
+.pf-avatar > img,
+.pf-avatar > .pf-avatar-letter {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  object-fit: cover;
+  border-radius: var(--av-r, 50%);
+  clip-path: var(--av-clip, none);
+  background: var(--p-page, #eef3fb);
+}
+
+.pf-avatar-letter {
+  font-size: 38px;
+  font-weight: bold;
+  color: var(--p-accent, #ff9933);
+}
+
+.pf-avatar.small {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+}
+
+.pf-avatar.small .pf-avatar-letter {
+  font-size: 20px;
+}
+
+.pf-avatar.tiny {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+}
+
+.pf-avatar.tiny .pf-avatar-letter {
+  font-size: 13px;
+}
+
+#profile-card.av-circle { --av-r: 50%; --av-clip: none; }
+#profile-card.av-rounded { --av-r: 24%; --av-clip: none; }
+#profile-card.av-square { --av-r: 0; --av-clip: none; }
+#profile-card.av-diamond { --av-r: 0; --av-clip: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+#profile-card.av-hexagon { --av-r: 0; --av-clip: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
+
+.pf-who {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-name {
+  margin: 0;
+  padding: 0;
+  font-size: 20px;
+  color: var(--p-accent);
+  background: none; /* style.css gives every h2 the orange bar */
+  overflow-wrap: anywhere;
+}
+
+.pf-handle {
+  font-size: 11px;
+  color: var(--p-muted);
+}
+
+.pf-mood {
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.pf-headline {
+  margin-top: 6px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.pf-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--p-muted);
+}
+
+.pf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+/* ---------- sections ---------- */
+
+.pf-section {
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: var(--p-card);
+  border: var(--p-line) var(--p-border-style) var(--p-border);
+  border-radius: var(--p-radius);
+}
+
+.pf-section h3 {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--p-head-text);
+  background: linear-gradient(var(--p-head-a), var(--p-head-b));
+}
+
+.pf-section .pf-content {
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pf-section .pf-content.empty {
+  color: var(--p-muted);
+  font-style: italic;
+}
+
+.pf-stats {
+  display: flex;
+  background: var(--p-card);
+  border-radius: var(--p-radius);
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--p-muted);
+}
+
+.pf-stats b {
+  color: var(--p-text);
+}
+
+.pf-top {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+
+.pf-top-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--p-page);
+  border: 1px solid var(--p-border);
+  border-radius: calc(var(--p-radius) / 2);
+}
+
+.pf-top-item:hover {
+  border-color: var(--p-accent);
+}
+
+.pf-top-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-error {
+  padding: 20px;
+  text-align: center;
+  color: #a33;
+}
+
+/* ---------- editor ---------- */
+
+.pf-form {
+  padding: 4px 2px;
+}
+
+.pf-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 46px;
+  align-items: start;
+  gap: 4px 8px;
+  margin-bottom: 8px;
+}
+
+.pf-row label {
+  padding-top: 5px;
+  font-weight: bold;
+}
+
+.pf-row input,
+.pf-row textarea {
+  min-width: 0;
+  padding: 5px;
+  font: inherit;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 1px solid var(--p-border);
+}
+
+.pf-row textarea {
+  resize: vertical;
+}
+
+.pf-count {
+  padding-top: 6px;
+  font-size: 10px;
+  color: var(--p-muted);
+}
+
+.pf-form .pf-error {
+  padding: 0 0 6px;
+  text-align: left;
+}
+
+/* avatar / theme / accent pickers */
+
+.pf-row.wide .pf-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pf-choice {
+  min-width: 34px;
+  padding: 3px 6px;
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--p-text);
+  background: var(--p-card);
+  border: 2px solid var(--p-border);
+  border-radius: 6px;
+}
+
+.pf-choice:hover:not(:disabled) {
+  background: var(--p-page);
+  border-color: var(--p-accent);
+}
+
+.pf-choice.text {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.pf-choice.swatch {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+}
