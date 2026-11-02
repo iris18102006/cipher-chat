@@ -780,3 +780,115 @@ def test_ask_policy_holds_messages_until_the_request_is_accepted(client):
     got = b.get("/api/messages/alice").json()
     assert len(got) == 1 and got[0]["from"] == "alice" and got[0]["held"] is False
     assert a.get("/api/messages/bob").json()[0]["delivered"] is True
+
+
+def test_wait_policy_refuses_messages_before_accepting(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "wait"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob", "x1") == {"type": "msg-rejected", "to": "bob", "cid": "x1", "reason": "wait"}
+    assert a.get("/api/messages/bob").json() == []
+    assert b.get("/api/contacts").json()[0]["held"] == 0
+    # once they accept, talking is fine
+    b.post("/api/friends/alice/accept")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob")["type"] == "msg"
+
+
+def test_held_messages_are_limited(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        for n in range(3):
+            assert say(wa, "bob", f"m{n}")["held"] is True
+        assert say(wa, "bob", "m3")["reason"] == "limit"
+    assert b.get("/api/contacts").json()[0]["held"] == 3
+
+
+def test_declining_a_request_throws_away_the_waiting_messages(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        say(wa, "bob")
+    assert b.delete("/api/friends/alice").status_code == 200
+    # even if they become friends later, the old messages stay hidden
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    assert b.get("/api/messages/alice").json() == []
+    assert b.get("/api/contacts").json()[0]["unread"] == 0
+
+
+def test_switching_to_allow_lets_waiting_messages_through(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.put("/api/settings", json={"message_policy": "ask"})
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        say(wa, "bob")
+        b.put("/api/settings", json={"message_policy": "allow"})
+        assert wa.receive_json()["type"] == "receipt"
+    assert len(b.get("/api/messages/alice").json()) == 1
+
+
+def test_default_policy_still_lets_a_pending_request_talk(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        echo = say(wa, "bob")
+        assert echo["held"] is False
+    assert len(b.get("/api/messages/alice").json()) == 1
+
+
+def test_the_person_who_got_the_request_can_always_answer(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.put("/api/settings", json={"message_policy": "wait"})
+    b.post("/api/friends/alice")  # bob asked, alice hasn't answered
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob")["type"] == "msg"
+
+
+def test_no_messages_between_people_who_are_not_friends(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert say(wa, "bob")["reason"] == "not_friends"
+    assert b.get("/api/messages/alice").json() == []
+
+
+def test_blocked_senders_are_not_told_about_policies(client):
+    # a block stays invisible to the person who was blocked, whatever the setting is
+    a, b = signup(client, "alice"), signup(client, "bob")
+    b.post("/api/blocks/alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        echo = say(wa, "bob")
+        assert echo["type"] == "msg" and echo["held"] is False
+
+
+def test_every_bundled_font_has_a_file_and_a_font_face():
+    css = (WEB / "fonts.css").read_text()
+    files = re.findall(r'url\("fonts/([a-z0-9-]+\.woff2)"\)', css)
+    assert len(files) >= 11
+    for name in files:
+        assert (WEB / "fonts" / name).stat().st_size > 1000, name
+    js = (WEB / "profile.js").read_text()
+    for family in re.findall(r'font-family: "([^"]+)"', css):
+        assert family in js, f"{family} is bundled but the editor never uses it"
+
+
+def test_top_bar_has_the_requests_and_blocked_panels():
+    html = (WEB / "index.html").read_text()
+    for needle in ("requests-btn", "req-count", "blocked-btn", "lists-overlay", 'src="lists.js"'):
+        assert needle in html, needle
+    # two scripts share one global namespace, so the helpers must not share names
+    names = lambda f: set(re.findall(r"^(?:async )?function (\w+)", (WEB / f).read_text(), re.M))
+    assert not names("lists.js") & (names("profile.js") | names("app.js") | names("friends.js") | names("settings.js"))
