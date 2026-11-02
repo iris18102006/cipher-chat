@@ -1131,3 +1131,166 @@ def contacts(user=Depends(current_user), conn=Depends(get_conn)):
             }
         )
     return out
+
+
+@app.get("/api/messages/{peer_name}")
+def history(
+    peer_name: str,
+    before: int | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    peer = get_peer(conn, peer_name)
+    rows = conn.execute(
+        """
+        SELECT m.id, u.username AS sender, m.iv, m.ct, m.created_at,
+               m.delivered_at, m.read_at, m.hidden
+        FROM messages m JOIN users u ON u.id = m.sender_id
+        WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
+            OR (m.sender_id = :peer AND m.recipient_id = :me))
+          AND NOT (m.recipient_id = :me AND m.hidden != 0)
+          AND (:before IS NULL OR m.id < :before)
+        ORDER BY m.id DESC LIMIT :limit
+        """,
+        {"me": user["id"], "peer": peer["id"], "before": before, "limit": limit},
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "from": r["sender"],
+            "iv": r["iv"],
+            "ct": r["ct"],
+            "ts": r["created_at"],
+            "delivered": r["delivered_at"] is not None,
+            "read": r["read_at"] is not None,
+            # my own message that's still waiting for them to accept my request
+            "held": r["hidden"] == HELD and r["sender"] == user["username"],
+        }
+        for r in reversed(rows)
+    ]
+
+
+def message_rule(conn, me_id: int, peer_id: int) -> tuple[int, str]:
+    """Can I message them right now? Returns (hidden value to store, reason it's refused).
+
+    Friends can always talk. If I asked them to be friends and they haven't answered,
+    their setting decides: allow it, hold my messages until they accept, or make me wait.
+    """
+    status = friend_status(conn, me_id, peer_id)
+    if status in ("friends", "incoming"):
+        return 0, ""  # (incoming: they asked me, so answering them is always fine)
+    if status == "none":
+        return 0, "not_friends"
+    policy = conn.execute("SELECT msg_policy FROM users WHERE id = ?", (peer_id,)).fetchone()[0]
+    if policy == "wait":
+        return 0, "wait"
+    if policy == "ask":
+        held = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE sender_id = ? AND recipient_id = ? AND hidden = ?",
+            (me_id, peer_id, HELD),
+        ).fetchone()[0]
+        if held >= MAX_HELD:
+            return 0, "limit"
+        return HELD, ""
+    return 0, ""
+
+
+# ---------- websocket: presence, typing, live messages ----------
+
+
+def presence_audience(conn, user_id: int) -> set[str]:
+    """Only users with a social relationship should receive presence events."""
+    rows = conn.execute(
+        """
+        SELECT username FROM users WHERE id IN (
+            SELECT addressee_id FROM friendships WHERE requester_id = :me
+            UNION SELECT requester_id FROM friendships WHERE addressee_id = :me
+            UNION SELECT blocker_id FROM blocks WHERE blocked_id = :me
+        )
+        """,
+        {"me": user_id},
+    ).fetchall()
+    return {r["username"] for r in rows}
+
+
+class Manager:
+    """Tracks open sockets per username. One user can have several tabs."""
+
+    def __init__(self):
+        self.sockets: dict[str, set[WebSocket]] = defaultdict(set)
+
+    def is_online(self, username: str) -> bool:
+        return bool(self.sockets.get(username))
+
+    async def send_user(self, username: str, payload: dict) -> int:
+        sent = 0
+        for ws in list(self.sockets.get(username, ())):
+            try:
+                await ws.send_text(json.dumps(payload))
+                sent += 1
+            except Exception:
+                self.sockets[username].discard(ws)
+        return sent
+
+    async def send_many(self, usernames: set[str], payload: dict):
+        for name in usernames:
+            await self.send_user(name, payload)
+
+
+manager = Manager()
+
+
+def utc_now_sql(conn) -> str:
+    return conn.execute("SELECT datetime('now')").fetchone()[0]
+
+
+def same_origin(ws: WebSocket) -> bool:
+    origin = ws.headers.get("origin")
+    host = ws.headers.get("host")
+    if not origin or not host:
+        return False
+    return origin.split("://", 1)[-1] == host
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    # browsers don't apply same-origin rules to websockets, so check it ourselves
+    if not same_origin(ws):
+        await ws.close(code=4403)
+        return
+    conn = connect()
+    try:
+        user = user_from_token(conn, ws.cookies.get(COOKIE))
+        if not user:
+            await ws.close(code=4401)
+            return
+        await ws.accept()
+        me, my_id = user["username"], user["id"]
+
+        first_tab = not manager.is_online(me)
+        manager.sockets[me].add(ws)
+        if first_tab:
+            await manager.send_many(
+                presence_audience(conn, my_id) - blocked_names(conn, my_id) - {me},
+                {"type": "presence", "user": me, "online": True},
+            )
+
+        # anything sent while we were offline now counts as delivered
+        pending = conn.execute(
+            "SELECT m.id, u.username FROM messages m JOIN users u ON u.id = m.sender_id "
+            "WHERE m.recipient_id = ? AND m.delivered_at IS NULL AND m.hidden = 0",
+            (my_id,),
+        ).fetchall()
+        if pending:
+            conn.execute(
+                "UPDATE messages SET delivered_at = datetime('now') "
+                "WHERE recipient_id = ? AND delivered_at IS NULL AND hidden = 0",
+                (my_id,),
+            )
+            conn.commit()
+            for row in pending:
+                await manager.send_user(
+                    row["username"],
+                    {"type": "receipt", "id": row["id"], "status": "delivered"},
+                )
