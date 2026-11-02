@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cipher-chat - a place for friends</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <div id="top">
+    <h1>cipher-chat</h1>
+    <p>a place for friends. your messages are end-to-end encrypted.</p>
+  </div>
+  <p id="error"></p>
+  <div id="wrap">
+    <div class="box">
+      <h2>Member Login</h2>
+      <form id="login-form">
+        <label for="login-user">Username:</label>
+        <input id="login-user" name="username" type="text" autocomplete="username">
+        <label for="login-pass">Password:</label>
+        <input id="login-pass" name="password" type="password" autocomplete="current-password">
+        <button type="submit">Login</button>
+      </form>
+    </div>
+    <div class="box">
+      <h2>New here? Sign Up!</h2>
+      <form id="signup-form">
+        <label for="signup-user">Pick a username:</label>
+        <input id="signup-user" name="username" type="text" autocomplete="username">
+        <label for="signup-pass">Pick a password:</label>
+        <input id="signup-pass" name="password" type="password" autocomplete="new-password">
+        <p class="hint">username: 3-20 letters, numbers or _<br>password: at least 8 characters</p>
+        <button type="submit">Sign Up!</button>
+      </form>
+    </div>
+  </div>
+  <script src="login.js"></script>
+</body>
+</html>
