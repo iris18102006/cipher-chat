@@ -588,3 +588,98 @@ async function paintGroupInfo() {
       err.textContent = ex.message;
     }
   };
+
+  const parts = [];
+
+  if (iOwn) {
+    const row = el("div", "rename-row");
+    const input = el("input");
+    input.type = "text";
+    input.maxLength = GROUP_NAME_MAX;
+    input.value = d.name;
+    input.setAttribute("aria-label", "group name");
+    row.append(
+      input,
+      listButton("Rename", act(() => gapi("/api/groups/" + gid, "PUT", { name: input.value })))
+    );
+    parts.push(row);
+  }
+
+  const memberRows = d.members.map((m) => {
+    const tags = [m.owner ? "owner" : "", m.username === state.me ? "you" : ""].filter(Boolean).join(", ");
+    const buttons = [];
+    const changed = m.username !== state.me && m.pub && pubState(m.username, m.pub) === "changed";
+    if (changed) {
+      buttons.push(
+        listButton("Trust new key", async () => {
+          try {
+            localStorage.setItem(knownSlot(m.username), m.pub);
+          } catch {}
+          await loadContacts().catch(() => {});
+          await paintGroupPanel();
+        })
+      );
+    }
+    if (iOwn && m.username !== state.me) {
+      buttons.push(
+        listButton("Remove", () => {
+          if (!confirm("Remove " + shownName(m) + " from the group? A new key is made so they can't read anything new.")) return;
+          act(() => leaveOrRemove(gid, m.username))();
+        })
+      );
+    }
+    const row = personRow(m, tags, buttons);
+    const who = row.querySelector(".who");
+    if (changed) {
+      const warn = el("small", "key-changed", "their key changed since you first saw it. Check it with them before trusting it.");
+      who.append(warn);
+    }
+    if (m.pub) {
+      const fp = el("small", "fp-line", "");
+      fingerprintOf(m.pub).then((t) => (fp.textContent = "key " + t));
+      who.append(fp);
+    }
+    return row;
+  });
+  parts.push(listSection("Members (" + d.members.length + ")", memberRows, ""));
+
+  const inGroup = new Set(d.members.map((m) => m.username));
+  const addable = friendsToPick(inGroup);
+  if (addable.length) {
+    const picks = new Set();
+    const add = listButton("Add to group", act(async () => {
+      if (!picks.size) throw new Error("pick someone to add");
+      // one at a time: every new person means a new key
+      for (const u of [...picks]) await addToGroup(gid, u);
+    }));
+    parts.push(listSection("Add friends", addable.map((c) => pickRow(c, picks, pickNote(c))), ""), add);
+  }
+
+  parts.push(
+    el("p", "list-empty", "Messages are end-to-end encrypted. People you add can't read what was said before they joined, and people who leave can't read what comes after."),
+    listButton("Leave group", () => {
+      if (!confirm("Leave " + d.name + "?")) return;
+      act(async () => {
+        await leaveOrRemove(gid, state.me);
+        closeGroupPanel();
+      })();
+    }),
+    err
+  );
+  body.replaceChildren(...parts);
+}
+
+// ---------- wiring ----------
+
+$("new-group").onclick = () => openGroupPanel("new");
+$("group-info").onclick = () => state.openGroup != null && openGroupPanel("info", state.openGroup);
+$("groups-close").onclick = closeGroupPanel;
+$("groups-overlay").addEventListener("click", (e) => {
+  if (e.target === $("groups-overlay")) closeGroupPanel();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("groups-overlay").hidden) closeGroupPanel();
+});
+
+// this file can finish loading after the socket connected
+if (state.ws && state.ws.readyState === WebSocket.OPEN) loadGroups().catch(() => {});
