@@ -473,3 +473,14 @@
   height: 28px;
   padding: 0;
 }
+
+#ct-status {
+  min-height: 16px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #556;
+}
+
+#ct-status.bad {
+  color: #b00020;
+}
