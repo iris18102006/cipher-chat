@@ -1,0 +1,4 @@
+/* chat themes: how one conversation looks for you. Each .ct-<name> only sets the
+   --c-* colour variables, and style.css reads them (with the classic look as the
+   fallback). The names have to match CHAT_THEMES in backend/chat_themes.py.
+   The same classes style the little previews in the picker (.ct-swatch). */
