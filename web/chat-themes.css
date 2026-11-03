@@ -30,3 +30,31 @@
   --c-send-b: #e0701a;
   --c-send-text: #ffffff;
 }
+
+.ct-emo {
+  --c-log: #1b1b22;
+  --c-card: #26262f;
+  --c-text: #f1e9f5;
+  --c-muted: #a99bb5;
+  --c-head-a: #3a1d3f;
+  --c-head-b: #120912;
+  --c-head-text: #ffd1f0;
+  --c-head-sub: #d9a9cf;
+  --c-bar: #20202a;
+  --c-line: #6b3a63;
+  --c-me-a: #7a1f55;
+  --c-me-b: #4d1236;
+  --c-me-border: #ff2e93;
+  --c-me-text: #ffe6f4;
+  --c-them-a: #2e2e3a;
+  --c-them-b: #23232d;
+  --c-them-border: #6b3a63;
+  --c-them-text: #f1e9f5;
+  --c-accent: #ff2e93;
+  --c-in-bg: #14141b;
+  --c-in-text: #f1e9f5;
+  --c-in-border: #6b3a63;
+  --c-send-a: #ff2e93;
+  --c-send-b: #c21a6b;
+  --c-send-text: #ffffff;
+}
