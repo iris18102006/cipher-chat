@@ -29,3 +29,11 @@ def test_theme_is_private_to_you(client):
     b = make_user(client, "bob", "b")
     a.put("/api/chat-themes/dm/bob", json={"theme": "neon", "accent": "", "pattern": "grid"})
     assert b.get("/api/chat-themes").json() == {"dm": {}, "group": {}}
+
+
+def test_back_to_default_forgets_it(client):
+    a = signup(client, "alice")
+    signup(client, "bob")
+    a.put("/api/chat-themes/dm/bob", json={"theme": "emo", "accent": "", "pattern": "none"})
+    assert a.put("/api/chat-themes/dm/bob", json=DEFAULT).json() == DEFAULT
+    assert a.get("/api/chat-themes").json()["dm"] == {}
