@@ -99,7 +99,7 @@ This is a learning project, not Signal.
 - [x] Message requests and a settings page
 - [ ] Forward secrecy with a ratchet
 - [x] Group chats
-- [ ] Chat themes for each conversation
+- [x] Chat themes for each conversation
 - [x] Fix: unblocking someone does nothing
 - [x] Separate button for friend requests
 - [x] Separate button that lists who you blocked
