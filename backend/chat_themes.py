@@ -15,3 +15,11 @@ from .groups import get_group
 from .main import ACCENT_RE, current_user, get_conn, get_peer
 
 router = APIRouter()
+
+# the names have to match the .ct-* classes in web/chat-themes.css
+CHAT_THEMES = (
+    "classic", "emo", "kawaii", "neon", "forest",
+    "sunset", "gothic", "terminal", "ocean", "midnight",
+)
+CHAT_PATTERNS = ("none", "dots", "grid", "hearts", "stars")
+DEFAULT = {"theme": "classic", "accent": "", "pattern": "none"}
