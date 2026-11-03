@@ -81,3 +81,13 @@ def list_chat_themes(user=Depends(current_user), conn=Depends(get_conn)):
         "dm": {r["username"]: {k: r[k] for k in keys} for r in dm},
         "group": {str(r["target_id"]): {k: r[k] for k in keys} for r in rows},
     }
+
+
+@router.put("/api/chat-themes/dm/{username}")
+def set_dm_theme(
+    username: str, body: ChatThemeBody, user=Depends(current_user), conn=Depends(get_conn)
+):
+    peer = get_peer(conn, username)
+    if peer["id"] == user["id"]:
+        raise HTTPException(400, "you can't chat with yourself")
+    return save(conn, user["id"], "dm", peer["id"], clean(body))
