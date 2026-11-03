@@ -40,3 +40,22 @@ def clean(body: ChatThemeBody) -> dict:
     if accent and not ACCENT_RE.match(accent):
         raise HTTPException(400, "accent must look like #ff9933")
     return {"theme": body.theme, "accent": accent.lower(), "pattern": body.pattern}
+
+
+def save(conn, user_id: int, kind: str, target_id: int, look: dict) -> dict:
+    if look == DEFAULT:
+        # back to the normal look, so there's nothing to remember
+        conn.execute(
+            "DELETE FROM chat_themes WHERE user_id = ? AND kind = ? AND target_id = ?",
+            (user_id, kind, target_id),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO chat_themes (user_id, kind, target_id, theme, accent, pattern) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT (user_id, kind, target_id) DO UPDATE SET "
+            "theme = excluded.theme, accent = excluded.accent, pattern = excluded.pattern",
+            (user_id, kind, target_id, look["theme"], look["accent"], look["pattern"]),
+        )
+    conn.commit()
+    return look
