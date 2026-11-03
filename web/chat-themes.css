@@ -226,3 +226,31 @@
   --c-send-b: #d1ae14;
   --c-send-text: #000000;
 }
+
+.ct-ocean {
+  --c-log: #e6f4fa;
+  --c-card: #f4fbfe;
+  --c-text: #0b2f45;
+  --c-muted: #4f7a8f;
+  --c-head-a: #2aa6c9;
+  --c-head-b: #0b6a8f;
+  --c-head-text: #ffffff;
+  --c-head-sub: #d6f1fa;
+  --c-bar: #d3ebf5;
+  --c-line: #7ab8d1;
+  --c-me-a: #c9f3ee;
+  --c-me-b: #8fe3d8;
+  --c-me-border: #00b3a4;
+  --c-me-text: #063a36;
+  --c-them-a: #ffffff;
+  --c-them-b: #d4edf7;
+  --c-them-border: #7ab8d1;
+  --c-them-text: #0b2f45;
+  --c-accent: #00b3a4;
+  --c-in-bg: #ffffff;
+  --c-in-text: #0b2f45;
+  --c-in-border: #7ab8d1;
+  --c-send-a: #00b3a4;
+  --c-send-b: #008578;
+  --c-send-text: #ffffff;
+}
