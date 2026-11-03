@@ -354,9 +354,15 @@ async def remove_member(gid: int, username: str, user=Depends(current_user), con
         "DELETE FROM chat_group_members WHERE group_id = ? AND user_id = ?", (gid, target["id"])
     )
     conn.execute("DELETE FROM chat_group_keys WHERE group_id = ? AND user_id = ?", (gid, target["id"]))
+    # their look for this group goes with them
+    conn.execute(
+        "DELETE FROM chat_themes WHERE kind = 'group' AND target_id = ? AND user_id = ?",
+        (gid, target["id"]),
+    )
     left = members_of(conn, gid)
     if not left:
         conn.execute("DELETE FROM chat_groups WHERE id = ?", (gid,))
+        conn.execute("DELETE FROM chat_themes WHERE kind = 'group' AND target_id = ?", (gid,))
         conn.commit()
         await manager.send_user(target["username"], {"type": "group", "event": "removed", "group": gid})
         return {"deleted": True}
