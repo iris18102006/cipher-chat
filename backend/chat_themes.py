@@ -23,3 +23,9 @@ CHAT_THEMES = (
 )
 CHAT_PATTERNS = ("none", "dots", "grid", "hearts", "stars")
 DEFAULT = {"theme": "classic", "accent": "", "pattern": "none"}
+
+
+class ChatThemeBody(BaseModel):
+    theme: str = "classic"
+    accent: str = ""
+    pattern: str = "none"
