@@ -59,3 +59,25 @@ def save(conn, user_id: int, kind: str, target_id: int, look: dict) -> dict:
         )
     conn.commit()
     return look
+
+
+@router.get("/api/chat-themes")
+def list_chat_themes(user=Depends(current_user), conn=Depends(get_conn)):
+    """Every look you've set, keyed by username (1:1 chats) or group id (groups)."""
+    dm = conn.execute(
+        "SELECT u.username, t.theme, t.accent, t.pattern FROM chat_themes t "
+        "JOIN users u ON u.id = t.target_id WHERE t.user_id = ? AND t.kind = 'dm'",
+        (user["id"],),
+    ).fetchall()
+    # only groups you're still in
+    rows = conn.execute(
+        "SELECT t.target_id, t.theme, t.accent, t.pattern FROM chat_themes t "
+        "JOIN chat_group_members m ON m.group_id = t.target_id AND m.user_id = t.user_id "
+        "WHERE t.user_id = ? AND t.kind = 'group'",
+        (user["id"],),
+    ).fetchall()
+    keys = ("theme", "accent", "pattern")
+    return {
+        "dm": {r["username"]: {k: r[k] for k in keys} for r in dm},
+        "group": {str(r["target_id"]): {k: r[k] for k in keys} for r in rows},
+    }
