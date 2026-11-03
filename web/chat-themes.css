@@ -323,3 +323,10 @@
   background-image: radial-gradient(color-mix(in srgb, var(--c-accent, #ff9933) 40%, transparent) 1.5px, transparent 1.5px);
   background-size: 16px 16px;
 }
+
+#chat-pane.cp-grid::before {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--c-accent, #ff9933) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--c-accent, #ff9933) 22%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
