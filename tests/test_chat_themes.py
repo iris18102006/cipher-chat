@@ -45,3 +45,17 @@ def test_changing_it_again_replaces_it(client):
     a.put("/api/chat-themes/dm/bob", json={"theme": "emo", "accent": "", "pattern": "none"})
     a.put("/api/chat-themes/dm/bob", json={"theme": "ocean", "accent": "#112233", "pattern": "dots"})
     assert a.get("/api/chat-themes").json()["dm"]["bob"]["theme"] == "ocean"
+
+
+def test_rejects_bad_values(client):
+    a = signup(client, "alice")
+    signup(client, "bob")
+    bad = [
+        {"theme": "<script>", "accent": "", "pattern": "none"},
+        {"theme": "classic", "accent": "red", "pattern": "none"},
+        {"theme": "classic", "accent": "url(x)", "pattern": "none"},
+        {"theme": "classic", "accent": "", "pattern": "svg"},
+    ]
+    for body in bad:
+        assert a.put("/api/chat-themes/dm/bob", json=body).status_code == 400, body
+    assert a.get("/api/chat-themes").json()["dm"] == {}
