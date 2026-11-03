@@ -44,3 +44,34 @@ async function loadChatThemes() {
   chatThemes.group = all.group || {};
   applyChatTheme();
 }
+
+async function saveChatLook(look) {
+  const open = state.openGroup != null ? "g" + state.openGroup : "d" + state.open;
+  const store = state.openGroup != null ? chatThemes.group : chatThemes.dm;
+  const key = state.openGroup != null ? String(state.openGroup) : state.open;
+  const before = store[key];
+  // show it straight away, then ask the server; put it back if that fails
+  if (look.theme === "classic" && !look.accent && look.pattern === "none") delete store[key];
+  else store[key] = look;
+  applyChatTheme();
+  renderChatThemePicker();
+  try {
+    await api(chatThemeUrl(), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(look),
+    });
+    $("ct-status").textContent = "saved";
+    $("ct-status").className = "";
+  } catch {
+    const still = (state.openGroup != null ? "g" + state.openGroup : "d" + state.open) === open;
+    if (before) store[key] = before;
+    else delete store[key];
+    if (still) {
+      applyChatTheme();
+      renderChatThemePicker();
+    }
+    $("ct-status").textContent = "couldn't save that, try again";
+    $("ct-status").className = "bad";
+  }
+}
