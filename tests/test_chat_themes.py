@@ -37,3 +37,11 @@ def test_back_to_default_forgets_it(client):
     a.put("/api/chat-themes/dm/bob", json={"theme": "emo", "accent": "", "pattern": "none"})
     assert a.put("/api/chat-themes/dm/bob", json=DEFAULT).json() == DEFAULT
     assert a.get("/api/chat-themes").json()["dm"] == {}
+
+
+def test_changing_it_again_replaces_it(client):
+    a = signup(client, "alice")
+    signup(client, "bob")
+    a.put("/api/chat-themes/dm/bob", json={"theme": "emo", "accent": "", "pattern": "none"})
+    a.put("/api/chat-themes/dm/bob", json={"theme": "ocean", "accent": "#112233", "pattern": "dots"})
+    assert a.get("/api/chat-themes").json()["dm"]["bob"]["theme"] == "ocean"
