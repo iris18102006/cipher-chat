@@ -282,3 +282,13 @@
   --c-send-b: #4766e6;
   --c-send-text: #ffffff;
 }
+
+/* a colour you picked yourself: your bubbles, the send button and the typing dots
+   follow it. Has to come after the themes so it wins. */
+.ct-accent {
+  --c-me-a: color-mix(in srgb, var(--c-accent) 28%, var(--c-card));
+  --c-me-b: color-mix(in srgb, var(--c-accent) 48%, var(--c-card));
+  --c-me-border: color-mix(in srgb, var(--c-accent) 75%, #000);
+  --c-send-a: var(--c-accent);
+  --c-send-b: color-mix(in srgb, var(--c-accent) 75%, #000);
+}
