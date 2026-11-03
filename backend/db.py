@@ -145,6 +145,18 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_group_messages_group
                 ON chat_group_messages (group_id, id);
+            -- how each person wants one conversation to look. Only for them: the other
+            -- people in the chat keep their own look. target_id is the other user's id
+            -- (kind 'dm') or a group's id (kind 'group').
+            CREATE TABLE IF NOT EXISTS chat_themes (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL CHECK (kind IN ('dm', 'group')),
+                target_id INTEGER NOT NULL,
+                theme TEXT NOT NULL DEFAULT 'classic',
+                accent TEXT NOT NULL DEFAULT '',
+                pattern TEXT NOT NULL DEFAULT 'none',
+                PRIMARY KEY (user_id, kind, target_id)
+            );
             """
         )
         # added after the first version, so migrate old databases in place
