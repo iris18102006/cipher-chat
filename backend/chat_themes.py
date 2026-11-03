@@ -91,3 +91,11 @@ def set_dm_theme(
     if peer["id"] == user["id"]:
         raise HTTPException(400, "you can't chat with yourself")
     return save(conn, user["id"], "dm", peer["id"], clean(body))
+
+
+@router.put("/api/chat-themes/group/{gid}")
+def set_group_theme(
+    gid: int, body: ChatThemeBody, user=Depends(current_user), conn=Depends(get_conn)
+):
+    get_group(conn, gid, user)  # 404 unless you're a member
+    return save(conn, user["id"], "group", gid, clean(body))
