@@ -254,3 +254,31 @@
   --c-send-b: #008578;
   --c-send-text: #ffffff;
 }
+
+.ct-midnight {
+  --c-log: #0f1424;
+  --c-card: #181f36;
+  --c-text: #dfe6ff;
+  --c-muted: #8793bd;
+  --c-head-a: #27325f;
+  --c-head-b: #10162d;
+  --c-head-text: #dfe6ff;
+  --c-head-sub: #9fb0ee;
+  --c-bar: #131a30;
+  --c-line: #33406e;
+  --c-me-a: #2f4290;
+  --c-me-b: #233170;
+  --c-me-border: #6c8cff;
+  --c-me-text: #eef1ff;
+  --c-them-a: #1d2542;
+  --c-them-b: #171e38;
+  --c-them-border: #33406e;
+  --c-them-text: #dfe6ff;
+  --c-accent: #6c8cff;
+  --c-in-bg: #0b1020;
+  --c-in-text: #dfe6ff;
+  --c-in-border: #33406e;
+  --c-send-a: #6c8cff;
+  --c-send-b: #4766e6;
+  --c-send-text: #ffffff;
+}
