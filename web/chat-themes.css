@@ -86,3 +86,31 @@
   --c-send-b: #ff6fb5;
   --c-send-text: #ffffff;
 }
+
+.ct-neon {
+  --c-log: #08051a;
+  --c-card: #120a2e;
+  --c-text: #e8fbff;
+  --c-muted: #7fb7c9;
+  --c-head-a: #2d0a6b;
+  --c-head-b: #0a1a4a;
+  --c-head-text: #00f0ff;
+  --c-head-sub: #7fe9f5;
+  --c-bar: #0c0722;
+  --c-line: #00f0ff;
+  --c-me-a: #0f3d1a;
+  --c-me-b: #0a2a12;
+  --c-me-border: #39ff14;
+  --c-me-text: #e8fbff;
+  --c-them-a: #1a0f45;
+  --c-them-b: #120a2e;
+  --c-them-border: #00f0ff;
+  --c-them-text: #e8fbff;
+  --c-accent: #39ff14;
+  --c-in-bg: #05030f;
+  --c-in-text: #e8fbff;
+  --c-in-border: #00f0ff;
+  --c-send-a: #39ff14;
+  --c-send-b: #1fc20a;
+  --c-send-text: #05030f;
+}
