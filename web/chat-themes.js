@@ -147,3 +147,13 @@ function renderChatThemePicker() {
   st.className = status.c;
   body.append(st);
 }
+
+function openChatThemePicker() {
+  if (state.open == null && state.openGroup == null) return;
+  renderChatThemePicker();
+  $("ct-overlay").hidden = false;
+}
+
+function closeChatThemePicker() {
+  $("ct-overlay").hidden = true;
+}
