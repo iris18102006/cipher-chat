@@ -157,3 +157,12 @@ function openChatThemePicker() {
 function closeChatThemePicker() {
   $("ct-overlay").hidden = true;
 }
+
+$("chat-theme").onclick = openChatThemePicker;
+$("ct-close").onclick = closeChatThemePicker;
+$("ct-overlay").addEventListener("mousedown", (e) => {
+  if (e.target === $("ct-overlay")) closeChatThemePicker();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("ct-overlay").hidden) closeChatThemePicker();
+});
