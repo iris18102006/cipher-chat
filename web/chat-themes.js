@@ -22,3 +22,18 @@ function chatThemeUrl() {
     ? "/api/chat-themes/group/" + state.openGroup
     : "/api/chat-themes/dm/" + encodeURIComponent(state.open);
 }
+
+// put the look on the chat pane (only names from our own lists ever become classes)
+function applyChatTheme() {
+  const pane = $("chat-pane");
+  const look = currentChatLook();
+  for (const c of [...pane.classList]) if (c.startsWith("ct-") || c.startsWith("cp-")) pane.classList.remove(c);
+  if (CHAT_THEMES.some(([n]) => n === look.theme)) pane.classList.add("ct-" + look.theme);
+  if (CHAT_PATTERNS.some(([n]) => n === look.pattern) && look.pattern !== "none") pane.classList.add("cp-" + look.pattern);
+  if (/^#[0-9a-f]{6}$/i.test(look.accent)) {
+    pane.classList.add("ct-accent");
+    pane.style.setProperty("--c-accent", look.accent);
+  } else {
+    pane.style.removeProperty("--c-accent");
+  }
+}
