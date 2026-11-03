@@ -20,6 +20,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Friend requests (send, accept, decline, cancel, unfriend) with a popup when one arrives
 - Blocking: a blocked person can't message you, can't see when you're online and can't see your profile
 - Group chats: make a group from your friends, up to 30 people. Messages are end-to-end encrypted for the whole group, typing shows who is writing, your own messages say "seen by", and the Members panel lets you rename, add friends, remove people (owner) or leave
+- Chat themes: every conversation (1:1 or group) can have its own look, picked from the Theme button in the chat header: 10 themes, 5 background patterns and an accent colour. It's saved per person on the server, so nobody else sees or changes what you picked. Only fixed names and a hex colour are ever stored, never free text
 - Works on phones (one panel at a time)
 
 ## How it works
