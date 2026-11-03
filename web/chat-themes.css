@@ -347,3 +347,22 @@
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%208l4.2%209.6%2010.4%201-7.9%206.9%202.3%2010.2L24%2030.4l-9%205.3%202.3-10.2-7.9-6.9%2010.4-1z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%208l4.2%209.6%2010.4%201-7.9%206.9%202.3%2010.2L24%2030.4l-9%205.3%202.3-10.2-7.9-6.9%2010.4-1z'/%3E%3C/svg%3E");
 }
+
+/* ---------- the picker ---------- */
+
+#ct-body fieldset {
+  margin: 0 0 12px;
+  padding: 8px 10px 10px;
+  border: 1px solid #7f9db9;
+}
+
+#ct-body legend {
+  padding: 0 6px;
+  font-weight: bold;
+  color: #17407f;
+}
+
+#ct-body .ct-for {
+  margin: 0 0 10px;
+  color: #556;
+}
