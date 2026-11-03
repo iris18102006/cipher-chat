@@ -83,3 +83,67 @@ function chatThemeButton(cls, label, pressed, onClick) {
   b.onclick = onClick;
   return b;
 }
+
+function renderChatThemePicker() {
+  const body = $("ct-body");
+  const look = currentChatLook();
+  const status = $("ct-status") ? { t: $("ct-status").textContent, c: $("ct-status").className } : { t: "", c: "" };
+  body.replaceChildren();
+
+  const who = state.openGroup != null ? state.groups.get(state.openGroup)?.name : state.contacts.get(state.open) && shownName(state.contacts.get(state.open));
+  body.append(el("p", "ct-for", "How this chat looks for you" + (who ? " (" + who + ")" : "") + ". Nobody else sees it."));
+
+  const themes = el("fieldset");
+  themes.append(el("legend", "", "Theme"));
+  const grid = el("div", "ct-grid");
+  for (const [name, label] of CHAT_THEMES) {
+    const b = chatThemeButton("ct-swatch ct-" + name, "", look.theme === name, () => saveChatLook({ ...look, theme: name }));
+    const head = el("span", "sw-head");
+    const log = el("span", "sw-log");
+    log.append(el("span", "sw-b them"), el("span", "sw-b me"));
+    b.append(head, log, el("span", "sw-name", label));
+    grid.append(b);
+  }
+  themes.append(grid);
+  body.append(themes);
+
+  const pats = el("fieldset");
+  pats.append(el("legend", "", "Background"));
+  const chips = el("div", "ct-chips");
+  for (const [name, label] of CHAT_PATTERNS) {
+    chips.append(chatThemeButton("ct-chip", label, look.pattern === name, () => saveChatLook({ ...look, pattern: name })));
+  }
+  pats.append(chips);
+  body.append(pats);
+
+  const acc = el("fieldset");
+  acc.append(el("legend", "", "Accent colour"));
+  const dots = el("div", "ct-chips");
+  dots.append(chatThemeButton("ct-chip", "Theme's own", !look.accent, () => saveChatLook({ ...look, accent: "" })));
+  for (const c of CHAT_ACCENTS) {
+    const d = chatThemeButton("ct-dot", "", look.accent === c, () => saveChatLook({ ...look, accent: c }));
+    d.style.background = c;
+    d.title = c;
+    d.setAttribute("aria-label", "accent " + c);
+    dots.append(d);
+  }
+  acc.append(dots);
+  const row = el("div", "ct-accent-row");
+  const picker = el("input");
+  picker.type = "color";
+  picker.value = look.accent || "#ff9933";
+  picker.setAttribute("aria-label", "pick your own accent colour");
+  picker.onchange = () => saveChatLook({ ...look, accent: picker.value.toLowerCase() });
+  row.append(picker, el("span", "", "or pick your own"));
+  acc.append(row);
+  body.append(acc);
+
+  const reset = el("button", "", "Back to the normal look");
+  reset.type = "button";
+  reset.onclick = () => saveChatLook({ ...CHAT_DEFAULT });
+  body.append(reset);
+  const st = el("p", "", status.t);
+  st.id = "ct-status";
+  st.className = status.c;
+  body.append(st);
+}
