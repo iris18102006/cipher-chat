@@ -75,3 +75,11 @@ async function saveChatLook(look) {
     $("ct-status").className = "bad";
   }
 }
+
+function chatThemeButton(cls, label, pressed, onClick) {
+  const b = el("button", cls, label);
+  b.type = "button";
+  b.setAttribute("aria-pressed", pressed ? "true" : "false");
+  b.onclick = onClick;
+  return b;
+}
