@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="profile.css">
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="chat-themes.css">
 </head>
 <body>
   <header id="top">
@@ -51,6 +52,7 @@
             <div id="chat-name"></div>
             <div id="chat-status"></div>
           </div>
+          <button id="chat-theme" type="button" title="change how this chat looks for you">Theme</button>
           <button id="group-info" type="button" hidden>Members</button>
           <button id="view-profile" type="button">Profile</button>
           <button id="verify" type="button">Verify keys</button>
@@ -110,6 +112,17 @@
     </div>
   </div>
 
+  <!-- how this chat looks for you, filled in by chat-themes.js -->
+  <div id="ct-overlay" hidden>
+    <div id="ct-card" role="dialog" aria-modal="true" aria-labelledby="ct-title">
+      <div id="ct-bar">
+        <span id="ct-title">Chat theme</span>
+        <button id="ct-close" type="button" aria-label="close chat theme">&times;</button>
+      </div>
+      <div id="ct-body"></div>
+    </div>
+  </div>
+
   <!-- settings, filled in by settings.js -->
   <div id="settings-overlay" hidden>
     <div id="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -140,5 +153,6 @@
   <script src="settings.js"></script>
   <script src="lists.js"></script>
   <script src="groups.js"></script>
+  <script src="chat-themes.js"></script>
 </body>
 </html>
