@@ -2,3 +2,31 @@
    --c-* colour variables, and style.css reads them (with the classic look as the
    fallback). The names have to match CHAT_THEMES in backend/chat_themes.py.
    The same classes style the little previews in the picker (.ct-swatch). */
+
+.ct-classic {
+  --c-log: #fafcff;
+  --c-card: #ffffff;
+  --c-text: #111111;
+  --c-muted: #666677;
+  --c-head-a: #2a5da8;
+  --c-head-b: #17407f;
+  --c-head-text: #ffffff;
+  --c-head-sub: #cfe0ff;
+  --c-bar: #eef3fb;
+  --c-line: #c5d4ea;
+  --c-me-a: #ffe2c0;
+  --c-me-b: #ffc98a;
+  --c-me-border: #e0701a;
+  --c-me-text: #111111;
+  --c-them-a: #ffffff;
+  --c-them-b: #dfeaf9;
+  --c-them-border: #7f9db9;
+  --c-them-text: #111111;
+  --c-accent: #ff9933;
+  --c-in-bg: #ffffff;
+  --c-in-text: #111111;
+  --c-in-border: #7f9db9;
+  --c-send-a: #ff9933;
+  --c-send-b: #e0701a;
+  --c-send-text: #ffffff;
+}
