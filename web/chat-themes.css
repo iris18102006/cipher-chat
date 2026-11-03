@@ -318,3 +318,8 @@
   z-index: 0;
   pointer-events: none;
 }
+
+#chat-pane.cp-dots::before {
+  background-image: radial-gradient(color-mix(in srgb, var(--c-accent, #ff9933) 40%, transparent) 1.5px, transparent 1.5px);
+  background-size: 16px 16px;
+}
