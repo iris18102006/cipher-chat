@@ -37,3 +37,10 @@ function applyChatTheme() {
     pane.style.removeProperty("--c-accent");
   }
 }
+
+async function loadChatThemes() {
+  const all = await api("/api/chat-themes");
+  chatThemes.dm = all.dm || {};
+  chatThemes.group = all.group || {};
+  applyChatTheme();
+}
