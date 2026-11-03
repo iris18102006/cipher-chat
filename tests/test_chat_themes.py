@@ -22,3 +22,10 @@ def test_set_and_read_dm_theme(client):
     assert r.status_code == 200
     assert r.json() == {"theme": "gothic", "accent": "#b3122a", "pattern": "hearts"}
     assert a.get("/api/chat-themes").json()["dm"] == {"bob": r.json()}
+
+
+def test_theme_is_private_to_you(client):
+    a = make_user(client, "alice", "a")
+    b = make_user(client, "bob", "b")
+    a.put("/api/chat-themes/dm/bob", json={"theme": "neon", "accent": "", "pattern": "grid"})
+    assert b.get("/api/chat-themes").json() == {"dm": {}, "group": {}}
