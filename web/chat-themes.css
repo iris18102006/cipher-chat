@@ -342,3 +342,8 @@
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%2038S10%2030%2010%2020c0-5%204-8%207.5-8%203%200%205%201.8%206.5%204%201.5-2.2%203.5-4%206.5-4C34%2012%2038%2015%2038%2020c0%2010-14%2018-14%2018z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%2038S10%2030%2010%2020c0-5%204-8%207.5-8%203%200%205%201.8%206.5%204%201.5-2.2%203.5-4%206.5-4C34%2012%2038%2015%2038%2020c0%2010-14%2018-14%2018z'/%3E%3C/svg%3E");
 }
+
+#chat-pane.cp-stars::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%208l4.2%209.6%2010.4%201-7.9%206.9%202.3%2010.2L24%2030.4l-9%205.3%202.3-10.2-7.9-6.9%2010.4-1z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24%208l4.2%209.6%2010.4%201-7.9%206.9%202.3%2010.2L24%2030.4l-9%205.3%202.3-10.2-7.9-6.9%2010.4-1z'/%3E%3C/svg%3E");
+}
