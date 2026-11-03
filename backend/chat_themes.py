@@ -29,3 +29,14 @@ class ChatThemeBody(BaseModel):
     theme: str = "classic"
     accent: str = ""
     pattern: str = "none"
+
+
+def clean(body: ChatThemeBody) -> dict:
+    if body.theme not in CHAT_THEMES:
+        raise HTTPException(400, "unknown theme")
+    if body.pattern not in CHAT_PATTERNS:
+        raise HTTPException(400, "unknown pattern")
+    accent = body.accent.strip()
+    if accent and not ACCENT_RE.match(accent):
+        raise HTTPException(400, "accent must look like #ff9933")
+    return {"theme": body.theme, "accent": accent.lower(), "pattern": body.pattern}
