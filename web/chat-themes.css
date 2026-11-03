@@ -372,3 +372,60 @@
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 8px;
 }
+
+.ct-swatch {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  font-weight: normal;
+  text-align: center;
+  border: 2px solid #7f9db9;
+  background: var(--c-log);
+  color: var(--c-text);
+  cursor: pointer;
+}
+
+.ct-swatch[aria-pressed="true"] {
+  border-color: #ff9933;
+  box-shadow: 0 0 0 2px #ff9933;
+}
+
+.ct-swatch .sw-head {
+  height: 12px;
+  background: linear-gradient(var(--c-head-a), var(--c-head-b));
+}
+
+.ct-swatch .sw-log {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 5px;
+  background: var(--c-log);
+}
+
+.ct-swatch .sw-b {
+  display: block;
+  width: 62%;
+  height: 8px;
+  border-radius: 5px;
+  border: 1px solid;
+}
+
+.ct-swatch .sw-b.them {
+  background: linear-gradient(var(--c-them-a), var(--c-them-b));
+  border-color: var(--c-them-border);
+}
+
+.ct-swatch .sw-b.me {
+  align-self: flex-end;
+  background: linear-gradient(var(--c-me-a), var(--c-me-b));
+  border-color: var(--c-me-border);
+}
+
+.ct-swatch .sw-name {
+  padding: 3px 2px;
+  font-size: 11px;
+  background: var(--c-bar);
+  color: var(--c-text);
+}
