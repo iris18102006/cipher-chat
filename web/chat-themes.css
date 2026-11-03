@@ -297,3 +297,24 @@
 #chat-pane.ct-terminal #msg {
   font-family: "Courier New", monospace;
 }
+
+/* ---------- background patterns ----------
+   drawn on a layer behind the messages (the header and the composer cover it) */
+
+#chat-pane {
+  position: relative;
+  background: var(--c-log, #fafcff);
+}
+
+#chat-pane > * {
+  position: relative;
+  z-index: 1;
+}
+
+#chat-pane::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
