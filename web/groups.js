@@ -239,6 +239,7 @@ async function openGroupChat(gid) {
   stopTyping();
   state.open = null;
   state.openGroup = gid;
+  applyChatTheme();
   document.body.classList.add("in-chat");
   $("chat-empty").hidden = true;
   $("chat-pane").hidden = false;
