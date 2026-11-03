@@ -58,3 +58,31 @@
   --c-send-b: #c21a6b;
   --c-send-text: #ffffff;
 }
+
+.ct-kawaii {
+  --c-log: #ffeaf4;
+  --c-card: #fff8fc;
+  --c-text: #5a2d4a;
+  --c-muted: #a0708f;
+  --c-head-a: #ffb3d9;
+  --c-head-b: #ff8ec7;
+  --c-head-text: #ffffff;
+  --c-head-sub: #fff0f8;
+  --c-bar: #fff0f8;
+  --c-line: #ffb3d9;
+  --c-me-a: #ffd1e8;
+  --c-me-b: #ffb3d9;
+  --c-me-border: #ff6fb5;
+  --c-me-text: #5a2d4a;
+  --c-them-a: #ffffff;
+  --c-them-b: #ffeaf4;
+  --c-them-border: #ffb3d9;
+  --c-them-text: #5a2d4a;
+  --c-accent: #ff6fb5;
+  --c-in-bg: #ffffff;
+  --c-in-text: #5a2d4a;
+  --c-in-border: #ffb3d9;
+  --c-send-a: #ff8ec7;
+  --c-send-b: #ff6fb5;
+  --c-send-text: #ffffff;
+}
