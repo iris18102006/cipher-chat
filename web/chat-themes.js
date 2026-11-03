@@ -11,3 +11,14 @@ const CHAT_ACCENTS = ["#ff9933", "#ff2e93", "#b3122a", "#39ff14", "#00b3a4", "#2
 const CHAT_DEFAULT = { theme: "classic", accent: "", pattern: "none" };
 
 const chatThemes = { dm: {}, group: {} };
+
+function currentChatLook() {
+  const mine = state.openGroup != null ? chatThemes.group[String(state.openGroup)] : chatThemes.dm[state.open];
+  return mine || CHAT_DEFAULT;
+}
+
+function chatThemeUrl() {
+  return state.openGroup != null
+    ? "/api/chat-themes/group/" + state.openGroup
+    : "/api/chat-themes/dm/" + encodeURIComponent(state.open);
+}
