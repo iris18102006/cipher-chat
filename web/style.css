@@ -294,8 +294,8 @@ h2 {
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
-  color: #fff;
-  background: linear-gradient(var(--blue-light), var(--blue));
+  color: var(--c-head-text, #fff);
+  background: linear-gradient(var(--c-head-a, var(--blue-light)), var(--c-head-b, var(--blue)));
 }
 
 #chat-head > div {
@@ -310,7 +310,7 @@ h2 {
 
 #chat-status {
   font-size: 10px;
-  color: #cfe0ff;
+  color: var(--c-head-sub, #cfe0ff);
 }
 
 #chat-status.online {
@@ -360,7 +360,7 @@ h2 {
   min-height: 0;
   overflow-y: auto;
   padding: 10px;
-  background: #fafcff;
+  color: var(--c-text, inherit);
 }
 
 #older {
@@ -374,7 +374,7 @@ h2 {
   margin: 12px auto 6px;
   text-align: center;
   font-size: 10px;
-  color: var(--muted);
+  color: var(--c-muted, var(--muted));
 }
 
 .day::before,
@@ -383,7 +383,7 @@ h2 {
   display: inline-block;
   width: 40px;
   margin: 0 8px;
-  border-top: 1px solid #c5d4ea;
+  border-top: 1px solid var(--c-line, #c5d4ea);
   vertical-align: middle;
 }
 
@@ -407,15 +407,17 @@ h2 {
 
 .msg.me {
   margin-left: auto;
-  background: linear-gradient(#ffe2c0, #ffc98a);
-  border-color: var(--orange-dark);
+  color: var(--c-me-text, inherit);
+  background: linear-gradient(var(--c-me-a, #ffe2c0), var(--c-me-b, #ffc98a));
+  border-color: var(--c-me-border, var(--orange-dark));
   border-bottom-right-radius: 3px;
 }
 
 .msg.them {
   margin-right: auto;
-  background: linear-gradient(#fff, #dfeaf9);
-  border-color: var(--line);
+  color: var(--c-them-text, inherit);
+  background: linear-gradient(var(--c-them-a, #fff), var(--c-them-b, #dfeaf9));
+  border-color: var(--c-them-border, var(--line));
   border-bottom-left-radius: 3px;
 }
 
@@ -434,7 +436,7 @@ h2 {
   gap: 8px;
   margin-top: 3px;
   font-size: 9px;
-  color: var(--muted);
+  color: var(--c-muted, var(--muted));
 }
 
 .tick.read {
@@ -447,8 +449,7 @@ h2 {
 #typing {
   padding: 4px 12px;
   font-size: 11px;
-  color: var(--muted);
-  background: #fafcff;
+  color: var(--c-muted, var(--muted));
 }
 
 #typing span {
@@ -457,7 +458,7 @@ h2 {
   height: 6px;
   margin-right: 2px;
   border-radius: 50%;
-  background: var(--blue-light);
+  background: var(--c-accent, var(--blue-light));
   animation: bounce 1.2s infinite ease-in-out;
 }
 
@@ -486,15 +487,17 @@ h2 {
   display: flex;
   gap: 8px;
   padding: 8px;
-  background: var(--mist);
-  border-top: 1px solid #c5d4ea;
+  background: var(--c-bar, var(--mist));
+  border-top: 1px solid var(--c-line, #c5d4ea);
 }
 
 #msg {
   flex: 1;
   resize: none;
   padding: 6px;
-  border: 1px solid var(--line);
+  color: var(--c-in-text, inherit);
+  background: var(--c-in-bg, #fff);
+  border: 1px solid var(--c-in-border, var(--line));
   font: inherit;
   max-height: 120px;
 }
@@ -506,13 +509,13 @@ h2 {
 #send {
   align-self: flex-end;
   padding: 6px 18px;
-  color: #fff;
-  background: linear-gradient(var(--orange), var(--orange-dark));
-  border-color: var(--orange-dark);
+  color: var(--c-send-text, #fff);
+  background: linear-gradient(var(--c-send-a, var(--orange)), var(--c-send-b, var(--orange-dark)));
+  border-color: var(--c-send-b, var(--orange-dark));
 }
 
 #send:hover:not(:disabled) {
-  background: linear-gradient(#ffb15e, var(--orange));
+  background: linear-gradient(color-mix(in srgb, var(--c-send-a, var(--orange)) 80%, #fff), var(--c-send-a, var(--orange)));
 }
 
 /* ---------- phones: one panel at a time ---------- */
@@ -659,7 +662,8 @@ h2 {
 
 #settings-overlay,
 #lists-overlay,
-#groups-overlay {
+#groups-overlay,
+#ct-overlay {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -673,7 +677,8 @@ h2 {
 
 #settings-card,
 #lists-card,
-#groups-card {
+#groups-card,
+#ct-card {
   width: 100%;
   max-width: 480px;
   background: #fff;
@@ -683,7 +688,8 @@ h2 {
 
 #settings-bar,
 #lists-bar,
-#groups-bar {
+#groups-bar,
+#ct-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -697,7 +703,8 @@ h2 {
 
 #settings-close,
 #lists-close,
-#groups-close {
+#groups-close,
+#ct-close {
   padding: 0 8px;
   font-size: 16px;
   line-height: 20px;
@@ -705,7 +712,8 @@ h2 {
 
 #settings-body,
 #lists-body,
-#groups-body {
+#groups-body,
+#ct-body {
   padding: 12px;
 }
 
@@ -866,7 +874,7 @@ h2 {
   margin-bottom: 2px;
   font-size: 10px;
   font-weight: bold;
-  color: var(--blue-light);
+  color: var(--c-accent, var(--blue-light));
 }
 
 #groups-body input[type="text"] {
