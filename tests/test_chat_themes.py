@@ -78,3 +78,19 @@ def test_group_theme_for_members_only(client):
     assert c.put(f"/api/chat-themes/group/{gid}", json=look).status_code == 404
     assert d.put(f"/api/chat-themes/group/{gid}", json=look).status_code == 404
     assert d.put("/api/chat-themes/group/9999", json=look).status_code == 404
+
+
+def test_leaving_a_group_drops_its_theme(client):
+    from backend import db
+
+    a, b, _ = trio(client)
+    gid = new_group(a, members=("bob",))["id"]
+    b.put(f"/api/chat-themes/group/{gid}", json={"theme": "forest", "accent": "", "pattern": "dots"})
+    assert b.delete(f"/api/groups/{gid}/members/bob").status_code == 200
+    assert b.get("/api/chat-themes").json()["group"] == {}
+    conn = db.connect()
+    try:
+        left = conn.execute("SELECT COUNT(*) FROM chat_themes WHERE kind = 'group'").fetchone()[0]
+    finally:
+        conn.close()
+    assert left == 0
