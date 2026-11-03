@@ -397,6 +397,7 @@ async function openChat(peer) {
   stopTyping(); // tell whoever we were typing to that we stopped
   state.openGroup = null;
   state.open = peer;
+  if (typeof applyChatTheme === "function") applyChatTheme();
   document.body.classList.add("in-chat");
   $("chat-empty").hidden = true;
   $("chat-pane").hidden = false;
@@ -455,6 +456,7 @@ function connect() {
     try {
       await loadContacts();
       if (typeof loadGroups === "function") await loadGroups();
+      if (typeof loadChatThemes === "function") await loadChatThemes();
       // catch up on anything we missed while disconnected
       if (state.open) {
         await loadHistory(state.open);
