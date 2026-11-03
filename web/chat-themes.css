@@ -330,3 +330,10 @@
     linear-gradient(90deg, color-mix(in srgb, var(--c-accent, #ff9933) 22%, transparent) 1px, transparent 1px);
   background-size: 22px 22px;
 }
+
+#chat-pane.cp-hearts::before,
+#chat-pane.cp-stars::before {
+  background: color-mix(in srgb, var(--c-accent, #ff9933) 30%, transparent);
+  -webkit-mask-size: 44px 44px;
+  mask-size: 44px 44px;
+}
