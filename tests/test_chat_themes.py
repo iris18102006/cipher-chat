@@ -65,3 +65,16 @@ def test_unknown_user_and_self(client):
     a = signup(client, "alice")
     assert a.put("/api/chat-themes/dm/nobody", json=DEFAULT).status_code == 404
     assert a.put("/api/chat-themes/dm/alice", json=DEFAULT).status_code == 400
+
+
+def test_group_theme_for_members_only(client):
+    a, b, c = trio(client)
+    d = make_user(client, "dave", "d")
+    gid = new_group(a, members=("bob",))["id"]
+    look = {"theme": "kawaii", "accent": "#ff6fb5", "pattern": "stars"}
+    assert a.put(f"/api/chat-themes/group/{gid}", json=look).status_code == 200
+    assert a.get("/api/chat-themes").json()["group"] == {str(gid): look}
+    assert b.get("/api/chat-themes").json()["group"] == {}
+    assert c.put(f"/api/chat-themes/group/{gid}", json=look).status_code == 404
+    assert d.put(f"/api/chat-themes/group/{gid}", json=look).status_code == 404
+    assert d.put("/api/chat-themes/group/9999", json=look).status_code == 404
