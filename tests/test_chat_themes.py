@@ -59,3 +59,9 @@ def test_rejects_bad_values(client):
     for body in bad:
         assert a.put("/api/chat-themes/dm/bob", json=body).status_code == 400, body
     assert a.get("/api/chat-themes").json()["dm"] == {}
+
+
+def test_unknown_user_and_self(client):
+    a = signup(client, "alice")
+    assert a.put("/api/chat-themes/dm/nobody", json=DEFAULT).status_code == 404
+    assert a.put("/api/chat-themes/dm/alice", json=DEFAULT).status_code == 400
