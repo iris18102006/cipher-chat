@@ -292,3 +292,8 @@
   --c-send-a: var(--c-accent);
   --c-send-b: color-mix(in srgb, var(--c-accent) 75%, #000);
 }
+
+#chat-pane.ct-terminal #log,
+#chat-pane.ct-terminal #msg {
+  font-family: "Courier New", monospace;
+}
