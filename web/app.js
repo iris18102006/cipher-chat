@@ -159,6 +159,7 @@ async function decryptFor(peer, iv, ct) {
 async function loadContacts() {
   const list = await api("/api/contacts");
   const prev = state.contacts;
+  const heldBefore = state.open && prev.get(state.open) ? prev.get(state.open).held : 0;
   state.contacts = new Map();
   state.order = [];
   for (const row of list) {
@@ -184,6 +185,20 @@ async function loadContacts() {
   }
   renderBuddies();
   if (state.open) renderChatHeader();
+  // the request was accepted (here, from a profile, or from the list) or the setting changed:
+  // the messages that were waiting are readable now, so load them into the open chat
+  const open = state.open;
+  const now = open && state.contacts.get(open);
+  if (heldBefore > 0 && now && now.held === 0) {
+    try {
+      await loadHistory(open);
+      if (state.open === open) {
+        renderMessages();
+        scrollBottom();
+        markRead(open);
+      }
+    } catch {}
+  }
 }
 
 function bump(username) {
