@@ -49,8 +49,8 @@ async function paintLists() {
       await fn();
       await loadContacts();
       await paintLists();
-    } catch {
-      err.textContent = "that didn't work, try again";
+    } catch (ex) {
+      err.textContent = whyFailed(ex, "that didn't work, try again");
     }
   };
   const call = (method, path) => () => api(path, { method });
