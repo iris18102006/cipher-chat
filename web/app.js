@@ -564,7 +564,8 @@ async function handleWS(data) {
     setTyping(data.from, data.state);
   } else if (data.type === "msg") {
     const peer = data.from === state.me ? data.to : data.from;
-    if (!state.contacts.has(peer)) await loadContacts();
+    const fresh = !state.contacts.has(peer);
+    if (fresh) await loadContacts();
     const c = state.contacts.get(peer);
     if (!c) return;
     const list = state.msgs.get(peer);
@@ -579,7 +580,7 @@ async function handleWS(data) {
         if (list) renderMessages();
         markRead(peer);
       } else {
-        c.unread++;
+        if (!fresh) c.unread++; // a freshly loaded list already counts this message
         if (state.open === peer && list) renderMessages();
       }
     } else if (state.open === peer) {
