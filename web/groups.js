@@ -174,6 +174,10 @@ async function loadOlderGroup() {
 
 // ---------- buddy list ----------
 
+function memberCount(n) {
+  return n + (n === 1 ? " member" : " members");
+}
+
 function groupTypingText(g) {
   const names = [...g.typing.keys()].map((u) => memberName(g.id, u));
   if (!names.length) return "";
@@ -189,7 +193,7 @@ function groupRow(g) {
   const info = el("div", "buddy-info");
   info.append(el("div", "buddy-name", g.name));
   const typing = groupTypingText(g);
-  info.append(el("div", "buddy-sub", typing ? typing + "..." : g.members + " members"));
+  info.append(el("div", "buddy-sub", typing ? typing + "..." : memberCount(g.members)));
   li.append(info);
   if (g.unread > 0) li.append(el("span", "badge", g.unread > 99 ? "99+" : String(g.unread)));
   li.onclick = () => openGroupChat(g.id);
@@ -220,7 +224,7 @@ function renderGroupHeader() {
   $("chat-name").textContent = g.name;
   $("chat-name").title = "";
   const typing = groupTypingText(g);
-  $("chat-status").textContent = typing ? typing + "..." : g.members + " members";
+  $("chat-status").textContent = typing ? typing + "..." : memberCount(g.members);
   $("chat-status").className = "";
   for (const id of ["view-profile", "verify", "block"]) $(id).hidden = true;
   $("group-info").hidden = false;
