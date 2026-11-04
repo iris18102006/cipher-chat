@@ -927,3 +927,9 @@ def test_logout_closes_that_sessions_socket(client):
         with pytest.raises(WebSocketDisconnect) as gone:
             wa.receive_json()
         assert gone.value.code == 4401
+
+
+def test_login_with_huge_password_is_just_wrong(client):
+    signup(client, "alice")
+    r = client.post("/api/login", json={"username": "alice", "password": "x" * 5000})
+    assert r.status_code == 401
