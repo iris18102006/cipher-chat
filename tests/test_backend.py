@@ -179,7 +179,9 @@ def test_oversized_and_self_messages_dropped(client):
     signup(client, "bob")
     with a.websocket_connect("/ws", headers=ORIGIN) as wa:
         wa.receive_json()
-        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "x" * 20000})
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "x" * 20000, "cid": "big"})
+        # too long: the sender is told, so the message isn't just swallowed
+        assert wa.receive_json() == {"type": "msg-rejected", "to": "bob", "cid": "big", "reason": "too_long"}
         wa.send_json({"type": "msg", "to": "alice", "iv": "aXY=", "ct": "Y3Q="})
         wa.send_json({"type": "ping"})
         assert wa.receive_json() == {"type": "pong"}

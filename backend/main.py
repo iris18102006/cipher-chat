@@ -1371,7 +1371,13 @@ async def websocket_endpoint(ws: WebSocket):
                 iv, ct = data.get("iv"), data.get("ct")
                 if not (isinstance(iv, str) and isinstance(ct, str)):
                     continue
-                if len(iv) > 32 or not ct or len(ct) > MAX_CT_LEN:
+                if len(iv) > 32 or not iv or not ct:
+                    continue
+                if len(ct) > MAX_CT_LEN:
+                    await manager.send_user(
+                        me,
+                        {"type": "msg-rejected", "to": peer["username"], "cid": data.get("cid"), "reason": "too_long"},
+                    )
                     continue
                 if i_blocked(conn, my_id, peer["id"]):
                     continue  # you blocked them, unblock to talk again

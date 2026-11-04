@@ -476,7 +476,12 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
         v, iv, ct = data.get("v"), data.get("iv"), data.get("ct")
         if not (isinstance(v, int) and isinstance(iv, str) and isinstance(ct, str)) or isinstance(v, bool):
             return True
-        if len(iv) > 32 or not ct or len(ct) > MAX_CT_LEN:
+        if len(iv) > 32 or not iv or not ct:
+            return True
+        if len(ct) > MAX_CT_LEN:
+            await manager.send_user(
+                me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "too_long"}
+            )
             return True
         current = conn.execute("SELECT key_version FROM chat_groups WHERE id = ?", (gid,)).fetchone()[0]
         # you can only write with a key version you actually hold
