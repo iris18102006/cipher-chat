@@ -784,7 +784,7 @@ async function setBlocked(username, on) {
     }
     if (typeof refreshLists === "function") refreshLists();
   } catch {
-    setConn(false, "couldn't change the block, try again");
+    toast("couldn't change the block, try again");
   }
 }
 
