@@ -908,3 +908,12 @@ def test_strangers_cannot_send_typing(client):
             wb.send_json({"type": "ping"})
             # the only thing bob gets is his own pong, never alice's typing
             assert wb.receive_json() == {"type": "pong"}
+
+
+def test_unfriending_nobody_sends_no_event(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+        wb.receive_json()
+        assert a.delete("/api/friends/bob").status_code == 200
+        wb.send_json({"type": "ping"})
+        assert wb.receive_json() == {"type": "pong"}

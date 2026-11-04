@@ -936,16 +936,17 @@ async def accept_friend(username: str, user=Depends(current_user), conn=Depends(
 async def remove_friend(username: str, user=Depends(current_user), conn=Depends(get_conn)):
     """Unfriend, cancel a request I sent, or decline one I got."""
     peer = other_user(conn, user, username)
-    conn.execute(
+    cur = conn.execute(
         "DELETE FROM friendships WHERE (requester_id = :a AND addressee_id = :b) "
         "OR (requester_id = :b AND addressee_id = :a)",
         {"a": user["id"], "b": peer["id"]},
     )
     drop_held(conn, user["id"], peer["id"])
     conn.commit()
-    await manager.send_user(
-        peer["username"], {"type": "social", "event": "removed", "from": user["username"]}
-    )
+    if cur.rowcount:  # nothing to tell them if there was nothing between you
+        await manager.send_user(
+            peer["username"], {"type": "social", "event": "removed", "from": user["username"]}
+        )
     return {"status": "none"}
 
 
