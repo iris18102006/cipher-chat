@@ -30,8 +30,23 @@ async function api(path, opts) {
     location.href = "/login.html";
     throw new Error("not logged in");
   }
-  if (!res.ok) throw new Error("request failed: " + res.status);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const data = await res.json();
+      if (data && typeof data.detail === "string") detail = data.detail;
+    } catch {}
+    const err = new Error(detail || "request failed: " + res.status);
+    err.status = res.status;
+    err.server = !!detail; // the message is the server's own reason, fine to show
+    throw err;
+  }
   return res.json();
+}
+
+// the server's reason if it gave one, otherwise a plain fallback
+function whyFailed(ex, fallback) {
+  return ex && ex.server ? ex.message : fallback;
 }
 
 function parseTs(ts) {
