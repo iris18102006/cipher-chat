@@ -336,7 +336,8 @@ function setGroupTyping(gid, user, on) {
 async function handleGroupWS(data) {
   const gid = data.group;
   if (data.type === "gmsg") {
-    if (!state.groups.has(gid)) await loadGroups();
+    const fresh = !state.groups.has(gid);
+    if (fresh) await loadGroups();
     const g = state.groups.get(gid);
     if (!g) return;
     const mine = data.from === state.me;
@@ -352,10 +353,10 @@ async function handleGroupWS(data) {
       setGroupTypingQuiet(g, data.from);
       if (state.openGroup === gid && document.visibilityState === "visible") {
         if (list) renderMessages();
-        g.unread++;
+        if (!fresh) g.unread++;
         markGroupRead(gid);
       } else {
-        g.unread++;
+        if (!fresh) g.unread++;
         if (state.openGroup === gid && list) renderMessages();
       }
     } else if (state.openGroup === gid) {
