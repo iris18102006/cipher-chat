@@ -31,10 +31,12 @@ function avatarNode(p, size) {
 
 let pfCurrent = null; // the profile that is open right now
 let pfReturnFocus = null; // what had focus before the page opened
+let pfLoadId = 0; // counts profile loads, so an old slow answer can be ignored
 
 // ---------- open / close ----------
 
 function closeProfile() {
+  pfLoadId++; // anything still loading is no longer wanted
   $("profile-overlay").hidden = true;
   pfCurrent = null;
   // put the keyboard back where it was
@@ -49,11 +51,14 @@ async function openProfile(username) {
     $("pf-close").focus();
   }
   $("pf-body").replaceChildren(el("p", "pf-error", "loading..."));
+  const mine = ++pfLoadId;
   try {
     const p = await api("/api/profile/" + encodeURIComponent(username));
+    if (mine !== pfLoadId || $("profile-overlay").hidden) return; // someone newer took over
     pfCurrent = p;
     renderProfile(p);
   } catch {
+    if (mine !== pfLoadId) return;
     pfCurrent = null;
     $("pf-body").replaceChildren(el("p", "pf-error", "this profile isn't available."));
   }
