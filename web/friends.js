@@ -17,7 +17,7 @@ async function socialCall(method, path, username, errBox) {
     await loadContacts();
     await openProfile(username);
   } catch (ex) {
-    errBox.textContent = "that didn't work, try again";
+    errBox.textContent = whyFailed(ex, "that didn't work, try again");
   }
 }
 
