@@ -1263,6 +1263,10 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         user = user_from_token(conn, ws.cookies.get(COOKIE))
         if not user:
+            # accept first: closing before accept shows up in the browser as a plain
+            # failed connection (1006), so the page would retry forever instead of
+            # sending the person back to the login page
+            await ws.accept()
             await ws.close(code=4401)
             return
         await ws.accept()

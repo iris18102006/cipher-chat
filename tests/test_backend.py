@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from PIL import Image
 
 from backend import db
@@ -116,9 +117,12 @@ def test_key_upload_validation(client):
 
 
 def test_ws_rejects_anonymous_and_cross_origin(client):
-    with pytest.raises(Exception):
-        with client.websocket_connect("/ws", headers=ORIGIN):
-            pass
+    # logged out: the socket opens and is closed with 4401, which is what lets the
+    # page send the person back to the login screen (a refused handshake can't say why)
+    with client.websocket_connect("/ws", headers=ORIGIN) as anon:
+        with pytest.raises(WebSocketDisconnect) as gone:
+            anon.receive_json()
+        assert gone.value.code == 4401
     a = signup(client, "alice")
     with pytest.raises(Exception):
         with a.websocket_connect("/ws", headers={"origin": "http://evil.example", "host": "testserver"}):
