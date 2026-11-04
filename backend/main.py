@@ -36,6 +36,9 @@ COOKIE = "session"
 SESSION_DAYS = 30
 USERNAME_RE = re.compile(r"^[a-z0-9_]{3,20}$")
 MAX_CT_LEN = 16_000  # base64 chars of ciphertext, roughly 12 KB of text
+MAX_FRAME = 40_000  # biggest websocket frame we even try to read
+FLOOD_LIMIT = 40  # events per socket ...
+FLOOD_WINDOW = 10  # ... per this many seconds
 PUB_LEN = 88  # base64 of an uncompressed P-256 point (65 bytes)
 WEB_DIR = Path(__file__).parent.parent / "web"
 
@@ -1319,9 +1322,13 @@ async def websocket_endpoint(ws: WebSocket):
 
         await ws.send_text(json.dumps({"type": "ready", "me": me}))
 
+        recent: list[float] = []  # when this socket's last events arrived
         while True:
+            raw = await ws.receive_text()
+            if len(raw) > MAX_FRAME:
+                continue
             try:
-                data = json.loads(await ws.receive_text())
+                data = json.loads(raw)
             except json.JSONDecodeError:
                 continue
             if not isinstance(data, dict):
@@ -1332,6 +1339,13 @@ async def websocket_endpoint(ws: WebSocket):
             if kind == "ping":
                 await ws.send_text(json.dumps({"type": "pong"}))
                 continue
+
+            # flood control: a person can't type this fast, so extra events are dropped
+            now = time.monotonic()
+            recent[:] = [t for t in recent if now - t < FLOOD_WINDOW]
+            if len(recent) >= FLOOD_LIMIT:
+                continue
+            recent.append(now)
 
             # group chat events (messages, typing, read marks) live in groups.py
             if await groups.handle_ws(conn, my_id, me, data):

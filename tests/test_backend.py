@@ -933,3 +933,17 @@ def test_login_with_huge_password_is_just_wrong(client):
     signup(client, "alice")
     r = client.post("/api/login", json={"username": "alice", "password": "x" * 5000})
     assert r.status_code == 401
+
+
+def test_websocket_flood_is_dropped(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    a.post("/api/friends/bob")
+    b.post("/api/friends/alice/accept")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        for i in range(80):
+            wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": str(i)})
+        wa.send_json({"type": "ping"})
+        while wa.receive_json()["type"] != "pong":
+            pass
+    assert len(a.get("/api/messages/bob").json()) <= 40
