@@ -286,6 +286,7 @@ async function sendGroupMessage() {
   const g = state.groups.get(gid);
   const d = state.gDetail.get(gid);
   if (gid == null || !text || !g || !d) return;
+  if (tooLong(text)) return;
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     setConn(false, "offline, message not sent");
     return;
@@ -398,7 +399,11 @@ async function handleGroupWS(data) {
       if (groupPanel && groupPanel.id === gid) await paintGroupPanel();
     }
   } else if (data.type === "gmsg-rejected") {
-    toast(data.reason === "not_member" ? "You're not in that group any more." : "That message wasn't sent, the group key just changed. Try again.");
+    toast(
+      data.reason === "not_member" ? "You're not in that group any more."
+        : data.reason === "too_long" ? "That message is too long, split it into a few shorter ones."
+        : "That message wasn't sent, the group key just changed. Try again."
+    );
     if (data.reason === "bad_key" && state.groups.has(gid)) loadGroupDetail(gid).catch(() => {});
   }
 }
