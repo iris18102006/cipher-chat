@@ -896,3 +896,15 @@ def test_top_bar_has_the_requests_and_blocked_panels():
     # two scripts share one global namespace, so the helpers must not share names
     names = lambda f: set(re.findall(r"^(?:async )?function (\w+)", (WEB / f).read_text(), re.M))
     assert not names("lists.js") & (names("profile.js") | names("app.js") | names("friends.js") | names("settings.js"))
+
+
+def test_strangers_cannot_send_typing(client):
+    a, b = signup(client, "alice"), signup(client, "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        wa.receive_json()
+        with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+            wb.receive_json()
+            wa.send_json({"type": "typing", "to": "bob", "state": True})
+            wb.send_json({"type": "ping"})
+            # the only thing bob gets is his own pong, never alice's typing
+            assert wb.receive_json() == {"type": "pong"}

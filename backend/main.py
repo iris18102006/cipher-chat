@@ -1328,6 +1328,8 @@ async def websocket_endpoint(ws: WebSocket):
             if kind == "typing":
                 if blocked_either_way(conn, my_id, peer["id"]):
                     continue
+                if friend_status(conn, my_id, peer["id"]) == "none":
+                    continue  # strangers can't message each other, so no typing either
                 await manager.send_user(
                     peer["username"],
                     {"type": "typing", "from": me, "state": bool(data.get("state"))},
