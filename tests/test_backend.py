@@ -917,3 +917,13 @@ def test_unfriending_nobody_sends_no_event(client):
         assert a.delete("/api/friends/bob").status_code == 200
         wb.send_json({"type": "ping"})
         assert wb.receive_json() == {"type": "pong"}
+
+
+def test_logout_closes_that_sessions_socket(client):
+    a = signup(client, "alice")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        assert a.post("/api/logout").status_code == 200
+        with pytest.raises(WebSocketDisconnect) as gone:
+            wa.receive_json()
+        assert gone.value.code == 4401

@@ -484,7 +484,7 @@ def login(
 
 
 @app.post("/api/logout")
-def logout(
+async def logout(
     response: Response,
     session: str | None = Cookie(default=None),
     conn=Depends(get_conn),
@@ -492,6 +492,8 @@ def logout(
     if session:
         conn.execute("DELETE FROM sessions WHERE token = ?", (hash_token(session),))
         conn.commit()
+        # a tab that's still open must not keep receiving messages after logging out
+        await manager.close_session(hash_token(session))
     response.delete_cookie(COOKIE)
     return {"ok": True}
 
@@ -1224,6 +1226,16 @@ class Manager:
     def is_online(self, username: str) -> bool:
         return bool(self.sockets.get(username))
 
+    async def close_session(self, token_hash: str):
+        """Close every socket that was opened with this session (after logout)."""
+        for socks in list(self.sockets.values()):
+            for ws in list(socks):
+                if getattr(ws.state, "token", None) == token_hash:
+                    try:
+                        await ws.close(code=4401)
+                    except Exception:
+                        pass
+
     async def send_user(self, username: str, payload: dict) -> int:
         sent = 0
         for ws in list(self.sockets.get(username, ())):
@@ -1271,6 +1283,7 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.close(code=4401)
             return
         await ws.accept()
+        ws.state.token = hash_token(ws.cookies.get(COOKIE) or "")
         me, my_id = user["username"], user["id"]
 
         first_tab = not manager.is_online(me)
