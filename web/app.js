@@ -49,6 +49,14 @@ function whyFailed(ex, fallback) {
   return ex && ex.server ? ex.message : fallback;
 }
 
+// the longest text one message can hold: the ciphertext (base64) has to stay under 16,000 characters
+const MAX_MSG_BYTES = 11900;
+function tooLong(text) {
+  if (new TextEncoder().encode(text).length <= MAX_MSG_BYTES) return false;
+  toast("That message is too long, split it into a few shorter ones.");
+  return true;
+}
+
 function parseTs(ts) {
   // sqlite gives "YYYY-MM-DD HH:MM:SS" in UTC
   return new Date(ts.replace(" ", "T") + "Z");
@@ -599,6 +607,7 @@ async function handleWS(data) {
       wait: "They want you to wait until they accept your friend request.",
       limit: "You can only leave a few messages until they accept your request.",
       not_friends: "You're not friends with them any more, so that message wasn't sent.",
+      too_long: "That message is too long, split it into a few shorter ones.",
     };
     toast(REASONS[data.reason] || "That message wasn't sent.");
   } else if (data.type === "read-sync") {
@@ -658,6 +667,7 @@ async function sendMessage() {
   if (!peer || !text) return;
   const c = state.contacts.get(peer);
   if (!c || !c.pub || c.changed) return;
+  if (tooLong(text)) return;
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     setConn(false, "offline, message not sent");
     return;
