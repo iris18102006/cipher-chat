@@ -119,6 +119,32 @@ async function sharedKeyFor(peer) {
   return key;
 }
 
+// ---------- forward secrecy: keeping the server stocked with one-time prekeys ----------
+
+let topUpBusy = false;
+
+// Friends use up one of our public prekeys for every message they send us. When the
+// server is running low, make more here (the private halves stay in this browser) and
+// upload the public halves.
+async function topUpPrekeys() {
+  if (!state.me || topUpBusy) return;
+  topUpBusy = true;
+  try {
+    const { count } = await api("/api/prekeys");
+    if (count >= PREKEY_LOW) return;
+    const keys = await makePrekeys(state.me, PREKEY_TARGET - count);
+    await api("/api/prekeys", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys }),
+    });
+  } catch (err) {
+    console.error("couldn't top up prekeys", err);
+  } finally {
+    topUpBusy = false;
+  }
+}
+
 // trust on first use: remember the first key we saw for each friend and
 // shout if it ever changes (could be a new device, could be someone in the middle)
 function knownSlot(peer) {
@@ -841,6 +867,8 @@ window.addEventListener("focus", markOpenRead);
 
 // keepalive so idle proxies don't drop the socket
 setInterval(() => sendWS({ type: "ping" }), 25000);
+// friends keep using up our one-time prekeys, so check now and then that there are enough
+setInterval(topUpPrekeys, 2 * 60 * 1000);
 // pick up new signups and fresh last-seen times
 setInterval(() => {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) loadContacts().catch(() => {});
@@ -860,6 +888,8 @@ setInterval(() => {
       body: JSON.stringify({ pub: state.myPub }),
     });
     $("my-key").textContent = "your key: " + (await fingerprintOf(state.myPub));
+    // the key is uploaded, so any prekeys belonging to an older key are gone: stock up
+    await topUpPrekeys();
     connect();
   } catch (err) {
     if (state.me) setConn(false, "couldn't start, check the console");
