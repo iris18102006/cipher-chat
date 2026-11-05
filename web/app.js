@@ -49,6 +49,14 @@ function whyFailed(ex, fallback) {
   return ex && ex.server ? ex.message : fallback;
 }
 
+// why the server can refuse a message, shown as a popup
+const REJECT_REASONS = {
+  wait: "They want you to wait until they accept your friend request.",
+  limit: "You can only leave a few messages until they accept your request.",
+  not_friends: "You're not friends with them any more, so that message wasn't sent.",
+  too_long: "That message is too long, split it into a few shorter ones.",
+};
+
 // the longest text one message can hold: the ciphertext (base64) has to stay under 16,000 characters
 const MAX_MSG_BYTES = 11900;
 function tooLong(text) {
@@ -689,13 +697,9 @@ async function handleWS(data) {
       openProfile(data.from);
     }
   } else if (data.type === "msg-rejected") {
-    const REASONS = {
-      wait: "They want you to wait until they accept your friend request.",
-      limit: "You can only leave a few messages until they accept your request.",
-      not_friends: "You're not friends with them any more, so that message wasn't sent.",
-      too_long: "That message is too long, split it into a few shorter ones.",
-    };
-    toast(REASONS[data.reason] || "That message wasn't sent.");
+    toast(REJECT_REASONS[data.reason] || "That message wasn't sent.");
+    // the copy of the text we kept for it is no use now
+    if (data.cid) dropPending(state.me, data.cid).catch(() => {});
   } else if (data.type === "read-sync") {
     const c = state.contacts.get(data.peer);
     if (c) {
