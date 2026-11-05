@@ -270,3 +270,35 @@ async function openForwardSecret(identityPriv, peerIdentityPub, prekey, ephPubB6
   const key = await fsMessageKey(identityPriv, peerIdentityPub, prekey.priv, ephPub, ephPubB64, prekey.pub);
   return decryptText(key, iv, ct);
 }
+
+// ---------- forward secrecy: keeping messages readable on this device ----------
+// A forward secret message can only be opened once, so the text has to be kept here after
+// that. This is the same trust as the private key: it lives in this browser's IndexedDB
+// and never leaves it. Messages we send are saved too (nobody, including us, can open our
+// own sent message from the ciphertext later). A sent message is saved under its cid first,
+// because only the server knows its id, and moved to the id once the server echoes it back.
+
+const plainSlot = (username, id) => "plain:" + username + ":" + id;
+const pendingSlot = (username, cid) => "pending:" + username + ":" + cid;
+
+async function savePlain(username, id, text) {
+  await dbSet(await openDB(), plainSlot(username, id), text);
+}
+
+async function loadPlain(username, id) {
+  const text = await dbGet(await openDB(), plainSlot(username, id));
+  return typeof text === "string" ? text : null;
+}
+
+async function savePending(username, cid, text) {
+  await dbSet(await openDB(), pendingSlot(username, cid), text);
+}
+
+async function loadPending(username, cid) {
+  const text = await dbGet(await openDB(), pendingSlot(username, cid));
+  return typeof text === "string" ? text : null;
+}
+
+async function dropPending(username, cid) {
+  await dbDelete(await openDB(), pendingSlot(username, cid));
+}
