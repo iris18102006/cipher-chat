@@ -1258,7 +1258,7 @@ def history(
     rows = conn.execute(
         """
         SELECT m.id, u.username AS sender, m.iv, m.ct, m.created_at,
-               m.delivered_at, m.read_at, m.hidden
+               m.delivered_at, m.read_at, m.hidden, m.v, m.eph, m.pid, m.cid
         FROM messages m JOIN users u ON u.id = m.sender_id
         WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
             OR (m.sender_id = :peer AND m.recipient_id = :me))
@@ -1274,6 +1274,11 @@ def history(
             "from": r["sender"],
             "iv": r["iv"],
             "ct": r["ct"],
+            "v": r["v"],
+            "eph": r["eph"],
+            "pid": r["pid"],
+            # only the sender gets this back: it's how their browser finds its own copy
+            "cid": r["cid"] if r["sender"] == user["username"] else None,
             "ts": r["created_at"],
             "delivered": r["delivered_at"] is not None,
             "read": r["read_at"] is not None,
