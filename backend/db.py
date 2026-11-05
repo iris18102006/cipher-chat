@@ -157,6 +157,16 @@ def init_db():
                 pattern TEXT NOT NULL DEFAULT 'none',
                 PRIMARY KEY (user_id, kind, target_id)
             );
+            -- one-time public prekeys for forward secrecy. Every person uploads a batch;
+            -- the private halves stay in their browser. The server hands each one out
+            -- once (and deletes it), so no two messages ever use the same one.
+            CREATE TABLE IF NOT EXISTS prekeys (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                id INTEGER NOT NULL,
+                pub TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, id)
+            );
             """
         )
         # added after the first version, so migrate old databases in place
