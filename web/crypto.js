@@ -142,3 +142,71 @@ async function unwrapGroupKey(wrapKey, iv, wk) {
   const raw = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, wrapKey, unb64(wk));
   return crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
+
+// ---------- forward secrecy: one-time prekeys ----------
+// Every message to a friend is also locked with a key that exists exactly once. We keep a
+// pile of "prekeys" (public half on the server, private half only here), friends take
+// one for each message they send us, and we delete the private half as soon as the
+// message has been read. After that nobody can open that message again, not even
+// someone who later steals our long-term key and has a copy of what the server stored.
+
+const PREKEY_TARGET = 100; // how many we try to keep on the server
+const PREKEY_LOW = 50; // top up when the server has fewer than this
+
+function dbDelete(db, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// several writes in one go, all or nothing
+function dbSetMany(db, entries) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    for (const [key, value] of entries) store.put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// two tabs topping up at the same moment would hand out the same ids twice
+function withLock(name, fn) {
+  if (typeof navigator !== "undefined" && navigator.locks) return navigator.locks.request(name, fn);
+  return fn();
+}
+
+const prekeySlot = (username, id) => "prekey:" + username + ":" + id;
+
+// Makes `count` new prekeys. The private halves are saved here first, and only then do we
+// return the public halves to upload, so a key someone claims always has its private half.
+function makePrekeys(username, count) {
+  return withLock("cc-prekeys:" + username, async () => {
+    const db = await openDB();
+    const counter = "prekey-next:" + username;
+    let next = (await dbGet(db, counter)) || 1;
+    const entries = [];
+    const publics = [];
+    for (let i = 0; i < count; i++) {
+      const pair = await crypto.subtle.generateKey(ECDH, false, ["deriveBits"]);
+      const pub = await exportPub(pair.publicKey);
+      entries.push([prekeySlot(username, next), { priv: pair.privateKey, pub }]);
+      publics.push({ id: next, pub });
+      next++;
+    }
+    entries.push([counter, next]);
+    await dbSetMany(db, entries);
+    return publics;
+  });
+}
+
+async function loadPrekey(username, id) {
+  return (await dbGet(await openDB(), prekeySlot(username, id))) || null;
+}
+
+async function deletePrekey(username, id) {
+  await dbDelete(await openDB(), prekeySlot(username, id));
+}
