@@ -44,6 +44,11 @@ PUB_LEN = 88  # base64 of an uncompressed P-256 point (65 bytes)
 PREKEY_BATCH = 100  # most keys in one upload
 PREKEY_MAX = 200  # most keys the server keeps for one person
 PREKEY_ID_MAX = 2_000_000_000
+CLAIM_LIMIT = 150  # prekeys one person can take from one other person ...
+CLAIM_WINDOW = 60 * 60  # ... per hour, so nobody can empty someone else's supply
+# the standard P-256 base point. It's handed out instead of a real prekey when a
+# message will never be shown anyway (someone blocked someone), so a block stays invisible
+DECOY_PREKEY = "BGsX0fLhLEJH+Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7Oy7ZAaDe/UfU="
 WEB_DIR = Path(__file__).parent.parent / "web"
 
 # profile theme presets (the css for each lives in web/themes.css)
@@ -400,6 +405,22 @@ def check_rate_limit(key: str):
     _fails[key] = recent
     if len(recent) >= FAIL_LIMIT:
         raise HTTPException(429, "too many tries, wait a few minutes")
+
+
+# ---------- prekey claim limiting (in memory, per claimer + target) ----------
+
+_claims: dict[tuple[int, int], list[float]] = defaultdict(list)
+
+
+def check_claim_limit(claimer_id: int, target_id: int):
+    now = time.time()
+    key = (claimer_id, target_id)
+    recent = [t for t in _claims[key] if now - t < CLAIM_WINDOW]
+    if len(recent) >= CLAIM_LIMIT:
+        _claims[key] = recent
+        raise HTTPException(429, "slow down, you're sending a lot of messages to this person")
+    recent.append(now)
+    _claims[key] = recent
 
 
 # ---------- sessions ----------
@@ -1127,6 +1148,35 @@ def put_prekeys(body: PrekeysBody, user=Depends(current_user), conn=Depends(get_
     )
     conn.commit()
     return {"count": have + len(ids) - replacing}
+
+
+@app.post("/api/prekeys/claim/{username}")
+def claim_prekey(username: str, user=Depends(current_user), conn=Depends(get_conn)):
+    """Take one of someone's one-time prekeys to lock one message to them.
+
+    Each key is handed out once and deleted, so a key can't be reused. Answers:
+    {id, pub}      a key to use
+    {none: true}   they have run out (the message then goes without forward secrecy)
+    {refused: why} the same reasons sending would be refused (not friends, wait, ...)
+    """
+    peer = other_user(conn, user, username)
+    if blocked_either_way(conn, user["id"], peer["id"]):
+        # the message will be dropped or hidden anyway, don't burn a real key
+        # and don't give away that there's a block
+        return {"id": 0, "pub": DECOY_PREKEY}
+    _, why = message_rule(conn, user["id"], peer["id"])
+    if why:
+        return {"refused": why}
+    check_claim_limit(user["id"], peer["id"])
+    row = conn.execute(
+        "DELETE FROM prekeys WHERE user_id = :u AND id = "
+        "(SELECT MIN(id) FROM prekeys WHERE user_id = :u) RETURNING id, pub",
+        {"u": peer["id"]},
+    ).fetchone()
+    conn.commit()
+    if not row:
+        return {"none": True}
+    return {"id": row["id"], "pub": row["pub"]}
 
 
 @app.get("/api/contacts")
