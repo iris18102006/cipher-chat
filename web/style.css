@@ -439,6 +439,11 @@ h2 {
   color: var(--c-muted, var(--muted));
 }
 
+.nofs {
+  color: #a33;
+  font-style: italic;
+}
+
 .tick.read {
   color: #1a73e8;
   font-weight: bold;
