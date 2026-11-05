@@ -40,6 +40,10 @@ MAX_FRAME = 40_000  # biggest websocket frame we even try to read
 FLOOD_LIMIT = 40  # events per socket ...
 FLOOD_WINDOW = 10  # ... per this many seconds
 PUB_LEN = 88  # base64 of an uncompressed P-256 point (65 bytes)
+# forward secrecy: public one-time prekeys that people upload for others to use
+PREKEY_BATCH = 100  # most keys in one upload
+PREKEY_MAX = 200  # most keys the server keeps for one person
+PREKEY_ID_MAX = 2_000_000_000
 WEB_DIR = Path(__file__).parent.parent / "web"
 
 # profile theme presets (the css for each lives in web/themes.css)
@@ -123,6 +127,15 @@ class Credentials(BaseModel):
 
 class KeyBody(BaseModel):
     pub: str
+
+
+class PrekeyItem(BaseModel):
+    id: int
+    pub: str
+
+
+class PrekeysBody(BaseModel):
+    keys: list[PrekeyItem]
 
 
 class CommentBody(BaseModel):
@@ -1079,6 +1092,41 @@ def put_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
     )
     conn.commit()
     return {"ok": True}
+
+
+@app.get("/api/prekeys")
+def prekey_count(user=Depends(current_user), conn=Depends(get_conn)):
+    n = conn.execute("SELECT COUNT(*) FROM prekeys WHERE user_id = ?", (user["id"],)).fetchone()[0]
+    return {"count": n}
+
+
+@app.put("/api/prekeys")
+def put_prekeys(body: PrekeysBody, user=Depends(current_user), conn=Depends(get_conn)):
+    """Store a batch of one-time public keys. The private halves never come here."""
+    keys = body.keys
+    if not keys or len(keys) > PREKEY_BATCH:
+        raise HTTPException(400, f"send between 1 and {PREKEY_BATCH} keys at a time")
+    ids = [k.id for k in keys]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(400, "the same key id twice")
+    for k in keys:
+        if not 1 <= k.id <= PREKEY_ID_MAX:
+            raise HTTPException(400, "bad key id")
+        if not valid_pub(k.pub):
+            raise HTTPException(400, "that doesn't look like a P-256 public key")
+    marks = ",".join("?" * len(ids))
+    have = conn.execute("SELECT COUNT(*) FROM prekeys WHERE user_id = ?", (user["id"],)).fetchone()[0]
+    replacing = conn.execute(
+        f"SELECT COUNT(*) FROM prekeys WHERE user_id = ? AND id IN ({marks})", [user["id"], *ids]
+    ).fetchone()[0]
+    if have + len(ids) - replacing > PREKEY_MAX:
+        raise HTTPException(400, "you already have plenty of prekeys stored")
+    conn.executemany(
+        "INSERT OR REPLACE INTO prekeys (user_id, id, pub) VALUES (?, ?, ?)",
+        [(user["id"], k.id, k.pub) for k in keys],
+    )
+    conn.commit()
+    return {"count": have + len(ids) - replacing}
 
 
 @app.get("/api/contacts")
