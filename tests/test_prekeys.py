@@ -92,3 +92,68 @@ def test_claim_is_refused_when_you_couldnt_message_them_anyway(client):
     assert a.get("/api/prekeys").json() == {"count": 3}
     assert b.post("/api/prekeys/claim/nobody_here").status_code == 404
     assert b.post("/api/prekeys/claim/bob").status_code == 400
+
+
+def test_forward_secret_message_is_stored_and_relayed(client):
+    a, b = make_user(client, "alice", "a"), make_user(client, "bob", "b")
+    befriend(a, b, "alice", "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        with b.websocket_connect("/ws", headers=ORIGIN) as wb:
+            assert wa.receive_json()["type"] == "presence"
+            assert wb.receive_json()["type"] == "ready"
+
+            wa.send_json(
+                {"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": "c-1", "eph": pk("e"), "pid": 7}
+            )
+            got = wb.receive_json()
+            assert got["type"] == "msg" and got["v"] == 2
+            assert got["eph"] == pk("e") and got["pid"] == 7
+            echo = wa.receive_json()
+            assert echo["id"] == got["id"] and echo["v"] == 2 and echo["cid"] == "c-1"
+
+            # an old style message still goes through and is marked as version 1
+            wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": "c-2"})
+            old = wb.receive_json()
+            assert old["v"] == 1 and old["eph"] is None and old["pid"] is None
+
+    mine = a.get("/api/messages/bob").json()
+    assert [(m["v"], m["pid"], m["cid"]) for m in mine] == [(2, 7, "c-1"), (1, None, "c-2")]
+    assert mine[0]["eph"] == pk("e")
+    # the cid is only for the sender, the recipient's history doesn't carry it
+    theirs = b.get("/api/messages/alice").json()
+    assert [(m["v"], m["pid"], m["cid"]) for m in theirs] == [(2, 7, None), (1, None, None)]
+
+
+def test_half_a_forward_secret_message_is_dropped(client):
+    a, b = make_user(client, "alice", "a"), make_user(client, "bob", "b")
+    befriend(a, b, "alice", "bob")
+    bad = [
+        {"eph": pk("e")},  # key but no prekey id
+        {"pid": 3},  # prekey id but no key
+        {"eph": "nope", "pid": 3},  # not a public key
+        {"eph": pk("e"), "pid": -1},
+        {"eph": pk("e"), "pid": True},  # a bool is an int in python, not a key id
+        {"eph": pk("e"), "pid": "3"},
+        {"eph": pk("e"), "pid": 3_000_000_000},
+    ]
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        for i, extra in enumerate(bad):
+            wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": f"bad{i}", **extra})
+        # a good one afterwards proves the socket survived and nothing before it was kept
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": "good"})
+        echo = wa.receive_json()
+        assert echo["cid"] == "good" and echo["v"] == 1
+    assert len(a.get("/api/messages/bob").json()) == 1
+
+
+def test_cid_is_cleaned_before_it_is_stored(client):
+    a, b = make_user(client, "alice", "a"), make_user(client, "bob", "b")
+    befriend(a, b, "alice", "bob")
+    with a.websocket_connect("/ws", headers=ORIGIN) as wa:
+        assert wa.receive_json()["type"] == "ready"
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": "x" * 65})
+        assert wa.receive_json()["cid"] is None
+        wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": 12345})
+        assert wa.receive_json()["cid"] is None
