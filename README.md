@@ -21,6 +21,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Blocking: a blocked person can't message you, can't see when you're online and can't see your profile
 - Group chats: make a group from your friends, up to 30 people. Messages are end-to-end encrypted for the whole group, typing shows who is writing, your own messages say "seen by", and the Members panel lets you rename, add friends, remove people (owner) or leave
 - Chat themes: every conversation (1:1 or group) can have its own look, picked from the Theme button in the chat header: 10 themes, 5 background patterns and an accent colour. It's saved per person on the server, so nobody else sees or changes what you picked. Only fixed names and a hex colour are ever stored, never free text
+- Forward secrecy for 1:1 chats: every message is locked with a one-time key as well, and that key is deleted the moment the message has been read. Someone who later steals your key and has a copy of what the server stored still can't open those messages
 - Too-long messages (over about 11,000 characters) are refused with a notice instead of vanishing, and flooding the socket gets dropped
 - Logging out closes any tab of that session that's still connected
 - Works on phones (one panel at a time)
@@ -70,6 +71,10 @@ If you serve it over https, set `CIPHER_SECURE_COOKIES=1` so the session cookie 
 
     pip install -r requirements-dev.txt
     python -m pytest tests
+
+The forward secrecy crypto in the browser has its own tests (Node 20+, nothing to install):
+
+    node --test
 
 ## Limitations
 
