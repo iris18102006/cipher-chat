@@ -1108,9 +1108,14 @@ async def put_settings(body: SettingsBody, user=Depends(current_user), conn=Depe
 def put_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
     if not valid_pub(body.pub):
         raise HTTPException(400, "that doesn't look like a P-256 public key")
+    old_pub = conn.execute("SELECT public_key FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
     conn.execute(
         "UPDATE users SET public_key = ? WHERE id = ?", (body.pub, user["id"])
     )
+    if old_pub != body.pub:
+        # the browser uploads its key on every page load, so only a real change counts.
+        # Prekeys belong to one identity: the old private halves are gone with it
+        conn.execute("DELETE FROM prekeys WHERE user_id = ?", (user["id"],))
     conn.commit()
     return {"ok": True}
 
