@@ -195,6 +195,14 @@ def init_db():
         # what happens to messages from someone whose friend request I haven't accepted yet:
         # allow (they arrive), ask (held until I accept) or wait (not allowed)
         _add_column(conn, "users", "msg_policy", "TEXT NOT NULL DEFAULT 'allow'")
+        # forward secrecy: 1 = locked with the long-term shared key (all old messages),
+        # 2 = also mixed with a one-time prekey. eph is the sender's one-time public key,
+        # pid is which of the recipient's prekeys was used, cid is the id the sender's
+        # browser picked (it finds the sender's own copy of the text with it)
+        _add_column(conn, "messages", "v", "INTEGER NOT NULL DEFAULT 1")
+        _add_column(conn, "messages", "eph", "TEXT")
+        _add_column(conn, "messages", "pid", "INTEGER")
+        _add_column(conn, "messages", "cid", "TEXT")
         conn.commit()
     finally:
         conn.close()
