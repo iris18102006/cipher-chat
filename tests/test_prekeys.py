@@ -157,3 +157,56 @@ def test_cid_is_cleaned_before_it_is_stored(client):
         assert wa.receive_json()["cid"] is None
         wa.send_json({"type": "msg", "to": "bob", "iv": "aXY=", "ct": "Y3Q=", "cid": 12345})
         assert wa.receive_json()["cid"] is None
+
+
+def test_new_identity_key_drops_old_prekeys_but_the_same_key_keeps_them(client):
+    a = make_user(client, "alice", "a")
+    a.put("/api/prekeys", json=batch(1, 5))
+    # the browser uploads its key on every page load, that must not wipe anything
+    assert a.put("/api/key", json={"pub": pk("a")}).status_code == 200
+    assert a.get("/api/prekeys").json() == {"count": 5}
+    # a different key means a new browser: the old private prekeys are gone, so are the public ones
+    assert a.put("/api/key", json={"pub": pk("z")}).status_code == 200
+    assert a.get("/api/prekeys").json() == {"count": 0}
+
+
+def test_claims_in_a_block_get_a_decoy_and_use_nothing_up(client):
+    a, b = make_user(client, "alice", "a"), make_user(client, "bob", "b")
+    befriend(a, b, "alice", "bob")
+    b.put("/api/prekeys", json=batch(1, 3))
+    assert b.post("/api/blocks/alice").status_code == 200
+    # alice was blocked: she gets a normal looking answer, but not one of bob's real keys
+    got = a.post("/api/prekeys/claim/bob").json()
+    assert got == {"id": 0, "pub": main.DECOY_PREKEY}
+    assert main.valid_pub(main.DECOY_PREKEY)
+    assert b.get("/api/prekeys").json() == {"count": 3}
+    # and the person who did the blocking gets the same shape back
+    a.put("/api/prekeys", json=batch(1, 2))
+    assert b.post("/api/prekeys/claim/alice").json() == {"id": 0, "pub": main.DECOY_PREKEY}
+    assert a.get("/api/prekeys").json() == {"count": 2}
+
+
+def test_claims_are_rate_limited_per_pair(client, monkeypatch):
+    monkeypatch.setattr(main, "CLAIM_LIMIT", 3)
+    a, b, c = make_user(client, "alice", "a"), make_user(client, "bob", "b"), make_user(client, "carol", "c")
+    befriend(a, b, "alice", "bob")
+    befriend(a, c, "alice", "carol")
+    a.put("/api/prekeys", json=batch(1, 10))
+    assert [b.post("/api/prekeys/claim/alice").status_code for _ in range(4)] == [200, 200, 200, 429]
+    # bob hitting the limit took three keys and no more, and carol isn't affected by it
+    assert a.get("/api/prekeys").json() == {"count": 7}
+    assert c.post("/api/prekeys/claim/alice").json()["id"] == 4
+    # claims that were refused for other reasons don't count towards the limit
+    d = make_user(client, "dave", "d")
+    for _ in range(5):
+        assert d.post("/api/prekeys/claim/alice").json() == {"refused": "not_friends"}
+
+
+def test_claim_respects_the_wait_setting(client):
+    a, b = make_user(client, "alice", "a"), make_user(client, "bob", "b")
+    # alice asked bob to be friends and bob says people who asked have to wait
+    a.post("/api/friends/bob")
+    assert b.put("/api/settings", json={"message_policy": "wait"}).status_code == 200
+    b.put("/api/prekeys", json=batch(1, 2))
+    assert a.post("/api/prekeys/claim/bob").json() == {"refused": "wait"}
+    assert b.get("/api/prekeys").json() == {"count": 2}
