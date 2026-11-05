@@ -210,3 +210,63 @@ async function loadPrekey(username, id) {
 async function deletePrekey(username, id) {
   await dbDelete(await openDB(), prekeySlot(username, id));
 }
+
+// ---------- forward secrecy: the key for one message ----------
+// Two secrets go into every message key:
+//   - the long-term shared key (your identity + their identity), which proves who's talking
+//   - a one-time secret from the sender's fresh key and the receiver's prekey
+// It's used as the HKDF salt, the long-term secret is the key material. Whoever knows only
+// one of the two gets nothing, so once the prekey is deleted, the one-time half is gone
+// for good and a stolen identity key opens nothing that was sent this way.
+
+const FS_INFO = "cipher-chat fs v1";
+
+function concatBytes(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
+// The same on both sides. The sender calls it with (fresh private key, prekey public key),
+// the receiver with (prekey private key, sender's fresh public key).
+async function fsMessageKey(identityPriv, peerIdentityPub, onePrivate, onePeerPublic, ephPubB64, prekeyPubB64) {
+  const oneTimeSecret = await crypto.subtle.deriveBits({ name: "ECDH", public: onePeerPublic }, onePrivate, 256);
+  const longTerm = await crypto.subtle.deriveKey(
+    { name: "ECDH", public: peerIdentityPub },
+    identityPriv,
+    "HKDF",
+    false,
+    ["deriveKey"]
+  );
+  // both public keys are in the info too, so the key is tied to this exact exchange
+  const info = concatBytes(new TextEncoder().encode(FS_INFO), unb64(ephPubB64), unb64(prekeyPubB64));
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: oneTimeSecret, info },
+    longTerm,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+// Lock one message. The fresh key made here is thrown away right after, only its public half
+// travels with the message.
+async function sealForwardSecret(identityPriv, peerIdentityPub, prekeyPubB64, text) {
+  const eph = await crypto.subtle.generateKey(ECDH, false, ["deriveBits"]);
+  const ephPubB64 = await exportPub(eph.publicKey);
+  const prekeyPub = await importPub(prekeyPubB64);
+  const key = await fsMessageKey(identityPriv, peerIdentityPub, eph.privateKey, prekeyPub, ephPubB64, prekeyPubB64);
+  const { iv, ct } = await encryptText(key, text);
+  return { iv, ct, eph: ephPubB64 };
+}
+
+// Open one message with the prekey it was locked to ({ priv, pub } from loadPrekey).
+async function openForwardSecret(identityPriv, peerIdentityPub, prekey, ephPubB64, iv, ct) {
+  const ephPub = await importPub(ephPubB64);
+  const key = await fsMessageKey(identityPriv, peerIdentityPub, prekey.priv, ephPub, ephPubB64, prekey.pub);
+  return decryptText(key, iv, ct);
+}
