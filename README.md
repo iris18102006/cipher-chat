@@ -100,7 +100,10 @@ This is a learning project, not Signal.
 
 - Your private key lives in one browser. Logging in from a new browser creates a new key, so old history can't be decrypted there and friends get a key-change warning.
 - Clearing site data deletes your private key and with it your ability to read old messages.
-- No forward secrecy, a stolen private key decrypts everything
+- Forward secrecy only covers 1:1 messages sent after it was added. Older messages, and everything in group chats (the group keys are wrapped with the long-term keys), are still opened by a stolen private key
+- A forward secret message can only be opened once, so the text you've read is kept on your device in IndexedDB. Someone who gets your whole browser profile can read what you've read, and a second browser can't read it at all
+- The server can hold back prekeys or swap one for its own. That only takes away the forward secrecy of a message, the server still can't read it (it never has the long-term keys). You only see it if the prekeys are held back, as a "no forward secrecy" label
+- One prekey is used per message, so someone who is offline for a long time while a lot of messages come in can run out (those messages fall back to the old way and are labelled)
 - The server still sees metadata: who talks to whom, when, message sizes, and online status
 - Message settings only cover people who sent you a friend request. Nobody can message someone they have no friend request or friendship with. Being refused ("wait") is shown to the sender, unlike a block
 - Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
@@ -122,7 +125,9 @@ This is a learning project, not Signal.
 - [x] Profile comments / a wall
 - [x] Image avatars, gallery, GIFs and stickers
 - [x] Message requests and a settings page
-- [ ] Forward secrecy with a ratchet
+- [x] Forward secrecy for 1:1 chats (one-time prekeys)
+- [ ] Forward secrecy for group chats
+- [ ] Sign messages so a group member can't pretend to be someone else
 - [x] Group chats
 - [x] Chat themes for each conversation
 - [x] Fix: unblocking someone does nothing
