@@ -36,6 +36,24 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 6. Every key has a fingerprint (SHA-256 of the public key). Use **Verify keys** in a chat and compare fingerprints with your friend over another channel.
 7. Your browser remembers the first key it saw for each friend (trust on first use) and warns you if it changes.
 
+## Forward secrecy (1:1 chats)
+
+Forward secrecy means that stealing a key later doesn't open messages from the past. Before this, one long-term key locked every message, so someone with a copy of the database and your key could read everything. Now each message also gets a key that only exists once.
+
+1. Your browser makes a pile of one-time **prekeys** (100 at a time). The private halves are saved in IndexedDB and never leave your browser, the public halves go to the server.
+2. To send a message, your browser asks the server for one of your friend's public prekeys. The server hands each one out once and deletes it.
+3. Your browser makes a brand new key pair, and mixes two secrets into the message key with HKDF: the long-term shared key (this proves who is talking) and a secret from your new key and their prekey (this is the one-time part). Then the new private key is thrown away and the message is sent with the new public key and the id of the prekey it used.
+4. Your friend's browser finds that prekey, opens the message, **saves the text on that device**, and then deletes the private prekey. From that moment the message can't be opened again from the ciphertext, by anyone.
+5. When the server is running low, your browser makes and uploads more prekeys.
+
+Things that follow from this:
+
+- Your own sent messages are saved the same way (you can't open them from the ciphertext either). Read messages and sent messages live on the device you used, in IndexedDB, next to your private key.
+- If your friend has run out of prekeys (they were offline for a long time and a lot of messages came in), the message is sent the old way and the chat shows a small "no forward secrecy" label on it. They make more when they're back online.
+- Prekeys are tied to your identity key. A new key (new browser, cleared site data) means all the old prekeys are dropped.
+- Prekey claims are rate limited per pair so one person can't use up someone else's supply, and a claim in a block gets a decoy so a block stays invisible.
+- This is not a Double Ratchet: there's no chain of keys to keep in sync between tabs, every message simply has its own key. That's simpler, but it uses up one prekey per message.
+
 ## Group chats
 
 1. A group has one AES-256 key per **version**. The browser of whoever makes a version generates it and wraps it (AES-GCM) once for every member, using the key it shares with that member (ECDH + HKDF, with its own HKDF label so it's never the same key that locks a 1:1 chat).
