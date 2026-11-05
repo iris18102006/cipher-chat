@@ -452,6 +452,10 @@ function renderMessages(keepScroll) {
   const list = (inGroup ? state.gmsgs.get(state.openGroup) : state.msgs.get(state.open)) || [];
   let lastDay = "";
   let prev = null;
+  // Old messages were all sent the old way, that's not worth a label on every one. But once
+  // a chat has started using one-time keys, a message after that without one is a fallback
+  // (they'd run out of keys), and that is worth knowing.
+  const firstFS = inGroup ? null : list.find((x) => x.v === 2);
   for (const m of list) {
     const d = parseTs(m.ts);
     const label = dayLabel(d);
@@ -468,6 +472,11 @@ function renderMessages(keepScroll) {
     }
     row.append(el("div", "text", m.text));
     const meta = el("div", "meta");
+    if (firstFS && m.v !== 2 && m.id > firstFS.id) {
+      const nofs = el("span", "nofs", "no forward secrecy");
+      nofs.title = "This message was locked with the long-term key only, because there were no one-time keys left";
+      meta.append(nofs);
+    }
     meta.append(el("span", "time", clock(d)));
     if (mine) {
       const t = inGroup ? groupTick(m) : tickFor(m);
