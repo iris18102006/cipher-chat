@@ -1476,6 +1476,23 @@ async def websocket_endpoint(ws: WebSocket):
                     continue
                 if len(iv) > 32 or not iv or not ct:
                     continue
+                # forward secret messages also carry the sender's one-time public key and
+                # the id of the recipient's prekey they used, old style ones carry neither
+                eph, pid = data.get("eph"), data.get("pid")
+                ver = 1
+                if eph is not None or pid is not None:
+                    if not (
+                        isinstance(eph, str)
+                        and valid_pub(eph)
+                        and isinstance(pid, int)
+                        and not isinstance(pid, bool)
+                        and 0 <= pid <= PREKEY_ID_MAX
+                    ):
+                        continue
+                    ver = 2
+                cid = data.get("cid")
+                if not (isinstance(cid, str) and 0 < len(cid) <= 64):
+                    cid = None
                 if len(ct) > MAX_CT_LEN:
                     await manager.send_user(
                         me,
@@ -1496,9 +1513,9 @@ async def websocket_endpoint(ws: WebSocket):
                         )
                         continue
                 cur = conn.execute(
-                    "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (my_id, peer["id"], iv, ct, hidden),
+                    "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden, v, eph, pid, cid) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (my_id, peer["id"], iv, ct, hidden, ver, eph, pid, cid),
                 )
                 msg_id = cur.lastrowid
                 conn.commit()
@@ -1512,8 +1529,11 @@ async def websocket_endpoint(ws: WebSocket):
                     "to": peer["username"],
                     "iv": iv,
                     "ct": ct,
+                    "v": ver,
+                    "eph": eph,
+                    "pid": pid,
                     "ts": row["created_at"],
-                    "cid": data.get("cid"),
+                    "cid": cid,
                 }
                 got = 0 if hidden else await manager.send_user(peer["username"], payload)
                 delivered = got > 0
