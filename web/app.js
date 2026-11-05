@@ -762,12 +762,40 @@ async function sendMessage() {
     setConn(false, "offline, message not sent");
     return;
   }
-  const key = await sharedKeyFor(peer);
-  const { iv, ct } = await encryptText(key, text);
-  if (sendWS({ type: "msg", to: peer, iv, ct, cid: crypto.randomUUID() })) {
+  // Each message takes one of their one-time prekeys. The server hands it out once and
+  // deletes it, so no two messages ever share one.
+  let claim;
+  try {
+    claim = await api("/api/prekeys/claim/" + encodeURIComponent(peer), { method: "POST" });
+  } catch (ex) {
+    toast(whyFailed(ex, "Couldn't send that, try again."));
+    return;
+  }
+  if (claim.refused) {
+    toast(REJECT_REASONS[claim.refused] || "That message wasn't sent.");
+    return;
+  }
+  const cid = crypto.randomUUID();
+  let body;
+  if (claim.pub) {
+    const sealed = await sealForwardSecret(state.identity.privateKey, await importPub(c.pub), claim.pub, text);
+    body = { iv: sealed.iv, ct: sealed.ct, eph: sealed.eph, pid: claim.id };
+    // nobody can open this one again, us included, so keep the text until the server
+    // tells us the message's id (decryptMessage moves it over)
+    await savePending(state.me, cid, text);
+  } else {
+    // they've run out of one-time keys (they'll make more next time they're online).
+    // Better to send the old way than not at all, but say so
+    const key = await sharedKeyFor(peer);
+    body = await encryptText(key, text);
+    toast("Sent without forward secrecy: they're out of one-time keys. It will be fixed when they're back online.");
+  }
+  if (sendWS({ type: "msg", to: peer, cid, ...body })) {
     $("msg").value = "";
     autosize();
     stopTyping();
+  } else {
+    dropPending(state.me, cid).catch(() => {});
   }
 }
 
