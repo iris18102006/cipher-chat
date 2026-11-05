@@ -180,6 +180,50 @@ async function decryptFor(peer, iv, ct) {
   }
 }
 
+// What to show when a forward secret message can't be opened. The key for each one exists
+// once, so these aren't errors in the usual sense: it's what forward secrecy looks like.
+const GONE_TEXT = "can't open this message here (its one-time key is gone, it was read on another browser or this browser's data was cleared)";
+const OTHER_BROWSER_TEXT = "you sent this from another browser, it can't be opened here";
+
+// Opens one message from a history row or a live websocket message ({ id, from, v, eph,
+// pid, cid, iv, ct }). Order: text we already kept on this device, then old style (one
+// long-term key, can be opened any time), then forward secret (needs the one-time key).
+async function decryptMessage(peer, m) {
+  const mine = m.from === state.me;
+  try {
+    const kept = await loadPlain(state.me, m.id);
+    if (kept !== null) return { text: kept, failed: false };
+    if (mine && m.cid) {
+      // we sent it and the server has just told us its id: move our copy over to it
+      const pending = await loadPending(state.me, m.cid);
+      if (pending !== null) {
+        await savePlain(state.me, m.id, pending);
+        await dropPending(state.me, m.cid);
+        return { text: pending, failed: false };
+      }
+    }
+  } catch {}
+  if (m.v !== 2) return decryptFor(peer, m.iv, m.ct);
+  if (mine) return { text: OTHER_BROWSER_TEXT, failed: true };
+  try {
+    const c = state.contacts.get(peer);
+    if (!c || !c.pub) throw new Error("no key");
+    const prekey = await loadPrekey(state.me, m.pid);
+    if (!prekey) {
+      // another tab may have opened it a moment ago, it saves the text before deleting the key
+      const again = await loadPlain(state.me, m.id);
+      return again !== null ? { text: again, failed: false } : { text: GONE_TEXT, failed: true };
+    }
+    const text = await openForwardSecret(state.identity.privateKey, await importPub(c.pub), prekey, m.eph, m.iv, m.ct);
+    // save the text first, and only then let the key go
+    await savePlain(state.me, m.id, text);
+    await deletePrekey(state.me, m.pid);
+    return { text, failed: false };
+  } catch {
+    return { text: "can't decrypt this message (the key changed or it's corrupted)", failed: true };
+  }
+}
+
 // ---------- contacts ----------
 
 async function loadContacts() {
@@ -435,8 +479,8 @@ function renderMessages(keepScroll) {
 async function decryptList(peer, rows) {
   const out = [];
   for (const r of rows) {
-    const { text, failed } = await decryptFor(peer, r.iv, r.ct);
-    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, delivered: r.delivered, read: r.read, held: !!r.held });
+    const { text, failed } = await decryptMessage(peer, r);
+    out.push({ id: r.id, from: r.from, v: r.v, text, failed, ts: r.ts, delivered: r.delivered, read: r.read, held: !!r.held });
   }
   return out;
 }
@@ -597,8 +641,8 @@ async function handleWS(data) {
     const list = state.msgs.get(peer);
     const mine = data.from === state.me;
     if (list && !list.some((m) => m.id === data.id)) {
-      const { text, failed } = await decryptFor(peer, data.iv, data.ct);
-      list.push({ id: data.id, from: data.from, text, failed, ts: data.ts, delivered: !!data.delivered, read: false, held: !!data.held });
+      const { text, failed } = await decryptMessage(peer, data);
+      list.push({ id: data.id, from: data.from, v: data.v, text, failed, ts: data.ts, delivered: !!data.delivered, read: false, held: !!data.held });
     }
     if (!mine) {
       c.typing = false;
