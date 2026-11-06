@@ -133,3 +133,4 @@ This is a learning project, not Signal.
 - [x] Fix: unblocking someone does nothing
 - [x] Separate button for friend requests
 - [x] Separate button that lists who you blocked
+ 
