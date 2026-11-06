@@ -4,7 +4,7 @@ End-to-end encrypted web chat with a 2000s social-site look. Work in progress.
 
 The server only ever sees ciphertext. Keys are generated in your browser and the private key never leaves it.
 
-## Features
+## Features 
 
 - Accounts (argon2 password hashes, httpOnly session cookies that expire after 30 days)
 - Buddy list with online dots, last seen, unread badges and search
