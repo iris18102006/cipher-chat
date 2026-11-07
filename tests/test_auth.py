@@ -38,3 +38,10 @@ def test_signup_trims_spaces_around_the_username(client):
     r = client.post("/api/signup", json={"username": "  trimmed  ", "password": "password123"})
     assert r.status_code == 200
     assert r.json() == {"username": "trimmed"}
+
+
+def test_logout_ends_the_session(client):
+    a = signup(client, "alice")
+    assert a.get("/api/me").status_code == 200
+    assert a.post("/api/logout").status_code == 200
+    assert a.get("/api/me").status_code == 401
