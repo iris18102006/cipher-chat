@@ -103,6 +103,11 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button:focus-visible {
+  outline: 2px solid #ff9933;
+  outline-offset: 2px;
+}
+
 .hint {
   margin: 6px 0 0;
   font-size: 10px;
