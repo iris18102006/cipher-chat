@@ -11,3 +11,8 @@ def page(name):
 def test_every_script_index_loads_exists():
     for src in re.findall(r'<script src="([^"]+)"', page("index.html")):
         assert (WEB / src).is_file(), src
+
+
+def test_every_stylesheet_index_loads_exists():
+    for href in re.findall(r'<link rel="stylesheet" href="([^"]+)"', page("index.html")):
+        assert (WEB / href).is_file(), href
