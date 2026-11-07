@@ -38,3 +38,10 @@ def test_dialog_labels_point_at_real_ids():
     assert targets
     for target in targets:
         assert f'id="{target}"' in text, target
+
+
+def test_close_buttons_have_a_label():
+    buttons = re.findall(r"<button[^>]*>&times;</button>", page("index.html"))
+    assert buttons
+    for button in buttons:
+        assert "aria-label=" in button, button
