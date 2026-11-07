@@ -1,3 +1,6 @@
+// Login and sign up. Posts the form to the API and shows what went wrong;
+// on success the server has set the session cookie, so we just go to the chat.
+
 const errorEl = document.getElementById("error");
 
 async function submit(path, form) {
