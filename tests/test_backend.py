@@ -8,23 +8,10 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 from PIL import Image
 
-from backend import db
 
 PUB_A = base64.b64encode(b"\x04" + b"a" * 64).decode()
 PUB_B = base64.b64encode(b"\x04" + b"b" * 64).decode()
 ORIGIN = {"origin": "http://testserver", "host": "testserver"}
-
-
-@pytest.fixture()
-def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
-    db.init_db()
-    from backend import main
-
-    main._fails.clear()
-    main.manager.sockets.clear()
-    with TestClient(main.app) as c:
-        yield c
 
 
 def signup(client, name, pw="password123"):
