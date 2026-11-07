@@ -57,3 +57,10 @@ def test_session_cookie_is_httponly_and_samesite(client):
     assert cookie.startswith("session=")
     assert "httponly" in cookie
     assert "samesite=lax" in cookie
+
+
+def test_login_ignores_case_and_spaces_in_the_username(client):
+    signup(client, "alice")
+    r = client.post("/api/login", json={"username": "  ALICE ", "password": "password123"})
+    assert r.status_code == 200
+    assert r.json() == {"username": "alice"}
