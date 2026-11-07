@@ -99,3 +99,7 @@ def test_chat_page_loads_when_logged_in(client):
     r = a.get("/", follow_redirects=False)
     assert r.status_code == 200
     assert 'id="composer"' in r.text
+
+
+def test_unknown_page_is_a_404(client):
+    assert client.get("/nope.html").status_code == 404
