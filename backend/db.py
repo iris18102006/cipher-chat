@@ -1,3 +1,4 @@
+"""SQLite connection and schema for cipher-chat."""
 import sqlite3
 from pathlib import Path
 
