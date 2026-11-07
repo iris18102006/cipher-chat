@@ -64,3 +64,11 @@ def test_login_ignores_case_and_spaces_in_the_username(client):
     r = client.post("/api/login", json={"username": "  ALICE ", "password": "password123"})
     assert r.status_code == 200
     assert r.json() == {"username": "alice"}
+
+
+def test_every_login_gets_its_own_session_token(client):
+    signup(client, "alice")
+    creds = {"username": "alice", "password": "password123"}
+    first = client.post("/api/login", json=creds).headers["set-cookie"].split(";")[0]
+    second = client.post("/api/login", json=creds).headers["set-cookie"].split(";")[0]
+    assert first != second
