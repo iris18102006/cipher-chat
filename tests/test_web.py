@@ -63,3 +63,8 @@ def test_ids_in_index_are_unique():
 def test_every_page_has_a_description():
     for p in WEB.glob("*.html"):
         assert 'name="description"' in p.read_text(), p.name
+
+
+def test_every_page_sets_a_theme_color():
+    for p in WEB.glob("*.html"):
+        assert 'name="theme-color"' in p.read_text(), p.name
