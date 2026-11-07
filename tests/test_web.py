@@ -30,3 +30,11 @@ def test_no_stylesheet_is_left_unloaded():
     for name in ("index.html", "login.html"):
         loaded |= set(re.findall(r'<link rel="stylesheet" href="([^"]+)"', page(name)))
     assert {p.name for p in WEB.glob("*.css")} == loaded
+
+
+def test_dialog_labels_point_at_real_ids():
+    text = page("index.html")
+    targets = re.findall(r'aria-labelledby="([^"]+)"', text)
+    assert targets
+    for target in targets:
+        assert f'id="{target}"' in text, target
