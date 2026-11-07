@@ -5,6 +5,8 @@ const errorEl = document.getElementById("error");
 
 async function submit(path, form) {
   errorEl.textContent = "";
+  const button = form.querySelector("button");
+  button.disabled = true;
   const username = form.elements.username.value;
   const password = form.elements.password.value;
   try {
@@ -27,6 +29,8 @@ async function submit(path, form) {
     errorEl.textContent = message;
   } catch {
     errorEl.textContent = "can't reach the server, is it running?";
+  } finally {
+    button.disabled = false;
   }
 }
 
