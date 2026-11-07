@@ -74,6 +74,10 @@ Things that follow from this:
 
 The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` header, so other sites and logged-out visitors can't connect.
 
+## Project layout
+
+- `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
+
 ## Run it
 
     python3 -m venv .venv
