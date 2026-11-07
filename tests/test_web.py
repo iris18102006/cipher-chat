@@ -58,3 +58,8 @@ def test_login_labels_point_at_real_inputs():
 def test_ids_in_index_are_unique():
     ids = re.findall(r'\bid="([^"]+)"', page("index.html"))
     assert len(ids) == len(set(ids))
+
+
+def test_every_page_has_a_description():
+    for p in WEB.glob("*.html"):
+        assert 'name="description"' in p.read_text(), p.name
