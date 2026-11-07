@@ -16,3 +16,9 @@ def test_signup_rejects_symbols_in_the_username(client):
 def test_signup_username_too_long(client):
     r = client.post("/api/signup", json={"username": "a" * 21, "password": "password123"})
     assert r.status_code == 400
+
+
+def test_signup_username_edges_are_allowed(client):
+    for name in ("abc", "a" * 20):
+        r = client.post("/api/signup", json={"username": name, "password": "password123"})
+        assert r.status_code == 200, name
