@@ -92,3 +92,9 @@ def test_login_form_limits_match_the_backend():
     assert re.search(r'id="signup-user"[^>]*maxlength="20"', text)
     assert re.search(r'id="signup-pass"[^>]*minlength="8"', text)
     assert re.search(r'id="signup-pass"[^>]*maxlength="128"', text)
+
+
+def test_every_login_field_is_required():
+    text = page("login.html")
+    for field in ("login-user", "login-pass", "signup-user", "signup-pass"):
+        assert re.search(rf'id="{field}"[^>]*\brequired\b', text), field
