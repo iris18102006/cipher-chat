@@ -45,3 +45,11 @@ def test_close_buttons_have_a_label():
     assert buttons
     for button in buttons:
         assert "aria-label=" in button, button
+
+
+def test_login_labels_point_at_real_inputs():
+    text = page("login.html")
+    targets = re.findall(r'<label for="([^"]+)"', text)
+    assert len(targets) == 4
+    for target in targets:
+        assert f'id="{target}"' in text, target
