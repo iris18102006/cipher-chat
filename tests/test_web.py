@@ -73,3 +73,8 @@ def test_every_page_sets_a_theme_color():
 def test_every_page_has_a_favicon():
     for p in WEB.glob("*.html"):
         assert 'rel="icon"' in p.read_text(), p.name
+
+
+def test_every_page_has_a_noscript_message():
+    for p in WEB.glob("*.html"):
+        assert "<noscript>" in p.read_text(), p.name
