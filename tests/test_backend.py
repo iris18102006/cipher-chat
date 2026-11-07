@@ -396,7 +396,8 @@ def test_messages_to_someone_who_blocked_you_are_hidden(client):
 
 
 def test_cant_send_to_someone_you_blocked(client):
-    a, b = signup(client, "alice"), signup(client, "bob")
+    a = signup(client, "alice")
+    signup(client, "bob")
     a.post("/api/blocks/bob")
     with a.websocket_connect("/ws", headers=ORIGIN) as wa:
         wa.receive_json()
