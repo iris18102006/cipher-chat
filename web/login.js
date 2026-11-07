@@ -27,6 +27,7 @@ async function submit(path, form) {
       if (typeof data.detail === "string") message = data.detail;
     }
     errorEl.textContent = message;
+    if (res.status === 401) form.elements.password.value = "";
   } catch {
     errorEl.textContent = "can't reach the server, is it running?";
   } finally {
