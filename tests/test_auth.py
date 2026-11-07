@@ -45,3 +45,7 @@ def test_logout_ends_the_session(client):
     assert a.get("/api/me").status_code == 200
     assert a.post("/api/logout").status_code == 200
     assert a.get("/api/me").status_code == 401
+
+
+def test_me_needs_a_login(client):
+    assert client.get("/api/me").status_code == 401
