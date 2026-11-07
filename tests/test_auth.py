@@ -72,3 +72,17 @@ def test_every_login_gets_its_own_session_token(client):
     first = client.post("/api/login", json=creds).headers["set-cookie"].split(";")[0]
     second = client.post("/api/login", json=creds).headers["set-cookie"].split(";")[0]
     assert first != second
+
+
+def test_session_tokens_are_stored_hashed(client):
+    from backend import db
+
+    a = signup(client, "alice")
+    token = a.cookies.get("session")
+    conn = db.connect()
+    try:
+        stored = [row["token"] for row in conn.execute("SELECT token FROM sessions")]
+    finally:
+        conn.close()
+    assert token and len(stored) == 1
+    assert token not in stored
