@@ -81,7 +81,7 @@ def test_create_group_stores_only_wrapped_keys(client):
 
 def test_create_group_validation(client):
     a, b, c = trio(client)
-    d = make_user(client, "dave", "d")  # not alice's friend
+    make_user(client, "dave", "d")  # not alice's friend
     body = lambda members, keys, name="x": {"name": name, "members": members, "keys": keys}  # noqa: E731
 
     assert a.post("/api/groups", json=body([], wraps("alice"))).status_code == 400
