@@ -85,6 +85,8 @@ Open `http://127.0.0.1:8000`, sign up, then open a second browser profile (or a 
 
 If you serve it over https, set `CIPHER_SECURE_COOKIES=1` so the session cookie is only sent over https.
 
+By default it listens on `127.0.0.1:8000`. Set `CIPHER_HOST` and `CIPHER_PORT` to change that.
+
 ## Tests
 
     pip install -r requirements-dev.txt
