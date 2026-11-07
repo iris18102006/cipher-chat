@@ -3,7 +3,7 @@ import base64
 import pytest
 
 from backend import main
-from tests.test_backend import ORIGIN, client, signup  # noqa: F401
+from tests.test_backend import ORIGIN, signup
 
 
 @pytest.fixture(autouse=True)
