@@ -207,7 +207,7 @@ def test_message_with_an_old_key_does_not_reach_people_who_joined_later(client):
 
 def test_only_friends_can_be_added_and_not_across_a_block(client):
     a, b, c = trio(client)
-    d = make_user(client, "dave", "d")
+    make_user(client, "dave", "d")
     gid = new_group(a, members=("bob",))["id"]
     # bob isn't friends with carol, so bob can't add her
     r = b.post(f"/api/groups/{gid}/members", json={"username": "carol", "version": 2, "keys": wraps("alice", "bob", "carol")})
