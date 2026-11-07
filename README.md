@@ -77,6 +77,7 @@ The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` he
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
+- `backend/db.py`: the SQLite schema and the connection helper (the database file `backend/cipher.db` is made on first run)
 
 ## Run it
 
