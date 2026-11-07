@@ -34,7 +34,7 @@ from .db import connect, init_db
 
 COOKIE = "session"
 SESSION_DAYS = 30
-USERNAME_RE = re.compile(r"^[a-z0-9_]{3,20}$")
+USERNAME_RE = re.compile(r"[a-z0-9_]{3,20}")
 MAX_CT_LEN = 16_000  # base64 chars of ciphertext, roughly 12 KB of text
 MAX_FRAME = 40_000  # biggest websocket frame we even try to read
 FLOOD_LIMIT = 40  # events per socket ...
@@ -482,7 +482,7 @@ def get_peer(conn, username: str):
 @app.post("/api/signup")
 def signup(creds: Credentials, response: Response, conn=Depends(get_conn)):
     username = creds.username.strip().lower()
-    if not USERNAME_RE.match(username):
+    if not USERNAME_RE.fullmatch(username):
         raise HTTPException(400, "username must be 3-20 chars: a-z, 0-9, _")
     if not 8 <= len(creds.password) <= 128:
         raise HTTPException(400, "password must be 8-128 characters")
