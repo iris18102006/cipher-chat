@@ -85,3 +85,10 @@ def test_chat_inputs_are_labelled():
     assert re.search(r'id="msg"[^>]*aria-label=', text)
     assert re.search(r'id="search"[^>]*aria-label=', text)
     assert re.search(r'id="log"[^>]*role="log"', text)
+
+
+def test_login_form_limits_match_the_backend():
+    text = page("login.html")
+    assert re.search(r'id="signup-user"[^>]*maxlength="20"', text)
+    assert re.search(r'id="signup-pass"[^>]*minlength="8"', text)
+    assert re.search(r'id="signup-pass"[^>]*maxlength="128"', text)
