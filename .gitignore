@@ -9,3 +9,4 @@ backend/cipher.db-wal
 backend/cipher.db-shm
 cookies.txt
 node_modules/
+.DS_Store
