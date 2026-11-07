@@ -90,6 +90,10 @@ If you serve it over https, set `CIPHER_SECURE_COOKIES=1` so the session cookie 
     pip install -r requirements-dev.txt
     python -m pytest tests
 
+Unused imports and variables are checked with pyflakes:
+
+    python -m pyflakes backend server.py tests
+
 The forward secrecy crypto in the browser has its own tests (Node 20+, nothing to install):
 
     node --test
