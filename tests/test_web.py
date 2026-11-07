@@ -53,3 +53,8 @@ def test_login_labels_point_at_real_inputs():
     assert len(targets) == 4
     for target in targets:
         assert f'id="{target}"' in text, target
+
+
+def test_ids_in_index_are_unique():
+    ids = re.findall(r'\bid="([^"]+)"', page("index.html"))
+    assert len(ids) == len(set(ids))
