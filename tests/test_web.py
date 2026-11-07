@@ -16,3 +16,10 @@ def test_every_script_index_loads_exists():
 def test_every_stylesheet_index_loads_exists():
     for href in re.findall(r'<link rel="stylesheet" href="([^"]+)"', page("index.html")):
         assert (WEB / href).is_file(), href
+
+
+def test_no_script_is_left_unloaded():
+    loaded = set()
+    for name in ("index.html", "login.html"):
+        loaded |= set(re.findall(r'<script src="([^"]+)"', page(name)))
+    assert {p.name for p in WEB.glob("*.js")} == loaded
