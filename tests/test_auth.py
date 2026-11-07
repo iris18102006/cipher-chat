@@ -49,3 +49,11 @@ def test_logout_ends_the_session(client):
 
 def test_me_needs_a_login(client):
     assert client.get("/api/me").status_code == 401
+
+
+def test_session_cookie_is_httponly_and_samesite(client):
+    r = client.post("/api/signup", json={"username": "alice", "password": "password123"})
+    cookie = r.headers["set-cookie"].lower()
+    assert cookie.startswith("session=")
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
