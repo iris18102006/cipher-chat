@@ -26,6 +26,7 @@ async function submit(path, form) {
       const data = await res.json().catch(() => ({}));
       if (typeof data.detail === "string") message = data.detail;
       else if (res.status === 429) message = "too many tries, wait a bit and try again";
+      else if (res.status >= 500) message = "the server had a problem, try again in a moment";
     }
     errorEl.textContent = message;
     if (res.status === 401) {
