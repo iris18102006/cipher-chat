@@ -22,3 +22,13 @@ def test_signup_username_edges_are_allowed(client):
     for name in ("abc", "a" * 20):
         r = client.post("/api/signup", json={"username": name, "password": "password123"})
         assert r.status_code == 200, name
+
+
+def test_signup_password_length_limits(client):
+    def attempt(name, pw):
+        return client.post("/api/signup", json={"username": name, "password": pw}).status_code
+
+    assert attempt("pw_short", "1234567") == 400
+    assert attempt("pw_min", "12345678") == 200
+    assert attempt("pw_max", "x" * 128) == 200
+    assert attempt("pw_long", "x" * 129) == 400
