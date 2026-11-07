@@ -115,7 +115,7 @@ This is a learning project, not Signal.
 - Group "seen by" and typing are visible to every member who hasn't blocked you
 - Someone who was removed keeps what they already read and the keys they already held, a new key only protects what's said afterwards
 
-## Roadmap 
+## Roadmap
 
 - [x] HKDF key derivation
 - [x] Accounts, buddy list, history
