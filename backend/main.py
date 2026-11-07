@@ -1,3 +1,7 @@
+"""The cipher-chat API: accounts, profiles, friends, blocks, messages and the websocket.
+
+The server only stores and forwards ciphertext, see the README.
+"""
 import base64
 import hashlib
 import io
