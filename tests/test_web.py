@@ -78,3 +78,10 @@ def test_every_page_has_a_favicon():
 def test_every_page_has_a_noscript_message():
     for p in WEB.glob("*.html"):
         assert "<noscript>" in p.read_text(), p.name
+
+
+def test_chat_inputs_are_labelled():
+    text = page("index.html")
+    assert re.search(r'id="msg"[^>]*aria-label=', text)
+    assert re.search(r'id="search"[^>]*aria-label=', text)
+    assert re.search(r'id="log"[^>]*role="log"', text)
