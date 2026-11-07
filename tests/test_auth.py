@@ -32,3 +32,9 @@ def test_signup_password_length_limits(client):
     assert attempt("pw_min", "12345678") == 200
     assert attempt("pw_max", "x" * 128) == 200
     assert attempt("pw_long", "x" * 129) == 400
+
+
+def test_signup_trims_spaces_around_the_username(client):
+    r = client.post("/api/signup", json={"username": "  trimmed  ", "password": "password123"})
+    assert r.status_code == 200
+    assert r.json() == {"username": "trimmed"}
