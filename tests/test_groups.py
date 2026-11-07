@@ -1,6 +1,6 @@
 import base64
 
-from tests.test_backend import ORIGIN, client, signup  # noqa: F401
+from tests.test_backend import ORIGIN, signup
 
 
 def pub(ch: str) -> str:
