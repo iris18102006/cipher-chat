@@ -7,7 +7,7 @@ async function submit(path, form) {
   errorEl.textContent = "";
   const button = form.querySelector("button");
   button.disabled = true;
-  const username = form.elements.username.value;
+  const username = form.elements.username.value.trim();
   const password = form.elements.password.value;
   try {
     const res = await fetch(path, {
