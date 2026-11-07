@@ -82,6 +82,7 @@ The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` he
 - `web/crypto.js`: all the Web Crypto code (keys, HKDF, AES-GCM, prekeys)
 - `web/app.js`: the chat screen (buddy list, messages, typing, receipts, the websocket)
 - `web/profile.js`, `web/profile-media.js`, `web/friends.js`, `web/lists.js`, `web/settings.js`, `web/groups.js` and `web/chat-themes.js`: one file for each screen on top of the chat (profiles and pictures, friends, the Requests and Blocked panels, settings, group chats, chat themes)
+- `tests/`: the Python tests (`python -m pytest tests`) and the Node crypto tests (`node --test`)
 
 ## Run it
 
