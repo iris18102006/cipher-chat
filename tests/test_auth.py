@@ -86,3 +86,9 @@ def test_session_tokens_are_stored_hashed(client):
         conn.close()
     assert token and len(stored) == 1
     assert token not in stored
+
+
+def test_login_page_is_public(client):
+    r = client.get("/login.html")
+    assert r.status_code == 200
+    assert "Member Login" in r.text
