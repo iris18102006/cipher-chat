@@ -23,3 +23,10 @@ def test_no_script_is_left_unloaded():
     for name in ("index.html", "login.html"):
         loaded |= set(re.findall(r'<script src="([^"]+)"', page(name)))
     assert {p.name for p in WEB.glob("*.js")} == loaded
+
+
+def test_no_stylesheet_is_left_unloaded():
+    loaded = set()
+    for name in ("index.html", "login.html"):
+        loaded |= set(re.findall(r'<link rel="stylesheet" href="([^"]+)"', page(name)))
+    assert {p.name for p in WEB.glob("*.css")} == loaded
