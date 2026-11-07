@@ -68,3 +68,8 @@ def test_every_page_has_a_description():
 def test_every_page_sets_a_theme_color():
     for p in WEB.glob("*.html"):
         assert 'name="theme-color"' in p.read_text(), p.name
+
+
+def test_every_page_has_a_favicon():
+    for p in WEB.glob("*.html"):
+        assert 'rel="icon"' in p.read_text(), p.name
