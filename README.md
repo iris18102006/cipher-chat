@@ -152,7 +152,7 @@ This is a learning project, not Signal.
 - [x] Separate button that lists who you blocked
 - [x] You can share photos, videos and files
 - [x] Relationship statuses made possible
-- [x] Pinnig a friend is possible now in chats and profile
+- [x] Pinnig a friend is possible now in chats 
 - [x] Now there is a feed where you can post your thoughts
 - [x] You can choose what friends to show in your profile according to your peferences
 - [ ] Profiles will have the possibility of showing a certain song into their profile
