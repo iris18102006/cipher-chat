@@ -151,5 +151,11 @@ This is a learning project, not Signal.
 - [x] Separate button for friend requests
 - [x] Separate button that lists who you blocked
 - [x] You can share photos, videos and files
-- [x] Relationship statuses
-- [ ] Pin a friend is possible now
+- [x] Relationship statuses made possible
+- [x] Pin a friend is possible now
+- [x] Now there is a feed where you can post your thoughts
+- [x] You can choose what friends to show in your profile according to your peferences
+- [ ] Profiles will have the possibility of showing a certain song into their profile
+- [ ] Posts will have the ability to get shared
+- [ ] The feed will have a special window so it doesn't have to look ugly
+
