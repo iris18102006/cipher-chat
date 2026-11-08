@@ -150,3 +150,6 @@ This is a learning project, not Signal.
 - [x] Fix: unblocking someone does nothing
 - [x] Separate button for friend requests
 - [x] Separate button that lists who you blocked
+- [x] You can share photos, videos and files
+- [x] Relationship statuses
+- [ ] Pin a friend is possible now
