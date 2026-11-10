@@ -117,7 +117,7 @@ def get_group(conn, gid: int, user):
 
 def members_of(conn, gid: int):
     return conn.execute(
-        "SELECT u.id, u.username, u.display_name, u.avatar_id, u.public_key, "
+        "SELECT u.id, u.username, u.display_name, u.avatar_id, u.public_key, u.sign_pub, "
         "m.joined_version, m.last_read_id "
         "FROM chat_group_members m JOIN users u ON u.id = m.user_id "
         "WHERE m.group_id = ? ORDER BY m.joined_at, u.id",
@@ -209,6 +209,7 @@ def detail(conn, gid: int, user) -> dict:
             "display_name": m["display_name"],
             "avatar": avatar_url(m["avatar_id"]),
             "pub": m["public_key"],
+            "sign_pub": m["sign_pub"],
             "owner": m["id"] == row["owner_id"],
         }
         for m in members_of(conn, gid)
