@@ -5,6 +5,8 @@ const state = {
   me: null,
   identity: null,
   myPub: null,
+  signing: null, // my ECDSA key pair for signing group messages
+  mySignPub: null,
   contacts: new Map(), // username -> { username, display_name, avatar, mood, friend, blocked, pub, online, last_seen, unread, typing, changed }
   order: [], // usernames, most recent conversation first
   msgs: new Map(), // username -> [{ id, from, text, ts, delivered, read, failed }]
@@ -971,6 +973,14 @@ setInterval(() => {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pub: state.myPub }),
+    });
+    // the key that signs group messages, so members can tell who really wrote what
+    state.signing = await loadOrCreateSigning(me.username);
+    state.mySignPub = await exportPub(state.signing.publicKey);
+    await api("/api/signkey", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pub: state.mySignPub }),
     });
     $("my-key").textContent = "your key: " + (await fingerprintOf(state.myPub));
     // the key is uploaded, so any prekeys belonging to an older key are gone: stock up
