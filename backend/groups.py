@@ -36,6 +36,7 @@ MAX_GROUPS = 50  # per person
 NAME_LIMIT = 40
 IV_BYTES = 12
 WRAPPED_KEY_BYTES = 48  # 32 byte AES key + 16 byte GCM tag
+SIG_BYTES = 64  # an ECDSA P-256 signature in the raw r||s form Web Crypto makes
 
 # every message a member is allowed to see: from the key version they joined at
 # onwards, and not from anyone they blocked or who blocked them
@@ -407,7 +408,7 @@ def group_history(
 ):
     _, mem = get_group(conn, gid, user)
     rows = conn.execute(
-        f"SELECT m.id, m.sender_id, u.username AS sender, m.key_version, m.iv, m.ct, m.created_at "
+        f"SELECT m.id, m.sender_id, u.username AS sender, m.key_version, m.iv, m.ct, m.sig, m.created_at "
         f"FROM chat_group_messages m JOIN users u ON u.id = m.sender_id "
         f"WHERE {VISIBLE} AND (:before IS NULL OR m.id < :before) "
         f"ORDER BY m.id DESC LIMIT :limit",
@@ -430,6 +431,7 @@ def group_history(
                 "v": r["key_version"],
                 "iv": r["iv"],
                 "ct": r["ct"],
+                "sig": r["sig"],
                 "ts": r["created_at"],
                 "seen_by": [n for n, last in readers if last >= r["id"]] if mine else [],
             }
@@ -479,6 +481,14 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
             return True
         if len(iv) > 32 or not iv or not ct:
             return True
+        # the signature is optional here (older browsers send none) but if it's there it
+        # has to be the right size. The server can't check it, only the members' browsers can
+        sig = data.get("sig")
+        if sig is not None and not (isinstance(sig, str) and b64_len(sig, SIG_BYTES)):
+            await manager.send_user(
+                me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "bad_sig"}
+            )
+            return True
         if len(ct) > MAX_CT_LEN:
             await manager.send_user(
                 me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "too_long"}
@@ -496,9 +506,9 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
             )
             return True
         cur = conn.execute(
-            "INSERT INTO chat_group_messages (group_id, sender_id, key_version, iv, ct) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (gid, me_id, v, iv, ct),
+            "INSERT INTO chat_group_messages (group_id, sender_id, key_version, iv, ct, sig) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (gid, me_id, v, iv, ct, sig),
         )
         msg_id = cur.lastrowid
         # writing means I've read everything up to here
@@ -519,6 +529,7 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
             "v": v,
             "iv": iv,
             "ct": ct,
+            "sig": sig,
             "ts": ts,
             "cid": data.get("cid"),
         }
