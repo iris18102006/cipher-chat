@@ -207,6 +207,8 @@ def init_db():
         # signing: an ECDSA public key per person (the private half stays in their browser),
         # so a group message can prove who wrote it even though the whole group shares a key
         _add_column(conn, "users", "sign_pub", "TEXT")
+        # the signature a group message was sent with (base64, 64 bytes), null on older messages
+        _add_column(conn, "chat_group_messages", "sig", "TEXT")
         conn.commit()
     finally:
         conn.close()
