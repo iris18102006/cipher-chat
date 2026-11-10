@@ -153,3 +153,171 @@
   color: #555;
   font-style: italic;
 }
+
+/* ---------- one post ---------- */
+
+.feed-post {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #aca899;
+  border-left: 5px solid #3a7bd5;
+  border-radius: 3px;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.12);
+}
+
+.feed-post.mine {
+  border-left-color: #ff9933;
+}
+
+.feed-post.is-new {
+  animation: feed-flash 1.6s ease-out;
+}
+
+@keyframes feed-flash {
+  from { background: #fff7c2; }
+  to { background: #fff; }
+}
+
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-head .pf-avatar {
+  flex: none;
+  cursor: pointer;
+}
+
+.feed-who {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.feed-who b {
+  cursor: pointer;
+  color: #0a246a;
+}
+
+.feed-who b:hover {
+  text-decoration: underline;
+}
+
+.feed-who small {
+  display: block;
+  color: #666;
+  font-size: 11px;
+}
+
+.feed-body {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feed-shared-tag {
+  font-size: 11px;
+  color: #666;
+  margin-left: 4px;
+}
+
+/* the post that was shared, inside the share */
+.feed-original {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f3f6fc;
+  border: 1px dashed #7f9db9;
+}
+
+.feed-original.is-note {
+  color: #666;
+  font-style: italic;
+}
+
+.feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.feed-actions button {
+  padding: 2px 10px;
+  border: 1px solid #aca899;
+  border-radius: 10px;
+  background: #f6f4ea;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.feed-actions button:hover {
+  background: #fff7c2;
+}
+
+.feed-actions button.on {
+  border-color: #d3472b;
+  color: #d3472b;
+  font-weight: bold;
+}
+
+.feed-actions .danger {
+  margin-left: auto;
+  color: #a33;
+}
+
+.feed-actions button:focus-visible,
+#feed-bar button:focus-visible,
+#feed-post:focus-visible,
+#feed-more:focus-visible,
+#feed-new:focus-visible {
+  outline: 2px solid #0a246a;
+  outline-offset: 2px;
+}
+
+/* the little form that opens when you press Share */
+.feed-share-form {
+  margin-top: 8px;
+  padding: 8px;
+  background: #fffbe6;
+  border: 1px solid #e0c060;
+}
+
+.feed-share-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  font: inherit;
+  border: 1px solid #7f9db9;
+}
+
+.feed-share-form .row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.feed-share-form .err {
+  color: #a33;
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  #feed-overlay {
+    padding: 0;
+  }
+
+  #feed-window {
+    border-radius: 0;
+    min-height: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-post.is-new {
+    animation: none;
+  }
+}
