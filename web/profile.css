@@ -974,3 +974,13 @@
     height: 10px;
   }
 }
+
+.pf-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.pf-song-holder {
+  margin-bottom: 8px;
+}
