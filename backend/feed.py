@@ -166,3 +166,43 @@ def get_feed(
         "posts": [post_dict(conn, r, user["id"], authors) for r in rows[:limit]],
         "more": len(rows) > limit,
     }
+
+
+@router.delete("/api/posts/{post_id}")
+def delete_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    # somebody else's post is "not found", the same answer as one that doesn't exist
+    row = conn.execute("SELECT author_id FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if not row or row["author_id"] != user["id"]:
+        raise HTTPException(404, "no such post")
+    conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    conn.commit()
+    return {"ok": True}
+
+
+def readable_post(conn, post_id: int, user):
+    """A post the person is allowed to see, or the same 404 whether it's missing or private."""
+    row = post_row(conn, post_id, user["id"])
+    if not row or row["author_id"] not in visible_authors(conn, user["id"]):
+        raise HTTPException(404, "no such post")
+    return row
+
+
+@router.post("/api/posts/{post_id}/like")
+def like_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    readable_post(conn, post_id, user)
+    conn.execute("INSERT OR IGNORE INTO post_likes (post_id, user_id) VALUES (?, ?)", (post_id, user["id"]))
+    conn.commit()
+    return like_state(conn, post_id, user["id"])
+
+
+@router.delete("/api/posts/{post_id}/like")
+def unlike_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    readable_post(conn, post_id, user)
+    conn.execute("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?", (post_id, user["id"]))
+    conn.commit()
+    return like_state(conn, post_id, user["id"])
+
+
+def like_state(conn, post_id: int, me_id: int) -> dict:
+    row = post_row(conn, post_id, me_id)
+    return {"likes": row["likes"], "liked": bool(row["liked"])}
