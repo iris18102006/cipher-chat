@@ -66,3 +66,46 @@ def remove_song(user=Depends(current_user), conn=Depends(get_conn)):
     conn.execute("DELETE FROM songs WHERE owner_id = ?", (user["id"],))
     conn.commit()
     return {"song_url": ""}
+
+
+def byte_range(header: str, size: int):
+    """(start, end) for a header like "bytes=100-" or "bytes=-500", None to send it all.
+
+    Browsers ask for pieces so you can jump around in a song. Only one piece at a time."""
+    if not header.startswith("bytes=") or "," in header:
+        return None
+    first, _, last = header[6:].strip().partition("-")
+    try:
+        if first == "":
+            n = int(last)
+            if n <= 0:
+                return None
+            start, end = max(size - n, 0), size - 1
+        else:
+            start = int(first)
+            end = int(last) if last else size - 1
+    except ValueError:
+        return None
+    if start < 0 or start >= size or end < start:
+        raise HTTPException(416, "that part of the song doesn't exist", headers={"Content-Range": f"bytes */{size}"})
+    return start, min(end, size - 1)
+
+
+@router.get("/api/song/{song_id}")
+def get_song(song_id: int, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute("SELECT owner_id, mime, data FROM songs WHERE id = ?", (song_id,)).fetchone()
+    # someone who blocked you doesn't let you listen either, and doesn't say why
+    if not row or (row["owner_id"] != user["id"] and i_blocked(conn, row["owner_id"], user["id"])):
+        raise HTTPException(404, "no such song")
+    data = bytes(row["data"])
+    size = len(data)
+    piece = byte_range(request.headers.get("range", ""), size)
+    if piece is None:
+        return Response(content=data, media_type=row["mime"], headers=SONG_HEADERS)
+    start, end = piece
+    return Response(
+        content=data[start : end + 1],
+        status_code=206,
+        media_type=row["mime"],
+        headers={**SONG_HEADERS, "Content-Range": f"bytes {start}-{end}/{size}"},
+    )
