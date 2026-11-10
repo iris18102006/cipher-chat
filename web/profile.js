@@ -288,7 +288,7 @@ function renderProfile(p) {
 
   body.append(section("About me", p.about_me));
   body.append(section("Interests", p.interests));
-  if (p.song) body.append(section("Now playing", p.song));
+  if (p.song || p.song_url) body.append(songSection(p));
   if (p.photos.length) body.append(gallerySection(p));
   else if (p.me) body.append(section("Pictures", ""));
   if (p.top_friends.length || p.me) body.append(topFriendsSection(p));
