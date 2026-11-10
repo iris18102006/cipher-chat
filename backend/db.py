@@ -101,6 +101,15 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_images_owner ON images (owner_id, kind, id);
+            -- the song someone can put on their profile. One per person, the bytes live in
+            -- the database like pictures do, so there are no file paths to get wrong
+            CREATE TABLE IF NOT EXISTS songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                mime TEXT NOT NULL,
+                data BLOB NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             -- group chats. The server only ever stores ciphertext: every message is
             -- encrypted with a group key, and that key is stored once per member,
             -- wrapped (encrypted) for them in the browser of whoever made it.
