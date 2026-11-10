@@ -148,3 +148,43 @@ document.addEventListener("keydown", (e) => {
   if (profile && !profile.hidden) return;
   closeFeed();
 });
+
+// ---------- writing a post ----------
+
+function paintCounter() {
+  const left = POST_MAX - $("feed-text").value.length;
+  const c = $("feed-chars");
+  c.textContent = String(left);
+  c.classList.toggle("low", left <= 50);
+  $("feed-post").disabled = $("feed-text").value.trim() === "";
+}
+
+$("feed-text").addEventListener("input", paintCounter);
+$("feed-text").addEventListener("keydown", (e) => {
+  // Ctrl+Enter / Cmd+Enter posts, plain Enter makes a new line
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    $("feed-compose").requestSubmit();
+  }
+});
+
+$("feed-compose").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("feed-text").value.trim();
+  if (!text) return;
+  feedError("");
+  $("feed-post").disabled = true;
+  try {
+    const p = await sendJson("/api/posts", "POST", { body: text });
+    $("feed-text").value = "";
+    feed.posts.unshift(p);
+    renderFeed();
+    $("feed-list").firstChild.classList.add("is-new");
+  } catch (ex) {
+    feedError(ex.server ? ex.message : "couldn't post that, try again");
+  } finally {
+    paintCounter();
+  }
+};
+
+paintCounter();
