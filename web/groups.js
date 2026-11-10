@@ -51,9 +51,11 @@ function pubState(username, pub) {
 
 // Same idea for the signing key: the first one we see for a person is the one we trust.
 // A different one later is shown as a warning on their messages, never trusted quietly.
+const signSlot = (username) => "cc-known-sign:" + state.me + ":" + username;
+
 function signPubState(username, pub) {
   if (username === state.me) return "ok";
-  const slot = "cc-known-sign:" + state.me + ":" + username;
+  const slot = signSlot(username);
   let known = null;
   try {
     known = localStorage.getItem(slot);
@@ -669,6 +671,20 @@ async function paintGroupInfo() {
         })
       );
     }
+    const signChanged = m.username !== state.me && m.sign_pub && signPubState(m.username, m.sign_pub) === "changed";
+    if (signChanged) {
+      buttons.push(
+        listButton("Trust new signing key", async () => {
+          try {
+            localStorage.setItem(signSlot(m.username), m.sign_pub);
+          } catch {}
+          // their old messages get checked again against the key we trust now
+          await loadGroupHistory(gid).catch(() => {});
+          if (state.openGroup === gid) renderMessages();
+          await paintGroupPanel();
+        })
+      );
+    }
     if (iOwn && m.username !== state.me) {
       buttons.push(
         listButton("Remove", () => {
@@ -683,10 +699,18 @@ async function paintGroupInfo() {
       const warn = el("small", "key-changed", "their key changed since you first saw it. Check it with them before trusting it.");
       who.append(warn);
     }
+    if (signChanged) {
+      who.append(el("small", "key-changed", "their signing key changed since you first saw it. Their messages show a warning until you trust it."));
+    }
     if (m.pub) {
       const fp = el("small", "fp-line", "");
       fingerprintOf(m.pub).then((t) => (fp.textContent = "key " + t));
       who.append(fp);
+    }
+    if (m.sign_pub) {
+      const sp = el("small", "fp-line", "");
+      fingerprintOf(m.sign_pub).then((t) => (sp.textContent = "signing key " + t));
+      who.append(sp);
     }
     return row;
   });
