@@ -337,7 +337,8 @@ async function sendGroupMessage() {
     return;
   }
   const { iv, ct } = await encryptText(key, text);
-  if (sendWS({ type: "gmsg", group: gid, v: d.key_version, iv, ct, cid: crypto.randomUUID() })) {
+  const sig = await signGroupMessage(state.signing.privateKey, gid, d.key_version, state.me, iv, ct);
+  if (sendWS({ type: "gmsg", group: gid, v: d.key_version, iv, ct, sig, cid: crypto.randomUUID() })) {
     $("msg").value = "";
     autosize();
     stopTyping();
@@ -443,6 +444,7 @@ async function handleGroupWS(data) {
     toast(
       data.reason === "not_member" ? "You're not in that group any more."
         : data.reason === "too_long" ? "That message is too long, split it into a few shorter ones."
+        : data.reason === "bad_sig" ? "That message wasn't sent, its signature was refused. Reload the page and try again."
         : "That message wasn't sent, the group key just changed. Try again."
     );
     if (data.reason === "bad_key" && state.groups.has(gid)) loadGroupDetail(gid).catch(() => {});
