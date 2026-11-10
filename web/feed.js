@@ -181,7 +181,7 @@ $("feed-compose").onsubmit = async (e) => {
     renderFeed();
     $("feed-list").firstChild.classList.add("is-new");
   } catch (ex) {
-    feedError(ex.server ? ex.message : "couldn't post that, try again");
+    feedError(ex.message); // sendJson only throws messages that are safe to show
   } finally {
     paintCounter();
   }
