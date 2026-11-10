@@ -204,6 +204,9 @@ def init_db():
         _add_column(conn, "messages", "eph", "TEXT")
         _add_column(conn, "messages", "pid", "INTEGER")
         _add_column(conn, "messages", "cid", "TEXT")
+        # signing: an ECDSA public key per person (the private half stays in their browser),
+        # so a group message can prove who wrote it even though the whole group shares a key
+        _add_column(conn, "users", "sign_pub", "TEXT")
         conn.commit()
     finally:
         conn.close()
