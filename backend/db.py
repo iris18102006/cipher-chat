@@ -123,6 +123,12 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id, id DESC);
             CREATE INDEX IF NOT EXISTS idx_posts_shared ON posts (shared_id);
+            CREATE TABLE IF NOT EXISTS post_likes (
+                post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (post_id, user_id)
+            );
             -- group chats. The server only ever stores ciphertext: every message is
             -- encrypted with a group key, and that key is stored once per member,
             -- wrapped (encrypted) for them in the browser of whoever made it.
