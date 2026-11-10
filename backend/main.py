@@ -1124,6 +1124,16 @@ def put_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
     return {"ok": True}
 
 
+@app.put("/api/signkey")
+def put_sign_key(body: KeyBody, user=Depends(current_user), conn=Depends(get_conn)):
+    """The public half of the key that signs group messages. Same shape as the identity key."""
+    if not valid_pub(body.pub):
+        raise HTTPException(400, "that doesn't look like a P-256 public key")
+    conn.execute("UPDATE users SET sign_pub = ? WHERE id = ?", (body.pub, user["id"]))
+    conn.commit()
+    return {"ok": True}
+
+
 @app.get("/api/prekeys")
 def prekey_count(user=Depends(current_user), conn=Depends(get_conn)):
     n = conn.execute("SELECT COUNT(*) FROM prekeys WHERE user_id = ?", (user["id"],)).fetchone()[0]
