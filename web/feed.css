@@ -321,3 +321,8 @@
     animation: none;
   }
 }
+
+/* a profile opened from a post has to open on top of the feed window */
+#profile-overlay {
+  z-index: 65;
+}
