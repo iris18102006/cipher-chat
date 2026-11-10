@@ -206,3 +206,27 @@ def unlike_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)
 def like_state(conn, post_id: int, me_id: int) -> dict:
     row = post_row(conn, post_id, me_id)
     return {"likes": row["likes"], "liked": bool(row["liked"])}
+
+
+@router.post("/api/posts/{post_id}/share")
+async def share_post(post_id: int, body: ShareBody, user=Depends(current_user), conn=Depends(get_conn)):
+    target = readable_post(conn, post_id, user)
+    # sharing a share shares what it points at, so a chain of shares is never longer than one
+    if target["is_share"]:
+        if target["shared_id"] is None:
+            raise HTTPException(404, "that post is gone")
+        target = readable_post(conn, target["shared_id"], user)
+    note = clean_text(body.body, NOTE_LIMIT, "note", multiline=True)
+    already = conn.execute(
+        "SELECT 1 FROM posts WHERE author_id = ? AND shared_id = ?", (user["id"], target["id"])
+    ).fetchone()
+    if already:
+        raise HTTPException(409, "you already shared that")
+    check_rate(user["id"])
+    cur = conn.execute(
+        "INSERT INTO posts (author_id, body, shared_id, is_share) VALUES (?, ?, ?, 1)",
+        (user["id"], note, target["id"]),
+    )
+    conn.commit()
+    await tell_friends(conn, user, cur.lastrowid)
+    return post_dict(conn, post_row(conn, cur.lastrowid, user["id"]), user["id"], visible_authors(conn, user["id"]))

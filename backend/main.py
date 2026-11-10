@@ -1629,10 +1629,11 @@ async def websocket_endpoint(ws: WebSocket):
 # ---------- group chats ----------
 # imported down here because groups.py uses helpers from this file
 
-from . import chat_themes, groups, songs  # noqa: E402
+from . import chat_themes, feed, groups, songs  # noqa: E402
 
 app.include_router(groups.router)
 app.include_router(songs.router)
+app.include_router(feed.router)
 app.include_router(chat_themes.router)
 
 
