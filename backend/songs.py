@@ -40,3 +40,29 @@ def sniff_audio(raw: bytes) -> str | None:
     if head[4:8] == b"ftyp":
         return "audio/mp4"
     return None
+
+
+def song_url(song_id) -> str:
+    return f"/api/song/{song_id}" if song_id else ""
+
+
+@router.put("/api/me/song")
+async def upload_song(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    raw = await read_body(request, MAX_SONG_UPLOAD)
+    mime = sniff_audio(raw)
+    if not mime:
+        raise HTTPException(400, "use an mp3, ogg, wav, flac or m4a file")
+    # a new row every time (so a new url), because browsers keep the old song for an hour
+    conn.execute("DELETE FROM songs WHERE owner_id = ?", (user["id"],))
+    cur = conn.execute(
+        "INSERT INTO songs (owner_id, mime, data) VALUES (?, ?, ?)", (user["id"], mime, raw)
+    )
+    conn.commit()
+    return {"song_url": song_url(cur.lastrowid)}
+
+
+@router.delete("/api/me/song")
+def remove_song(user=Depends(current_user), conn=Depends(get_conn)):
+    conn.execute("DELETE FROM songs WHERE owner_id = ?", (user["id"],))
+    conn.commit()
+    return {"song_url": ""}
