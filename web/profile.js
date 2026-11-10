@@ -36,6 +36,7 @@ let pfLoadId = 0; // counts profile loads, so an old slow answer can be ignored
 // ---------- open / close ----------
 
 function closeProfile() {
+  stopProfileSong(); // closing the page must not leave the music playing
   pfLoadId++; // anything still loading is no longer wanted
   $("profile-overlay").hidden = true;
   pfCurrent = null;
@@ -259,6 +260,7 @@ function wallSection(p) {
 function renderProfile(p) {
   applyTheme($("profile-card"), p);
   $("pf-title").textContent = p.me ? "My profile" : shownName(p) + "'s profile";
+  stopProfileSong();
   const body = $("pf-body");
   body.replaceChildren();
 
@@ -398,6 +400,7 @@ function effectiveColor(key) {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 function renderEditor(p) {
+  stopProfileSong();
   const body = $("pf-body");
   body.replaceChildren();
   const card = $("profile-card");
