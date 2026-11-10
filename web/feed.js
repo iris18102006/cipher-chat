@@ -97,3 +97,54 @@ async function loadFeed(older) {
     feed.loading = false;
   }
 }
+
+// ---------- opening and closing ----------
+
+function setNewCount(n) {
+  feed.newCount = n;
+  const badge = $("feed-count-new");
+  badge.textContent = String(n);
+  badge.hidden = n === 0;
+  const pill = $("feed-new");
+  pill.hidden = n === 0 || !feed.open;
+  pill.textContent = n === 1 ? "1 new post, show it" : n + " new posts, show them";
+}
+
+async function openFeed() {
+  feed.returnFocus = document.activeElement;
+  feed.open = true;
+  $("feed-overlay").hidden = false;
+  setNewCount(0);
+  $("feed-text").focus();
+  await loadFeed(false);
+}
+
+function closeFeed() {
+  feed.open = false;
+  $("feed-overlay").hidden = true;
+  if (feed.returnFocus && document.contains(feed.returnFocus)) feed.returnFocus.focus();
+  feed.returnFocus = null;
+}
+
+$("feed-btn").onclick = openFeed;
+$("feed-close").onclick = closeFeed;
+$("feed-refresh").onclick = () => {
+  setNewCount(0);
+  loadFeed(false);
+};
+$("feed-new").onclick = () => {
+  setNewCount(0);
+  loadFeed(false);
+  $("feed-window").scrollIntoView({ block: "start" });
+};
+$("feed-more").onclick = () => loadFeed(true);
+$("feed-overlay").addEventListener("click", (e) => {
+  if (e.target === $("feed-overlay")) closeFeed();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !feed.open) return;
+  // a profile page opened from the feed sits on top and closes first
+  const profile = document.getElementById("profile-overlay");
+  if (profile && !profile.hidden) return;
+  closeFeed();
+});
