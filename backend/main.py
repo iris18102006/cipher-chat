@@ -87,6 +87,7 @@ MAX_FRAMES = 300
 AVATAR_PX = 320
 PHOTO_PX = 1600
 CAPTION_LIMIT = 60
+MAX_SONG_UPLOAD = 6 * 1024 * 1024  # a profile song, about 6 minutes of a normal mp3
 
 # Safe MySpace-style profile customization. Users can combine whitelisted
 # visual options, but never submit arbitrary CSS/HTML.
