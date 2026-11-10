@@ -110,6 +110,19 @@ def init_db():
                 data BLOB NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            -- the feed: short posts that you and your friends can see. A post that has
+            -- shared_id set is a share of somebody else's post (body is the note that
+            -- came with it, may be empty). If the original is deleted the share stays,
+            -- and says the original is gone.
+            CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                body TEXT NOT NULL DEFAULT '',
+                shared_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_posts_shared ON posts (shared_id);
             -- group chats. The server only ever stores ciphertext: every message is
             -- encrypted with a group key, and that key is stored once per member,
             -- wrapped (encrypted) for them in the browser of whoever made it.
