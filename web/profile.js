@@ -464,6 +464,9 @@ function renderEditor(p) {
   const about = group("About you");
   for (const f of TEXT_FIELDS) inputs[f[0]] = textRow(about, f, p[f[0]]);
 
+  // ---- profile song (a file people can play)
+  mountSongEditor(group("Profile song"), p);
+
   // ---- profile picture
   mountAvatarEditor(group("Profile picture"), p, media);
 
