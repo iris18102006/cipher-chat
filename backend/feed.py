@@ -113,3 +113,56 @@ def post_dict(conn, row, me_id: int, can_see: set[int]) -> dict:
     else:
         out["original"] = plain_post(orig, me_id)
     return out
+
+
+async def tell_friends(conn, user, post_id: int):
+    """A little nudge to everybody who can see it and is online, so their feed can say 'new posts'."""
+    ids = visible_authors(conn, user["id"]) - {user["id"]}
+    if not ids:
+        return
+    names = conn.execute(
+        f"SELECT username FROM users WHERE id IN ({','.join('?' * len(ids))})", list(ids)
+    ).fetchall()
+    for r in names:
+        await manager.send_user(r["username"], {"type": "feed", "event": "new", "id": post_id, "from": user["username"]})
+
+
+def authors_clause(authors: set[int]):
+    """("p.author_id IN (:a0, :a1)", {"a0": 3, "a1": 9}) for a set of ids."""
+    names = {f"a{i}": uid for i, uid in enumerate(sorted(authors))}
+    return "p.author_id IN (" + ", ".join(":" + n for n in names) + ")", names
+
+
+# ---------- routes ----------
+
+
+@router.post("/api/posts")
+async def create_post(body: PostBody, user=Depends(current_user), conn=Depends(get_conn)):
+    text = clean_text(body.body, POST_LIMIT, "post", multiline=True)
+    if not text:
+        raise HTTPException(400, "write something first")
+    check_rate(user["id"])
+    cur = conn.execute("INSERT INTO posts (author_id, body) VALUES (?, ?)", (user["id"], text))
+    conn.commit()
+    await tell_friends(conn, user, cur.lastrowid)
+    return post_dict(conn, post_row(conn, cur.lastrowid, user["id"]), user["id"], {user["id"]})
+
+
+@router.get("/api/feed")
+def get_feed(
+    before: int | None = None,
+    limit: int = Query(FEED_PAGE, ge=1, le=50),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    """Newest first. `before` is the id of the oldest post you already have."""
+    authors = visible_authors(conn, user["id"])
+    where, params = authors_clause(authors)
+    rows = conn.execute(
+        POST_SELECT + f" WHERE {where} AND (:before IS NULL OR p.id < :before) ORDER BY p.id DESC LIMIT :limit",
+        {**params, "me": user["id"], "before": before, "limit": limit + 1},
+    ).fetchall()
+    return {
+        "posts": [post_dict(conn, r, user["id"], authors) for r in rows[:limit]],
+        "more": len(rows) > limit,
+    }
