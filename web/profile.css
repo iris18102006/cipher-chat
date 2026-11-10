@@ -870,3 +870,107 @@
   padding: 0;
   cursor: pointer;
 }
+
+/* ---------- the song player on a profile ---------- */
+
+.pf-song-name {
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.pf-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border: 2px solid var(--p-border, #7a8fb3);
+  border-radius: 4px;
+  background: linear-gradient(#f4f7fc, #d4deef);
+  color: #1b2a44;
+  font-size: 12px;
+}
+
+.pf-play {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid #1b2a44;
+  border-radius: 50%;
+  background: var(--p-accent, #ff9933);
+  color: #1b2a44;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pf-play:focus-visible,
+.pf-seek:focus-visible,
+.pf-vol:focus-visible {
+  outline: 2px solid #1b2a44;
+  outline-offset: 2px;
+}
+
+.pf-seek {
+  flex: 1 1 120px;
+  min-width: 80px;
+  accent-color: var(--p-accent, #ff9933);
+}
+
+.pf-vol {
+  width: 64px;
+  accent-color: var(--p-accent, #ff9933);
+}
+
+.pf-time {
+  min-width: 70px;
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+}
+
+.pf-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+
+.pf-bars i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  background: #1b2a44;
+}
+
+.pf-player.playing .pf-bars i {
+  animation: pf-bounce 0.7s ease-in-out infinite alternate;
+}
+
+.pf-player.playing .pf-bars i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.pf-player.playing .pf-bars i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pf-bounce {
+  from { height: 3px; }
+  to { height: 16px; }
+}
+
+.pf-player-error {
+  display: none;
+  color: #a33;
+}
+
+.pf-player.failed .pf-player-error {
+  display: inline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-player.playing .pf-bars i {
+    animation: none;
+    height: 10px;
+  }
+}
