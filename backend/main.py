@@ -681,6 +681,8 @@ def get_profile(username: str, user=Depends(current_user), conn=Depends(get_conn
     ).fetchone()[0]
     out["wall"] = wall_for(conn, row["id"], user["id"])
     out.update(media_for(conn, row))
+    song = conn.execute("SELECT id FROM songs WHERE owner_id = ?", (row["id"],)).fetchone()
+    out["song_url"] = f"/api/song/{song['id']}" if song else ""
     return out
 
 
