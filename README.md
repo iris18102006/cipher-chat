@@ -155,7 +155,7 @@ This is a learning project, not Signal.
 - [x] Pinnig a friend is possible now in chats 
 - [x] Now there is a feed where you can post your thoughts
 - [x] You can choose what friends to show in your profile according to your peferences
-- [ ] Profiles will have the possibility of showing a certain song into their profile
+- [ ] Profiles will have the possibility of listening the song into their profile, not just the name
 - [ ] Posts will have the ability to get shared
 - [ ] The feed will have a special window so it doesn't have to look ugly
 
