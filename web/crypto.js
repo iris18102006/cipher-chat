@@ -302,3 +302,30 @@ async function loadPending(username, cid) {
 async function dropPending(username, cid) {
   await dbDelete(await openDB(), pendingSlot(username, cid));
 }
+
+// ---------- signing group messages ----------
+// A group shares one key, so on its own any member could make a message that looks like it
+// came from someone else. Every group message is also signed with the sender's own signing
+// key (ECDSA P-256). The private half is made here, never leaves this browser, and the public
+// half goes to the server like the identity key does. Members check the signature themselves,
+// the server is not trusted to do it.
+
+const SIGN_ALG = { name: "ECDSA", namedCurve: "P-256" };
+const SIGN_HASH = { name: "ECDSA", hash: "SHA-256" };
+const SIGN_PREFIX = "cipher-chat group-message v1";
+
+// One signing key per username, kept next to the identity key.
+async function loadOrCreateSigning(username) {
+  const db = await openDB();
+  const slot = "signing:" + username;
+  let keys = await dbGet(db, slot);
+  if (!keys) {
+    keys = await crypto.subtle.generateKey(SIGN_ALG, false, ["sign", "verify"]);
+    await dbSet(db, slot, keys);
+  }
+  return keys;
+}
+
+function importSignPub(s) {
+  return crypto.subtle.importKey("raw", unb64(s), SIGN_ALG, true, ["verify"]);
+}
