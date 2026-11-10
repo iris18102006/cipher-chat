@@ -449,6 +449,25 @@ h2 {
   font-style: italic;
 }
 
+/* signed / not signed under a group message */
+.sig.signed {
+  color: #2a7a4b;
+}
+
+.sig.unsigned {
+  font-style: italic;
+}
+
+.sig.badsig {
+  color: #a33;
+  font-weight: bold;
+}
+
+.msg.forged {
+  border-color: #a33;
+  border-style: dashed;
+}
+
 .tick.read {
   color: #1a73e8;
   font-weight: bold;

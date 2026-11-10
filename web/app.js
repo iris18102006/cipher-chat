@@ -444,6 +444,22 @@ function tickFor(m) {
   return { text: "\u2713 sent", cls: "tick" };
 }
 
+// the little label under a group message that says whether it really came from the sender
+const SIGNATURE_BADGES = {
+  ok: ["\u2713 signed", "signed", "This message was signed with the sender's key, so it really came from them"],
+  unsigned: ["not signed", "unsigned", "Sent before signing existed (or by an old browser), so there's nothing to check it against"],
+  unknown: ["can't check", "unsigned", "The sender isn't in the group any more, so their key isn't available to check this"],
+  changed: ["\u26a0 key changed", "badsig", "The sender's signing key is not the one we first saw from them. Don't trust this message until you've checked with them"],
+  bad: ["\u26a0 fake?", "badsig", "The signature does not match. This message was not written by who it says, or it was changed on the way"],
+};
+
+function signatureBadge(kind) {
+  const [text, cls, title] = SIGNATURE_BADGES[kind] || SIGNATURE_BADGES.unknown;
+  const span = el("span", "sig " + cls, text);
+  span.title = title;
+  return span;
+}
+
 function renderMessages(keepScroll) {
   const box = $("messages");
   const log = $("log");
@@ -467,7 +483,8 @@ function renderMessages(keepScroll) {
       prev = null;
     }
     const mine = m.from === state.me;
-    const row = el("div", "msg " + (mine ? "me" : "them") + (m.failed ? " failed" : "") + (prev && prev.from === m.from ? " cont" : ""));
+    const forged = inGroup && (m.signed === "bad" || m.signed === "changed");
+    const row = el("div", "msg " + (mine ? "me" : "them") + (m.failed ? " failed" : "") + (forged ? " forged" : "") + (prev && prev.from === m.from ? " cont" : ""));
     // in a group, say who wrote it (once per run of messages from the same person)
     if (inGroup && !mine && !(prev && prev.from === m.from)) {
       row.append(el("div", "sender", memberName(state.openGroup, m.from)));
@@ -479,6 +496,7 @@ function renderMessages(keepScroll) {
       nofs.title = "This message was locked with the long-term key only, because there were no one-time keys left";
       meta.append(nofs);
     }
+    if (inGroup && m.signed) meta.append(signatureBadge(m.signed));
     meta.append(el("span", "time", clock(d)));
     if (mine) {
       const t = inGroup ? groupTick(m) : tickFor(m);
