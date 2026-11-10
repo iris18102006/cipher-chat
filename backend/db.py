@@ -119,6 +119,9 @@ def init_db():
                 author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 body TEXT NOT NULL DEFAULT '',
                 shared_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
+                -- 1 for a share. Kept apart from shared_id because that goes null when the
+                -- original is deleted, and the share should still say it was a share
+                is_share INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id, id DESC);
