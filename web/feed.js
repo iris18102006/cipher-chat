@@ -65,7 +65,72 @@ function renderPost(p) {
   card.append(head);
   if (p.body) card.append(el("p", "feed-body", p.body));
   if (p.is_share && p.original) card.append(originalBox(p.original));
+  card.append(postActions(p, card));
   return card;
+}
+
+// ---------- like, share, delete ----------
+
+function likeLabel(p) {
+  return (p.liked ? "\u2665 " : "\u2661 ") + p.likes;
+}
+
+function postActions(p, card) {
+  const bar = el("div", "feed-actions");
+
+  const like = el("button", p.liked ? "on" : "", likeLabel(p));
+  like.type = "button";
+  like.setAttribute("aria-pressed", String(p.liked));
+  like.setAttribute("aria-label", p.liked ? "unlike" : "like");
+  like.onclick = async () => {
+    like.disabled = true;
+    try {
+      const r = await sendJson("/api/posts/" + p.id + "/like", p.liked ? "DELETE" : "POST");
+      p.likes = r.likes;
+      p.liked = r.liked;
+      like.textContent = likeLabel(p);
+      like.classList.toggle("on", p.liked);
+      like.setAttribute("aria-pressed", String(p.liked));
+      like.setAttribute("aria-label", p.liked ? "unlike" : "like");
+    } catch (ex) {
+      feedError(ex.message);
+    } finally {
+      like.disabled = false;
+    }
+  };
+  bar.append(like);
+
+  // a share of a post that's gone, or that you can't read, has nothing to share onward
+  const original = p.is_share ? p.original : null;
+  const sharable = !original || !(original.gone || original.hidden);
+  if (sharable) {
+    const target = original || p;
+    const share = el("button", "", "\u21c4 Share" + (target.shares ? " " + target.shares : ""));
+    share.type = "button";
+    share.onclick = () => toggleShareForm(card, target, share);
+    bar.append(share);
+  }
+
+  if (p.mine) {
+    const del = el("button", "danger", "Delete");
+    del.type = "button";
+    del.onclick = () => deletePost(p, del);
+    bar.append(del);
+  }
+  return bar;
+}
+
+async function deletePost(p, button) {
+  if (!confirm("Delete this post? Shares of it will say the original was deleted.")) return;
+  button.disabled = true;
+  try {
+    await sendJson("/api/posts/" + p.id, "DELETE");
+    feed.posts = feed.posts.filter((x) => x.id !== p.id);
+    renderFeed();
+  } catch (ex) {
+    feedError(ex.message);
+    button.disabled = false;
+  }
 }
 
 function renderFeed() {
