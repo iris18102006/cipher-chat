@@ -49,6 +49,41 @@ function pubState(username, pub) {
   return known === pub ? "ok" : "changed";
 }
 
+// Same idea for the signing key: the first one we see for a person is the one we trust.
+// A different one later is shown as a warning on their messages, never trusted quietly.
+function signPubState(username, pub) {
+  if (username === state.me) return "ok";
+  const slot = "cc-known-sign:" + state.me + ":" + username;
+  let known = null;
+  try {
+    known = localStorage.getItem(slot);
+  } catch {}
+  if (!known) {
+    try {
+      localStorage.setItem(slot, pub);
+    } catch {}
+    return "ok";
+  }
+  return known === pub ? "ok" : "changed";
+}
+
+// Who really wrote this? One of:
+//   ok        signed with the sender's signing key
+//   unsigned  no signature (sent before signing existed, or by an old browser)
+//   unknown   signed, but the sender isn't in the group any more so there's no key to check
+//   changed   signed, but the sender's signing key isn't the one we first saw
+//   bad       the signature doesn't match this message and sender: it was not made by them
+async function checkSignature(gid, r) {
+  if (!r.sig) return "unsigned";
+  const d = state.gDetail.get(gid);
+  const member = d && d.members.find((x) => x.username === r.from);
+  const pub = r.from === state.me ? state.mySignPub : member && member.sign_pub;
+  if (!pub) return "unknown";
+  if (signPubState(r.from, pub) === "changed") return "changed";
+  const good = await verifyGroupMessage(pub, r.sig, gid, r.v, r.from, r.iv, r.ct, r.n);
+  return good ? "ok" : "bad";
+}
+
 function memberName(gid, username) {
   const d = state.gDetail.get(gid);
   const m = d && d.members.find((x) => x.username === username);
@@ -148,7 +183,8 @@ async function decryptGroupRows(gid, rows) {
       text = "can't decrypt this message (missing key, or the sender's key changed)";
       failed = true;
     }
-    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, v: r.v, seen: new Set(r.seen_by || []) });
+    const signed = await checkSignature(gid, r);
+    out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, v: r.v, signed, seen: new Set(r.seen_by || []) });
   }
   return out;
 }
