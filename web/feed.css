@@ -1,0 +1,155 @@
+/* The feed window. A proper little desktop-program window, not a modal in a hurry:
+   blue title bar, a bulletin-board header, cards that look like 2000s forum posts. */
+
+#feed-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 28px 10px;
+  overflow-y: auto;
+  background: rgba(10, 25, 55, 0.65);
+}
+
+#feed-overlay[hidden] {
+  display: none;
+}
+
+#feed-window {
+  width: 100%;
+  max-width: 640px;
+  background: #ece9d8;
+  border: 3px solid #0a246a;
+  border-radius: 8px 8px 3px 3px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  padding: 0 0 12px;
+}
+
+#feed-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(#3a7bd5, #0a4bbf 55%, #0a3a9a);
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+#feed-title {
+  flex: 1;
+  letter-spacing: 0.5px;
+}
+
+#feed-bar button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  background: linear-gradient(#e8f0ff, #9db8ea);
+  color: #0a246a;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#feed-close {
+  background: linear-gradient(#f6a590, #d3472b) !important;
+  color: #fff !important;
+}
+
+#feed-compose {
+  margin: 12px 12px 0;
+  padding: 10px;
+  background: #fff;
+  border: 2px inset #aca899;
+}
+
+.feed-label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: bold;
+  color: #0a246a;
+}
+
+#feed-text {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 220px;
+  padding: 6px;
+  font: inherit;
+  border: 1px solid #7f9db9;
+}
+
+#feed-compose-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+#feed-chars {
+  font-size: 11px;
+  color: #666;
+}
+
+#feed-chars.low {
+  color: #a33;
+  font-weight: bold;
+}
+
+#feed-post {
+  padding: 4px 18px;
+  border: 2px outset #fff;
+  border-radius: 4px;
+  background: linear-gradient(#fff4c4, #ffc94a);
+  color: #4a2f00;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#feed-post:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#feed-error {
+  margin: 8px 12px 0;
+  color: #a33;
+  font-weight: bold;
+}
+
+#feed-new {
+  display: block;
+  margin: 10px auto 0;
+  padding: 4px 16px;
+  border: 1px solid #0a246a;
+  border-radius: 12px;
+  background: #fff7c2;
+  color: #0a246a;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#feed-list {
+  margin: 10px 12px 0;
+}
+
+#feed-more {
+  display: block;
+  margin: 10px auto 0;
+  padding: 5px 18px;
+  cursor: pointer;
+}
+
+.feed-empty {
+  padding: 22px 10px;
+  text-align: center;
+  color: #555;
+  font-style: italic;
+}

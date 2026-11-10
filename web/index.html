@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="chat-themes.css">
+  <link rel="stylesheet" href="feed.css">
 </head>
 <body>
   <noscript><p>cipher-chat needs JavaScript to encrypt your messages in your browser. Turn it on and reload the page.</p></noscript>
@@ -21,6 +22,7 @@
       <span id="conn" class="conn off">connecting...</span>
       <span>logged in as <b id="me-name">...</b></span>
       <button id="my-profile" type="button">My profile</button>
+      <button id="feed-btn" type="button">Feed <span id="feed-count-new" class="count" hidden>0</span></button>
       <button id="requests-btn" type="button">Requests <span id="req-count" class="count" hidden>0</span></button>
       <button id="blocked-btn" type="button">Blocked</button>
       <button id="settings-btn" type="button">Settings</button>
@@ -94,6 +96,29 @@
 
   <div id="toast" role="status" aria-live="polite" hidden></div>
 
+  <!-- the feed, filled in by feed.js -->
+  <div id="feed-overlay" hidden>
+    <div id="feed-window" role="dialog" aria-modal="true" aria-labelledby="feed-title">
+      <div id="feed-bar">
+        <span id="feed-title">Feed</span>
+        <button id="feed-refresh" type="button" aria-label="refresh the feed" title="refresh">&#8635;</button>
+        <button id="feed-close" type="button" aria-label="close the feed">&times;</button>
+      </div>
+      <form id="feed-compose" autocomplete="off">
+        <label for="feed-text" class="feed-label">What's on your mind?</label>
+        <textarea id="feed-text" rows="3" maxlength="500" placeholder="say something to your friends..."></textarea>
+        <div id="feed-compose-row">
+          <span id="feed-chars" aria-live="off">500</span>
+          <button id="feed-post" type="submit">Post</button>
+        </div>
+      </form>
+      <p id="feed-error" role="alert" hidden></p>
+      <button id="feed-new" type="button" hidden></button>
+      <div id="feed-list" aria-live="polite"></div>
+      <button id="feed-more" type="button" hidden>Load older posts</button>
+    </div>
+  </div>
+
   <!-- friend requests and blocked people, filled in by lists.js -->
   <div id="lists-overlay" hidden>
     <div id="lists-card" role="dialog" aria-modal="true" aria-labelledby="lists-title">
@@ -157,6 +182,7 @@
   <script src="friends.js"></script>
   <script src="settings.js"></script>
   <script src="lists.js"></script>
+  <script src="feed.js"></script>
   <script src="groups.js"></script>
   <script src="chat-themes.js"></script>
 </body>
