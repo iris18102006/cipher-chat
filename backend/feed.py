@@ -35,3 +35,85 @@ class PostBody(BaseModel):
 
 class ShareBody(BaseModel):
     body: str = ""
+
+
+# ---------- who can see what ----------
+
+
+def blocked_with(conn, user_id: int) -> set[int]:
+    """Everyone I blocked or who blocked me."""
+    rows = conn.execute(
+        "SELECT blocked_id FROM blocks WHERE blocker_id = :me "
+        "UNION SELECT blocker_id FROM blocks WHERE blocked_id = :me",
+        {"me": user_id},
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
+def visible_authors(conn, user_id: int) -> set[int]:
+    """Whose posts I can see: mine and my friends', minus anybody I have a block with."""
+    return ({user_id} | friend_ids(conn, user_id)) - blocked_with(conn, user_id)
+
+
+def check_rate(user_id: int):
+    now = time.monotonic()
+    seen = _recent[user_id]
+    while seen and now - seen[0] > POST_WINDOW:
+        seen.popleft()
+    if len(seen) >= POSTS_PER_WINDOW:
+        raise HTTPException(429, "slow down, you've posted a lot in the last few minutes")
+    seen.append(now)
+
+
+# ---------- turning rows into what the browser gets ----------
+
+POST_SELECT = """
+    SELECT p.id, p.author_id, p.body, p.shared_id, p.created_at,
+           u.username, u.display_name, u.avatar_id,
+           (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id) AS likes,
+           EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = :me) AS liked,
+           (SELECT COUNT(*) FROM posts s WHERE s.shared_id = p.id) AS shares
+    FROM posts p JOIN users u ON u.id = p.author_id
+"""
+
+
+def post_row(conn, post_id: int, me_id: int):
+    return conn.execute(POST_SELECT + " WHERE p.id = :id", {"id": post_id, "me": me_id}).fetchone()
+
+
+def plain_post(row, me_id: int) -> dict:
+    return {
+        "id": row["id"],
+        "author": {
+            "username": row["username"],
+            "display_name": row["display_name"],
+            "avatar": avatar_url(row["avatar_id"]),
+        },
+        "body": row["body"],
+        "created_at": row["created_at"],
+        "mine": row["author_id"] == me_id,
+        "likes": row["likes"],
+        "liked": bool(row["liked"]),
+        "shares": row["shares"],
+    }
+
+
+def post_dict(conn, row, me_id: int, can_see: set[int]) -> dict:
+    """One post. For a share, `original` is the post it points at, or says why it can't be shown."""
+    out = plain_post(row, me_id)
+    if row["shared_id"] is None and row["body"] == "" or row["shared_id"] is not None:
+        out["is_share"] = row["shared_id"] is not None
+    else:
+        out["is_share"] = False
+    if row["shared_id"] is not None:
+        orig = post_row(conn, row["shared_id"], me_id)
+        if not orig:
+            out["original"] = {"gone": True}
+        elif orig["author_id"] not in can_see:
+            # it was shared with you, but it isn't yours to read: say nothing about it
+            out["original"] = {"hidden": True}
+        else:
+            out["original"] = plain_post(orig, me_id)
+    elif row["body"] == "":
+        out["original"] = {"gone": True}  # a share whose original was deleted, and no note
+    return out
