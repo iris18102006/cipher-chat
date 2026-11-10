@@ -329,3 +329,37 @@ async function loadOrCreateSigning(username) {
 function importSignPub(s) {
   return crypto.subtle.importKey("raw", unb64(s), SIGN_ALG, true, ["verify"]);
 }
+
+// The exact bytes that get signed. Every field has its length in front of it, so one field
+// can't spill into the next ("ab"+"c" is not "a"+"bc"). The group, the key version and the
+// sender are in there, which means a signed message can't be moved to another group, passed
+// off as being from another key version, or blamed on someone else.
+function signedBytes(gid, version, sender, iv, ct, extra) {
+  const enc = new TextEncoder();
+  const parts = [SIGN_PREFIX, String(gid), String(version), sender, iv, ct, extra == null ? "" : String(extra)];
+  const bytes = parts.map((p) => enc.encode(p));
+  const out = new Uint8Array(bytes.reduce((n, b) => n + 4 + b.length, 0));
+  const view = new DataView(out.buffer);
+  let at = 0;
+  for (const b of bytes) {
+    view.setUint32(at, b.length);
+    out.set(b, at + 4);
+    at += 4 + b.length;
+  }
+  return out;
+}
+
+async function signGroupMessage(signPriv, gid, version, sender, iv, ct, extra) {
+  const sig = await crypto.subtle.sign(SIGN_HASH, signPriv, signedBytes(gid, version, sender, iv, ct, extra));
+  return b64(sig);
+}
+
+// true only if `sigB64` really is `sender`'s signature over exactly this message
+async function verifyGroupMessage(signPubB64, sigB64, gid, version, sender, iv, ct, extra) {
+  try {
+    const pub = await importSignPub(signPubB64);
+    return await crypto.subtle.verify(SIGN_HASH, pub, unb64(sigB64), signedBytes(gid, version, sender, iv, ct, extra));
+  } catch {
+    return false;
+  }
+}
