@@ -68,7 +68,7 @@ def check_rate(user_id: int):
 # ---------- turning rows into what the browser gets ----------
 
 POST_SELECT = """
-    SELECT p.id, p.author_id, p.body, p.shared_id, p.created_at,
+    SELECT p.id, p.author_id, p.body, p.shared_id, p.is_share, p.created_at,
            u.username, u.display_name, u.avatar_id,
            (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id) AS likes,
            EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = :me) AS liked,
@@ -101,19 +101,15 @@ def plain_post(row, me_id: int) -> dict:
 def post_dict(conn, row, me_id: int, can_see: set[int]) -> dict:
     """One post. For a share, `original` is the post it points at, or says why it can't be shown."""
     out = plain_post(row, me_id)
-    if row["shared_id"] is None and row["body"] == "" or row["shared_id"] is not None:
-        out["is_share"] = row["shared_id"] is not None
+    out["is_share"] = bool(row["is_share"])
+    if not out["is_share"]:
+        return out
+    orig = post_row(conn, row["shared_id"], me_id) if row["shared_id"] is not None else None
+    if not orig:
+        out["original"] = {"gone": True}
+    elif orig["author_id"] not in can_see:
+        # it was shared with you, but it isn't yours to read: say nothing about it
+        out["original"] = {"hidden": True}
     else:
-        out["is_share"] = False
-    if row["shared_id"] is not None:
-        orig = post_row(conn, row["shared_id"], me_id)
-        if not orig:
-            out["original"] = {"gone": True}
-        elif orig["author_id"] not in can_see:
-            # it was shared with you, but it isn't yours to read: say nothing about it
-            out["original"] = {"hidden": True}
-        else:
-            out["original"] = plain_post(orig, me_id)
-    elif row["body"] == "":
-        out["original"] = {"gone": True}  # a share whose original was deleted, and no note
+        out["original"] = plain_post(orig, me_id)
     return out
