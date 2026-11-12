@@ -1,4 +1,5 @@
 import base64
+import itertools
 
 from tests.test_backend import ORIGIN, signup
 
@@ -48,6 +49,26 @@ def new_group(a, members=("bob", "carol"), name="the gang"):
     )
     assert r.status_code == 200, r.text
     return r.json()
+
+
+_numbers = itertools.count()
+
+
+def gm(gid, v=1, ct="Y3Q=", cid=None, n=None, sig="default"):
+    """A group message the way the browser sends it from key version 1 of a new group:
+    numbered (every number used once) and signed. Pass n=... or sig=None to break that."""
+    msg = {
+        "type": "gmsg",
+        "group": gid,
+        "v": v,
+        "iv": "aXY=",
+        "ct": ct,
+        "n": next(_numbers) if n is None else n,
+        "sig": base64.b64encode(b"s" * 64).decode() if sig == "default" else sig,
+    }
+    if cid:
+        msg["cid"] = cid
+    return msg
 
 
 def drain(ws):
@@ -122,7 +143,7 @@ def test_group_message_flow_and_history(client):
         wa.send_json({"type": "gtyping", "group": gid, "state": True})
         assert of_type(drain(wb), "gtyping") == [{"type": "gtyping", "group": gid, "from": "alice", "state": True}]
 
-        wa.send_json({"type": "gmsg", "group": gid, "v": 1, "iv": "aXY=", "ct": "Y3Q=", "cid": "c1"})
+        wa.send_json(gm(gid, 1, "Y3Q=", cid="c1"))
         got = of_type(drain(wb), "gmsg")
         assert len(got) == 1 and got[0]["from"] == "alice" and got[0]["cid"] == "c1" and got[0]["v"] == 1
         echo = of_type(drain(wa), "gmsg")
@@ -150,13 +171,13 @@ def test_cannot_post_without_the_key_or_membership(client):
     gid = new_group(a, members=("bob",))["id"]
     with d.websocket_connect("/ws", headers=ORIGIN) as wd, a.websocket_connect("/ws", headers=ORIGIN) as wa:
         drain(wd), drain(wa)
-        wd.send_json({"type": "gmsg", "group": gid, "v": 1, "iv": "aXY=", "ct": "Y3Q="})
+        wd.send_json(gm(gid, 1, "Y3Q="))
         assert of_type(drain(wd), "gmsg-rejected")[0]["reason"] == "not_member"
         # a key version that doesn't exist yet
-        wa.send_json({"type": "gmsg", "group": gid, "v": 2, "iv": "aXY=", "ct": "Y3Q="})
+        wa.send_json(gm(gid, 2, "Y3Q="))
         assert of_type(drain(wa), "gmsg-rejected")[0]["reason"] == "bad_key"
-        wa.send_json({"type": "gmsg", "group": "1", "v": 1, "iv": "aXY=", "ct": "Y3Q="})
-        wa.send_json({"type": "gmsg", "group": gid, "v": 1, "iv": "aXY=", "ct": ""})
+        wa.send_json(gm("1", 1, "Y3Q="))
+        wa.send_json(gm(gid, 1, ""))
         assert drain(wa) == []
     assert a.get(f"/api/groups/{gid}/messages").json() == []
 
@@ -166,7 +187,7 @@ def test_new_member_gets_a_new_key_and_cannot_read_the_past(client):
     gid = new_group(a, members=("bob",))["id"]
     with a.websocket_connect("/ws", headers=ORIGIN) as wa:
         drain(wa)
-        wa.send_json({"type": "gmsg", "group": gid, "v": 1, "iv": "aXY=", "ct": "Y3Q="})
+        wa.send_json(gm(gid, 1, "Y3Q="))
         drain(wa)
 
     # wrong version: the key has to move to 2
@@ -199,7 +220,7 @@ def test_message_with_an_old_key_does_not_reach_people_who_joined_later(client):
     with b.websocket_connect("/ws", headers=ORIGIN) as wb, c.websocket_connect("/ws", headers=ORIGIN) as wc:
         drain(wb), drain(wc)
         # bob still had key 1 open in his browser when carol joined
-        wb.send_json({"type": "gmsg", "group": gid, "v": 1, "iv": "aXY=", "ct": "Y3Q="})
+        wb.send_json(gm(gid, 1, "Y3Q="))
         assert len(of_type(drain(wb), "gmsg")) == 1
         assert of_type(drain(wc), "gmsg") == []
     assert c.get(f"/api/groups/{gid}/messages").json() == []
@@ -275,7 +296,7 @@ def test_blocked_people_are_hidden_from_each_other_in_a_group(client):
     a.post("/api/blocks/bob")
     with a.websocket_connect("/ws", headers=ORIGIN) as wa, b.websocket_connect("/ws", headers=ORIGIN) as wb, c.websocket_connect("/ws", headers=ORIGIN) as wc:
         drain(wa), drain(wb), drain(wc)
-        wb.send_json({"type": "gmsg", "group": gid, "v": 1, "iv": "aXY=", "ct": "Y3Q="})
+        wb.send_json(gm(gid, 1, "Y3Q="))
         # bob isn't told anything, carol gets it, alice doesn't
         assert len(of_type(drain(wb), "gmsg")) == 1
         assert len(of_type(drain(wc), "gmsg")) == 1
