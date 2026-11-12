@@ -348,9 +348,13 @@ function renderGroupHeader() {
   const g = state.groups.get(state.openGroup);
   if (!g) return;
   $("chat-name").textContent = g.name;
-  $("chat-name").title = "";
+  const d = state.gDetail.get(g.id);
+  const fs = d && isForwardSecret(d, d.key_version);
+  $("chat-name").title = fs
+    ? "Forward secret: every message is locked with its own one-use key, which is deleted once it's read."
+    : "This group is about to get a new key so its messages can be forward secret. It happens by itself when a member opens it.";
   const typing = groupTypingText(g);
-  $("chat-status").textContent = typing ? typing + "..." : memberCount(g.members);
+  $("chat-status").textContent = typing ? typing + "..." : memberCount(g.members) + (fs ? " \u00b7 forward secret" : "");
   $("chat-status").className = "";
   for (const id of ["view-profile", "verify", "block"]) $(id).hidden = true;
   $("group-info").hidden = false;
