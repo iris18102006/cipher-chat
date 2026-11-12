@@ -142,8 +142,9 @@ This is a learning project, not Signal.
 
 - Your private key lives in one browser. Logging in from a new browser creates a new key, so old history can't be decrypted there and friends get a key-change warning.
 - Clearing site data deletes your private key and with it your ability to read old messages.
-- Forward secrecy only covers 1:1 messages sent after it was added. Older messages, and everything in group chats (the group keys are wrapped with the long-term keys), are still opened by a stolen private key
-- A forward secret message can only be opened once, so the text you've read is kept on your device in IndexedDB. Someone who gets your whole browser profile can read what you've read, and a second browser can't read it at all
+- Forward secrecy only covers messages sent after it was added: 1:1 messages from the prekey update on, and group messages from the group's `fs_version` on. Older ones are still opened by a stolen private key
+- A forward secret message can only be opened once, so the text you've read is kept on your device in IndexedDB. Someone who gets your whole browser profile can read what you've read, and a second browser can't read it at all. That goes for groups too: the key chains live in one browser
+- Group forward secrecy has gaps by design. A device that is stolen while it is running holds the chain state, so it can read what's sent after the theft until the key version changes. Your wrapped copy of a new key stays on the server until your device next opens the group and sets up its chains. Keys for messages that were skipped (up to 1000 per sender) are kept until the message shows up. If a member's device is offline for a very long time while more than that many messages are sent, the oldest ones can no longer be opened there
 - The server can hold back prekeys or swap one for its own. That only takes away the forward secrecy of a message, the server still can't read it (it never has the long-term keys). You only see it if the prekeys are held back, as a "no forward secrecy" label
 - One prekey is used per message, so someone who is offline for a long time while a lot of messages come in can run out (those messages fall back to the old way and are labelled)
 - The server still sees metadata: who talks to whom, when, message sizes, and online status
@@ -151,10 +152,13 @@ This is a learning project, not Signal.
 - Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
 - The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
 - Login rate limiting is in memory and resets when the server restarts
-- Group messages share one key, so any member could write something that looks like it came from another member (the server shows who sent it, but the server isn't trusted). Nothing signs messages yet
+- Group messages are signed, but signing keys are trusted on first use just like identity keys: a malicious server that swaps someone's signing key before you ever saw it can't be caught. Comparing signing key fingerprints in the Members panel is what protects you. Messages from before signing existed show as "not signed", and a message from someone who has left the group shows "can't check"
 - If a member loses their private key (clears site data, new browser) they can't read the group until someone removes them and adds them again, or the key is next replaced
 - The server knows who is in which group, when messages are sent and how big they are
 - Group "seen by" and typing are visible to every member who hasn't blocked you
+- Posts in the feed and the songs on profiles are not end-to-end encrypted (only messages are). The server can read them, and friends can see them. A share never shows the original post to people who couldn't see it, but the server knows about it
+- A profile song is only checked by looking at the first bytes of the file. It's played with a plain `<audio>` element and is served with `nosniff` and a sandbox policy
+- Feed rate limits (15 posts or shares per 10 minutes) are in memory and reset when the server restarts
 - Someone who was removed keeps what they already read and the keys they already held, a new key only protects what's said afterwards
 
 ## Roadmap
