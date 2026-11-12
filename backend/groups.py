@@ -13,6 +13,7 @@ Imported by main.py at the very bottom, after everything it needs is defined.
 """
 
 import base64
+import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -36,6 +37,7 @@ MAX_GROUPS = 50  # per person
 NAME_LIMIT = 40
 IV_BYTES = 12
 WRAPPED_KEY_BYTES = 48  # 32 byte AES key + 16 byte GCM tag
+MAX_CHAIN_N = 2**31  # message numbers in a sender's key chain
 SIG_BYTES = 64  # an ECDSA P-256 signature in the raw r||s form Web Crypto makes
 
 # every message a member is allowed to see: from the key version they joined at
@@ -409,7 +411,7 @@ def group_history(
 ):
     _, mem = get_group(conn, gid, user)
     rows = conn.execute(
-        f"SELECT m.id, m.sender_id, u.username AS sender, m.key_version, m.iv, m.ct, m.sig, m.created_at "
+        f"SELECT m.id, m.sender_id, u.username AS sender, m.key_version, m.iv, m.ct, m.sig, m.n, m.created_at "
         f"FROM chat_group_messages m JOIN users u ON u.id = m.sender_id "
         f"WHERE {VISIBLE} AND (:before IS NULL OR m.id < :before) "
         f"ORDER BY m.id DESC LIMIT :limit",
@@ -433,6 +435,7 @@ def group_history(
                 "iv": r["iv"],
                 "ct": r["ct"],
                 "sig": r["sig"],
+                "n": r["n"],
                 "ts": r["created_at"],
                 "seen_by": [n for n, last in readers if last >= r["id"]] if mine else [],
             }
@@ -495,7 +498,21 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
                 me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "too_long"}
             )
             return True
-        current = conn.execute("SELECT key_version FROM chat_groups WHERE id = ?", (gid,)).fetchone()[0]
+        current, fs_version = conn.execute(
+            "SELECT key_version, fs_version FROM chat_groups WHERE id = ?", (gid,)
+        ).fetchone()
+        # From fs_version on every message is numbered (its place in the sender's key chain)
+        # and signed. Before that there are no numbers. The numbers and signatures are what let
+        # members catch a replayed, reordered or forged message, so they aren't optional.
+        n = data.get("n")
+        numbered = isinstance(n, int) and not isinstance(n, bool) and 0 <= n < MAX_CHAIN_N
+        if (isinstance(v, int) and v >= fs_version and not (numbered and sig is not None)) or (
+            isinstance(v, int) and v < fs_version and n is not None
+        ):
+            await manager.send_user(
+                me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "bad_n"}
+            )
+            return True
         # you can only write with a key version you actually hold
         holds = conn.execute(
             "SELECT 1 FROM chat_group_keys WHERE group_id = ? AND user_id = ? AND version = ?",
@@ -506,11 +523,18 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
                 me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "bad_key"}
             )
             return True
-        cur = conn.execute(
-            "INSERT INTO chat_group_messages (group_id, sender_id, key_version, iv, ct, sig) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (gid, me_id, v, iv, ct, sig),
-        )
+        try:
+            cur = conn.execute(
+                "INSERT INTO chat_group_messages (group_id, sender_id, key_version, iv, ct, sig, n) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (gid, me_id, v, iv, ct, sig, n),
+            )
+        except sqlite3.IntegrityError:
+            # that number was already used by this sender for this key version
+            await manager.send_user(
+                me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "bad_n"}
+            )
+            return True
         msg_id = cur.lastrowid
         # writing means I've read everything up to here
         conn.execute(
@@ -531,6 +555,7 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
             "iv": iv,
             "ct": ct,
             "sig": sig,
+            "n": n,
             "ts": ts,
             "cid": data.get("cid"),
         }
