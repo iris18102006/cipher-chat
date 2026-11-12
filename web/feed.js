@@ -214,6 +214,36 @@ document.addEventListener("keydown", (e) => {
   closeFeed();
 });
 
+// ---------- keeping times fresh, and keeping Tab inside the window ----------
+
+// "5 min ago" goes stale while the window stays open, so the times are redrawn each minute
+setInterval(() => {
+  if (!feed.open) return;
+  for (const card of document.querySelectorAll("#feed-list .feed-post")) {
+    const post = feed.posts.find((p) => String(p.id) === card.dataset.id);
+    const sub = card.querySelector(".feed-head .feed-who small");
+    if (post && sub) sub.textContent = "@" + post.author.username + " \u00b7 " + postAgo(post.created_at);
+  }
+}, 60000);
+
+// Tab and Shift+Tab go round inside the window instead of walking out behind it
+$("feed-window").addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const items = [...$("feed-window").querySelectorAll("button, textarea, a[href], input")].filter(
+    (n) => !n.disabled && !n.hidden && n.offsetParent !== null
+  );
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
+
 // ---------- writing a post ----------
 
 function paintCounter() {
