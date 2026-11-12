@@ -172,8 +172,8 @@ This is a learning project, not Signal.
 - [x] Image avatars, gallery, GIFs and stickers
 - [x] Message requests and a settings page
 - [x] Forward secrecy for 1:1 chats (one-time prekeys)
-- [ ] Forward secrecy for group chats
-- [ ] Sign messages so a group member can't pretend to be someone else
+- [x] Forward secrecy for group chats (a key chain for every sender)
+- [x] Sign messages so a group member can't pretend to be someone else
 - [x] Group chats
 - [x] Chat themes for each conversation
 - [x] Fix: unblocking someone does nothing
@@ -184,7 +184,7 @@ This is a learning project, not Signal.
 - [x] Pinnig a friend is possible now in chats 
 - [x] Now there is a feed where you can post your thoughts
 - [x] You can choose what friends to show in your profile according to your peferences
-- [ ] Profiles will have the possibility of listening the song into their profile, not just the name
-- [ ] Posts will have the ability to get shared
-- [ ] The feed will have a special window so it doesn't have to look ugly
+- [x] Profiles will have the possibility of listening the song into their profile, not just the name
+- [x] Posts will have the ability to get shared
+- [x] The feed will have a special window so it doesn't have to look ugly
 
