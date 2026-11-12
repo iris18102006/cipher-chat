@@ -253,3 +253,54 @@ $("feed-compose").onsubmit = async (e) => {
 };
 
 paintCounter();
+
+// ---------- sharing ----------
+
+// The little form under a post: an optional note, then Share. Press the button again to close it.
+function toggleShareForm(card, target, button) {
+  const old = card.querySelector(".feed-share-form");
+  if (old) {
+    old.remove();
+    button.focus();
+    return;
+  }
+  const form = el("form", "feed-share-form");
+  const note = el("textarea");
+  note.maxLength = NOTE_MAX;
+  note.rows = 2;
+  note.placeholder = "add a note (optional)";
+  note.setAttribute("aria-label", "note to go with the shared post");
+  const err = el("span", "err");
+  const go = el("button", "", "Share");
+  go.type = "submit";
+  const cancel = el("button", "", "Cancel");
+  cancel.type = "button";
+  cancel.onclick = () => {
+    form.remove();
+    button.focus();
+  };
+  const row = el("div", "row");
+  row.append(go, cancel, err);
+  form.append(note, row);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    go.disabled = true;
+    err.textContent = "";
+    try {
+      const made = await sendJson("/api/posts/" + target.id + "/share", "POST", { body: note.value.trim() });
+      // every copy of the original on screen now has one more share
+      for (const p of feed.posts) {
+        if (p.id === target.id) p.shares = made.original.shares;
+        if (p.is_share && p.original && p.original.id === target.id) p.original.shares = made.original.shares;
+      }
+      feed.posts.unshift(made);
+      renderFeed();
+      $("feed-list").firstChild.classList.add("is-new");
+    } catch (ex) {
+      err.textContent = ex.message;
+      go.disabled = false;
+    }
+  };
+  card.append(form);
+  note.focus();
+}
