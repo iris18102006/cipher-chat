@@ -245,6 +245,14 @@ def init_db():
         # 1 once a member's device has set up its key chains and had its wrapped copy of the
         # group key destroyed (iv and wk emptied). The row stays so we know they hold the version
         _add_column(conn, "chat_group_keys", "consumed", "INTEGER NOT NULL DEFAULT 0")
+        # Forward secrecy starts at key version fs_version: messages from then on are numbered
+        # and their keys are not kept. Groups that already exist get fs_version = their
+        # next version and are marked for a rekey, so the first member to open them
+        # makes that version and everything from it on is forward secret. Older messages
+        # keep working the old way and keep their keys. New groups start at 1.
+        if "fs_version" not in [r["name"] for r in conn.execute("PRAGMA table_info(chat_groups)")]:
+            conn.execute("ALTER TABLE chat_groups ADD COLUMN fs_version INTEGER NOT NULL DEFAULT 1")
+            conn.execute("UPDATE chat_groups SET fs_version = key_version + 1, rekey_needed = 1")
         # a number can only be used once per sender and key version, which stops replays
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_group_messages_chain "
