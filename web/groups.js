@@ -120,6 +120,50 @@ async function groupKey(gid, version) {
   }
 }
 
+// ---------- forward secrecy: turning group keys into key chains ----------
+// From fs_version on, a group key is only used to start everybody's key chain (see crypto.js).
+// As soon as this device has saved those chains it asks the server to destroy its wrapped copy
+// of the key, so the key itself no longer exists anywhere that can be stolen from. After that
+// each message is opened with a one-use key that is deleted as it's used.
+
+const isForwardSecret = (d, version) => version >= d.fs_version;
+const chainSetups = new Map(); // gid -> the setup that's running, so it isn't done twice at once
+
+// Set up chains for every forward-secret key version I still hold a wrapped copy of.
+function ensureChains(gid) {
+  if (chainSetups.has(gid)) return chainSetups.get(gid);
+  const job = (async () => {
+    const d = state.gDetail.get(gid);
+    if (!d) return;
+    for (const w of d.keys.filter((k) => isForwardSecret(d, k.version))) {
+      try {
+        // the wrapper's key has to be the one we first saw, same rule as for any group key
+        if (pubState(w.from, w.from_pub) === "changed") continue;
+        const wrapKey = await deriveSharedKey(state.identity.privateKey, await importPub(w.from_pub), GROUP_WRAP_INFO);
+        const seed = await unwrapGroupSeed(wrapKey, w.iv, w.wk);
+        const names = new Set(d.members.map((m) => m.username));
+        for (const s of d.senders || []) if (s.v === w.version) names.add(s.u);
+        // saved first. Only when this has finished is it safe to destroy the server's copy
+        await adoptGroupVersion(state.me, gid, w.version, seed, [...names]);
+        await gapi("/api/groups/" + gid + "/keys/" + w.version + "/ack", "POST");
+        d.keys = d.keys.filter((k) => k.version !== w.version);
+      } catch {
+        // couldn't unwrap it or reach the server: the wrapped copy stays and we try again next time
+      }
+    }
+  })().finally(() => chainSetups.delete(gid));
+  chainSetups.set(gid, job);
+  return job;
+}
+
+// Can I write to this group right now?
+async function canWriteGroup(gid) {
+  const d = state.gDetail.get(gid);
+  if (!d) return false;
+  if (isForwardSecret(d, d.key_version)) return !!(await loadChain(state.me, gid, d.key_version, state.me));
+  return !!(await groupKey(gid, d.key_version));
+}
+
 // wrap a fresh group key for everyone in `members` ([{ username, pub }])
 async function wrapForMembers(members, key) {
   const out = [];
@@ -161,6 +205,7 @@ async function loadGroups() {
 async function loadGroupDetail(gid) {
   const d = await api("/api/groups/" + gid);
   state.gDetail.set(gid, d);
+  await ensureChains(gid);
   const g = state.groups.get(gid);
   if (g) {
     g.name = d.name;
