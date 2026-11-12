@@ -363,3 +363,39 @@ async function verifyGroupMessage(signPubB64, sigB64, gid, version, sender, iv, 
     return false;
   }
 }
+
+// ---------- forward secrecy for groups: a ratchet per sender ----------
+// Every member of a group has their own chain of keys for each group key version. The first
+// link comes from the group key (so everyone can work out everybody's chain), and from there
+// each message uses one key and then the chain steps forward and the old link is thrown away.
+// Steps only go one way, so a key that's been used and deleted can't be worked back out of
+// the keys that are left. Once a device has set its chains up it deletes the group key
+// itself, and tells the server to delete its wrapped copy (see groups.js).
+
+const CHAIN_INFO = "cipher-chat group-chain v1";
+const MAX_SKIP = 1000; // how many missed messages in a row we'll keep keys for
+
+const utf8 = (s) => new TextEncoder().encode(s);
+
+// The first link of one sender's chain. `rootRaw` is the group key's 32 bytes.
+async function groupChainStart(rootRaw, gid, version, sender) {
+  const base = await crypto.subtle.importKey("raw", rootRaw, "HKDF", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt: utf8(CHAIN_INFO), info: utf8(gid + "|" + version + "|" + sender) },
+    base,
+    256
+  );
+  return crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveBits"]);
+}
+
+// One step: the key for this message, and the chain key for the next one. Neither can be
+// exported and neither can be turned back into `ck`.
+async function chainStep(ck) {
+  const derive = (info) =>
+    crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: utf8(info) }, ck, 256);
+  const [mkBits, nextBits] = await Promise.all([derive("message key"), derive("next chain key")]);
+  return {
+    mk: await crypto.subtle.importKey("raw", mkBits, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]),
+    next: await crypto.subtle.importKey("raw", nextBits, "HKDF", false, ["deriveBits"]),
+  };
+}
