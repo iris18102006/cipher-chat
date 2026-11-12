@@ -30,7 +30,8 @@ function build(store) {
       dbDelete = async (db, k) => void store.delete(k);
       dbSetMany = async (db, entries) => { for (const [k, v] of entries) store.set(k, v); };
       return { generateGroupKey, groupSeedFromKey, adoptGroupVersion, withChain, chainSeal, chainOpen,
-               loadChain, saveGroupPlain, loadGroupPlain, saveGroupPending, loadGroupPending, dropGroupPending };
+               loadChain, saveGroupPlain, loadGroupPlain, saveGroupPending, loadGroupPending, dropGroupPending,
+               saveGroupSent, loadGroupSent, dropGroupSent };
     `
   );
   return fn(store, globalThis.crypto, globalThis.btoa, globalThis.atob);
@@ -137,6 +138,17 @@ test("a message I sent is kept as text under its client id, then under its real 
   assert.equal(await d.alice.loadGroupPending("alice", GID, "cid-1"), null);
   assert.equal(await d.alice.loadGroupPlain("alice", GID, 42), "what I wrote");
   assert.equal(await d.alice.loadGroupPlain("alice", GID, 43), null);
+});
+
+test("what I sent can be found again by key version and number", async () => {
+  const d = await group();
+  const m = await send(d.alice, "alice", "what I wrote");
+  await d.alice.saveGroupSent("alice", GID, 1, m.n, "what I wrote");
+  assert.equal(await d.alice.loadGroupSent("alice", GID, 1, m.n), "what I wrote");
+  // opening it from the chain is no longer possible, that's the point
+  await assert.rejects(() => open(d.alice, "alice", "alice", m), /gone/);
+  await d.alice.dropGroupSent("alice", GID, 1, m.n);
+  assert.equal(await d.alice.loadGroupSent("alice", GID, 1, m.n), null);
 });
 
 test("a device that joins a version later starts its chains at zero and still reads what comes", async () => {
