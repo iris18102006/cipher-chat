@@ -282,7 +282,7 @@ async function loadGroupHistory(gid) {
   state.gmsgs.set(gid, await decryptGroupRows(gid, rows));
   state.gHasOlder.set(gid, rows.length === PAGE);
   const g = state.groups.get(gid);
-  if (g) g.canWrite = !!(await groupKey(gid, g.key_version));
+  if (g) g.canWrite = await canWriteGroup(gid);
 }
 
 async function loadOlderGroup() {
@@ -418,14 +418,37 @@ async function sendGroupMessage() {
     setConn(false, "offline, message not sent");
     return;
   }
-  const key = await groupKey(gid, d.key_version);
-  if (!key) {
-    toast("you don't have this group's key yet, give it a second");
-    return;
+  const v = d.key_version;
+  const cid = crypto.randomUUID();
+  let msg;
+  if (isForwardSecret(d, v)) {
+    // lock it with the next key in my chain. That key is used once and deleted, so what I keep
+    // is the text itself (under the client id) until the server sends it back with a real id
+    const sealed = await withChain(state.me, gid, v, state.me, async (chain) => {
+      if (!chain) return null;
+      const s = await chainSeal(chain, text);
+      await saveGroupPending(state.me, gid, cid, text); // before anything can go wrong
+      return { state: s.state, sealed: s };
+    });
+    if (!sealed) {
+      toast("you don't have this group's keys on this device yet, give it a second");
+      return;
+    }
+    const { n, iv, ct } = sealed.sealed;
+    const sig = await signGroupMessage(state.signing.privateKey, gid, v, state.me, iv, ct, n);
+    msg = { type: "gmsg", group: gid, v, n, iv, ct, sig, cid };
+  } else {
+    // a group from before forward secrecy, waiting for its first rekey: the old way
+    const key = await groupKey(gid, v);
+    if (!key) {
+      toast("you don't have this group's key yet, give it a second");
+      return;
+    }
+    const { iv, ct } = await encryptText(key, text);
+    const sig = await signGroupMessage(state.signing.privateKey, gid, v, state.me, iv, ct);
+    msg = { type: "gmsg", group: gid, v, iv, ct, sig, cid };
   }
-  const { iv, ct } = await encryptText(key, text);
-  const sig = await signGroupMessage(state.signing.privateKey, gid, d.key_version, state.me, iv, ct);
-  if (sendWS({ type: "gmsg", group: gid, v: d.key_version, iv, ct, sig, cid: crypto.randomUUID() })) {
+  if (sendWS(msg)) {
     $("msg").value = "";
     autosize();
     stopTyping();
@@ -472,7 +495,9 @@ async function handleGroupWS(data) {
     const list = state.gmsgs.get(gid);
     if (list && !list.some((m) => m.id === data.id)) {
       // a message with a key version we haven't fetched yet (the key was just replaced)
-      if (!(await groupKey(gid, data.v))) await loadGroupDetail(gid);
+      const haveKey =
+        data.n != null ? !!(await loadChain(state.me, gid, data.v, data.from)) : !!(await groupKey(gid, data.v));
+      if (!haveKey) await loadGroupDetail(gid); // the key was just replaced, this also sets up its chains
       const [msg] = await decryptGroupRows(gid, [{ ...data, seen_by: [] }]);
       list.push(msg);
     }
@@ -522,7 +547,7 @@ async function handleGroupWS(data) {
       if (state.openGroup === gid) {
         await loadGroupDetail(gid);
         const g = state.groups.get(gid);
-        if (g) g.canWrite = !!(await groupKey(gid, g.key_version));
+        if (g) g.canWrite = await canWriteGroup(gid);
         renderGroupHeader();
       }
       if (groupPanel && groupPanel.id === gid) await paintGroupPanel();
@@ -532,8 +557,11 @@ async function handleGroupWS(data) {
       data.reason === "not_member" ? "You're not in that group any more."
         : data.reason === "too_long" ? "That message is too long, split it into a few shorter ones."
         : data.reason === "bad_sig" ? "That message wasn't sent, its signature was refused. Reload the page and try again."
+        : data.reason === "bad_n" ? "That message wasn't sent, its number was refused. Reload the page and try again."
         : "That message wasn't sent, the group key just changed. Try again."
     );
+    // the text we kept for it is no use now
+    if (data.cid) dropGroupPending(state.me, gid, data.cid).catch(() => {});
     if (data.reason === "bad_key" && state.groups.has(gid)) loadGroupDetail(gid).catch(() => {});
   }
 }
