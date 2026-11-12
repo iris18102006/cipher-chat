@@ -221,13 +221,23 @@ def detail(conn, gid: int, user) -> dict:
     keys = conn.execute(
         "SELECT k.version, u.username AS wrapper, k.wrapper_pub, k.iv, k.wk "
         "FROM chat_group_keys k JOIN users u ON u.id = k.wrapper_id "
-        "WHERE k.group_id = ? AND k.user_id = ? ORDER BY k.version",
+        "WHERE k.group_id = ? AND k.user_id = ? AND k.consumed = 0 ORDER BY k.version",
         (gid, user["id"]),
     ).fetchall()
     out["keys"] = [
         {"version": k["version"], "from": k["wrapper"], "from_pub": k["wrapper_pub"], "iv": k["iv"], "wk": k["wk"]}
         for k in keys
     ]
+    # Who has written in each forward-secret key version I can read. A device needs the list
+    # to set up everybody's key chain before it lets go of the group key, including people
+    # who have left since. Only usernames, nothing secret.
+    senders = conn.execute(
+        "SELECT DISTINCT m.key_version AS v, u.username AS u FROM chat_group_messages m "
+        "JOIN users u ON u.id = m.sender_id "
+        "WHERE m.group_id = ? AND m.key_version >= ? AND m.key_version >= ? ORDER BY m.key_version, u.username",
+        (gid, row["fs_version"], mem["joined_version"]),
+    ).fetchall()
+    out["senders"] = [{"v": s["v"], "u": s["u"]} for s in senders]
     return out
 
 
@@ -284,6 +294,26 @@ def list_groups(user=Depends(current_user), conn=Depends(get_conn)):
         (user["id"],),
     ).fetchall()
     return [summary(conn, r, user["id"], member_row(conn, r["id"], user["id"])) for r in rows]
+
+
+@router.post("/api/groups/{gid}/keys/{version}/ack")
+def ack_key(gid: int, version: int, user=Depends(current_user), conn=Depends(get_conn)):
+    """My browser has set up its key chains for this version, so it asks the server to destroy
+    my wrapped copy of the group key. After this nobody can get the group key back out of the
+    server's data for me, which is what makes the messages forward secret. Keys from before
+    forward secrecy (older than fs_version) stay, they're still needed to read old messages."""
+    row, _ = get_group(conn, gid, user)
+    if version < row["fs_version"]:
+        raise HTTPException(400, "that key is still needed for older messages")
+    cur = conn.execute(
+        "UPDATE chat_group_keys SET consumed = 1, iv = '', wk = '' "
+        "WHERE group_id = ? AND user_id = ? AND version = ?",
+        (gid, user["id"], version),
+    )
+    if cur.rowcount == 0:
+        raise HTTPException(404, "no such key")
+    conn.commit()
+    return {"ok": True}
 
 
 @router.get("/api/groups/{gid}")
