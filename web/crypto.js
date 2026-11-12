@@ -523,3 +523,21 @@ async function loadGroupPending(me, gid, cid) {
 async function dropGroupPending(me, gid, cid) {
   await dbDelete(await openDB(), groupPendingSlot(me, gid, cid));
 }
+
+// The same text again, filed under the message's place in my chain. The server never sees
+// our client ids, so if the echo of a message never reaches us (the connection dropped just
+// after sending), the text can still be found by key version and number when history loads.
+const groupSentSlot = (me, gid, v, n) => "gsent:" + me + ":" + gid + ":" + v + ":" + n;
+
+async function saveGroupSent(me, gid, v, n, text) {
+  await dbSet(await openDB(), groupSentSlot(me, gid, v, n), text);
+}
+
+async function loadGroupSent(me, gid, v, n) {
+  const text = await dbGet(await openDB(), groupSentSlot(me, gid, v, n));
+  return typeof text === "string" ? text : null;
+}
+
+async function dropGroupSent(me, gid, v, n) {
+  await dbDelete(await openDB(), groupSentSlot(me, gid, v, n));
+}

@@ -226,12 +226,15 @@ async function openChainRow(gid, r, signed) {
   // 1. already opened on this device: the text was kept, the key is long gone
   const kept = await loadGroupPlain(state.me, gid, r.id);
   if (kept !== null) return { text: kept, failed: false };
-  // 2. something I sent: the server is echoing it back, the text was saved under its client id
-  if (r.from === state.me && r.cid) {
-    const sent = await loadGroupPending(state.me, gid, r.cid);
+  // 2. something I sent: the text was saved when I sent it, under its client id (live echo)
+  //    and under its key version and number (history, if the echo never got here)
+  if (r.from === state.me) {
+    const sent =
+      (r.cid ? await loadGroupPending(state.me, gid, r.cid) : null) ?? (await loadGroupSent(state.me, gid, r.v, r.n));
     if (sent !== null) {
       await saveGroupPlain(state.me, gid, r.id, sent);
-      await dropGroupPending(state.me, gid, r.cid);
+      if (r.cid) await dropGroupPending(state.me, gid, r.cid);
+      await dropGroupSent(state.me, gid, r.v, r.n);
       return { text: sent, failed: false };
     }
   }
@@ -428,6 +431,7 @@ async function sendGroupMessage() {
       if (!chain) return null;
       const s = await chainSeal(chain, text);
       await saveGroupPending(state.me, gid, cid, text); // before anything can go wrong
+      await saveGroupSent(state.me, gid, v, s.n, text);
       return { state: s.state, sealed: s };
     });
     if (!sealed) {
