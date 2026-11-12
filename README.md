@@ -78,6 +78,26 @@ Things that follow from this:
 
 The websocket (`/ws`) needs a valid session cookie and a same-origin `Origin` header, so other sites and logged-out visitors can't connect.
 
+### Signed group messages
+
+Everyone in a group shares the same key, so on its own any member could build a message that looks like it came from someone else. To stop that every account also has a **signing key** (ECDSA P-256). The private half is made in your browser and never leaves it, the public half is published like your identity key.
+
+1. A group message is signed over its group, key version, sender, message number, iv and ciphertext (each with its length in front, so fields can't be shifted into each other). It can't be moved to another group or blamed on someone else.
+2. Every member's browser checks the signature. The server only checks that it has the right size, it isn't trusted to verify anything.
+3. Each message shows `signed`, `not signed` (old messages), `can't check` (the sender left the group) or a warning (`fake?` if the signature doesn't match, `key changed` if their signing key isn't the one you first saw). A message with a warning is not opened.
+4. Signing keys are trusted on first use, like identity keys. The Members panel shows each signing key's fingerprint and has a button to trust a changed one.
+
+### Forward secrecy in groups
+
+From a group's `fs_version` on, a group key is only used to **start key chains**:
+
+1. Every member has a chain for each key version, starting from `HKDF(group key, group, version, sender)`. Everyone who has the group key can work out everybody's chain.
+2. A message uses the next key in the sender's chain (and is numbered), then the chain steps forward and the old link is thrown away. A step only goes one way, a used key can't be worked out from the ones that are left.
+3. As soon as a device has saved the chains (non-extractable keys in IndexedDB) it tells the server to destroy its wrapped copy of the group key (`POST /api/groups/{id}/keys/{version}/ack`) and drops the key itself. After that the group key doesn't exist in any place it could be stolen from.
+4. Late or out-of-order messages are handled by keeping the keys of skipped numbers (up to 1000 per chain) until their message arrives. A key is deleted the moment it's used, so a message can only be opened once. The text you've read is kept on your device, like in 1:1 chats.
+5. The server refuses a message without a signature and a number, and refuses a number that was already used by that sender in that key version, so a replay is stopped there too.
+6. Groups that existed before this are marked once when the server starts: the first member to open one makes a new key version, and everything from it on is forward secret. Older messages keep the old key and stay readable the old way.
+
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
