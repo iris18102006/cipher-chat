@@ -598,6 +598,7 @@ async function rekeyGroup(gid) {
   const key = await generateGroupKey();
   const keys = await wrapForMembers(membersWithPubs(d), key);
   await gapi("/api/groups/" + gid + "/rekey", "POST", { version: d.key_version + 1, keys });
+  await loadGroupDetail(gid); // sets up my chains for the new version
 }
 
 // ---------- making a group, adding people ----------
@@ -611,6 +612,9 @@ async function createGroup(name, usernames) {
   const key = await generateGroupKey();
   const keys = await wrapForMembers(members, key);
   const d = await gapi("/api/groups", "POST", { name, members: usernames, keys });
+  // my own copy of the new key becomes my key chains right away
+  state.gDetail.set(d.id, d);
+  await ensureChains(d.id);
   await loadGroups();
   return d;
 }
@@ -624,6 +628,7 @@ async function addToGroup(gid, username) {
   const key = await generateGroupKey();
   const keys = await wrapForMembers(members, key);
   await gapi("/api/groups/" + gid + "/members", "POST", { username, version: d.key_version + 1, keys });
+  await loadGroupDetail(gid); // sets up my chains for the new version
 }
 
 async function leaveOrRemove(gid, username) {
