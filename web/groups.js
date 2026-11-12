@@ -217,20 +217,60 @@ async function loadGroupDetail(gid) {
   return d;
 }
 
+const NO_KEY_TEXT = "can't decrypt this message (missing key, or the sender's key changed)";
+const USED_KEY_TEXT = "can't open this message again: its one-use key was deleted and this device didn't keep a copy of the text";
+const FAKE_TEXT = "\u26a0 this message failed its signature check, so it was not opened";
+
+// Open one message that has a chain number (forward secret). Returns { text, failed }.
+async function openChainRow(gid, r, signed) {
+  // 1. already opened on this device: the text was kept, the key is long gone
+  const kept = await loadGroupPlain(state.me, gid, r.id);
+  if (kept !== null) return { text: kept, failed: false };
+  // 2. something I sent: the server is echoing it back, the text was saved under its client id
+  if (r.from === state.me && r.cid) {
+    const sent = await loadGroupPending(state.me, gid, r.cid);
+    if (sent !== null) {
+      await saveGroupPlain(state.me, gid, r.id, sent);
+      await dropGroupPending(state.me, gid, r.cid);
+      return { text: sent, failed: false };
+    }
+  }
+  // 3. a message that isn't from who it says must not be opened: opening moves the chain on,
+  //    and a fake must not be able to push it forward
+  if (signed === "bad" || signed === "changed") return { text: FAKE_TEXT, failed: true };
+  try {
+    const out = await withChain(state.me, gid, r.v, r.from, async (chain) => {
+      if (!chain) throw new Error("no chain");
+      const opened = await chainOpen(chain, r.n, r.iv, r.ct);
+      return { state: opened.state, text: opened.text };
+    });
+    await saveGroupPlain(state.me, gid, r.id, out.text);
+    return { text: out.text, failed: false };
+  } catch (ex) {
+    const noChain = ex && ex.message === "no chain";
+    return { text: noChain ? NO_KEY_TEXT : USED_KEY_TEXT, failed: true };
+  }
+}
+
 async function decryptGroupRows(gid, rows) {
   const out = [];
   for (const r of rows) {
+    const signed = await checkSignature(gid, r);
     let text;
     let failed = false;
-    try {
-      const key = await groupKey(gid, r.v);
-      if (!key) throw new Error("no key");
-      text = await decryptText(key, r.iv, r.ct);
-    } catch {
-      text = "can't decrypt this message (missing key, or the sender's key changed)";
-      failed = true;
+    if (r.n != null) {
+      ({ text, failed } = await openChainRow(gid, r, signed));
+    } else {
+      // from before forward secrecy: the group key itself opens it
+      try {
+        const key = await groupKey(gid, r.v);
+        if (!key) throw new Error("no key");
+        text = await decryptText(key, r.iv, r.ct);
+      } catch {
+        text = NO_KEY_TEXT;
+        failed = true;
+      }
     }
-    const signed = await checkSignature(gid, r);
     out.push({ id: r.id, from: r.from, text, failed, ts: r.ts, v: r.v, signed, seen: new Set(r.seen_by || []) });
   }
   return out;
