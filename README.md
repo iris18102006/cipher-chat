@@ -102,10 +102,11 @@ From a group's `fs_version` on, a group key is only used to **start key chains**
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
 - `backend/db.py`: the SQLite schema and the connection helper (the database file `backend/cipher.db` is made on first run)
-- `backend/groups.py` and `backend/chat_themes.py`: group chats (with their versioned keys) and the look of each conversation
-- `web/crypto.js`: all the Web Crypto code (keys, HKDF, AES-GCM, prekeys)
+- `backend/groups.py` and `backend/chat_themes.py`: group chats (with their versioned keys and key chains) and the look of each conversation
+- `backend/songs.py` and `backend/feed.py`: the song on a profile (with seeking) and the feed (posts, likes, shares)
+- `web/crypto.js`: all the Web Crypto code (keys, HKDF, AES-GCM, prekeys, signing, group key chains)
 - `web/app.js`: the chat screen (buddy list, messages, typing, receipts, the websocket)
-- `web/profile.js`, `web/profile-media.js`, `web/friends.js`, `web/lists.js`, `web/settings.js`, `web/groups.js` and `web/chat-themes.js`: one file for each screen on top of the chat (profiles and pictures, friends, the Requests and Blocked panels, settings, group chats, chat themes)
+- `web/profile.js`, `web/profile-media.js`, `web/friends.js`, `web/lists.js`, `web/settings.js`, `web/groups.js`, `web/chat-themes.js`, `web/profile-song.js` and `web/feed.js`: one file for each screen on top of the chat (profiles and pictures, friends, the Requests and Blocked panels, settings, group chats, chat themes, the profile song player, the feed window)
 - `tests/`: the Python tests (`python -m pytest tests`) and the Node crypto tests (`node --test`)
 - `server.py`: starts uvicorn
 
@@ -131,7 +132,7 @@ Unused imports and variables are checked with pyflakes:
 
     python -m pyflakes backend server.py tests
 
-The forward secrecy crypto in the browser has its own tests (Node 20+, nothing to install):
+The crypto in the browser (forward secrecy, signing, the group key chains, and a whole group conversation across three simulated devices) has its own tests (Node 20+, nothing to install):
 
     node --test
 
