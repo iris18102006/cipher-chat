@@ -536,9 +536,8 @@ async def handle_ws(conn, me_id: int, me: str, data: dict) -> bool:
         # members catch a replayed, reordered or forged message, so they aren't optional.
         n = data.get("n")
         numbered = isinstance(n, int) and not isinstance(n, bool) and 0 <= n < MAX_CHAIN_N
-        if (isinstance(v, int) and v >= fs_version and not (numbered and sig is not None)) or (
-            isinstance(v, int) and v < fs_version and n is not None
-        ):
+        # (v was already checked to be a whole number above)
+        if (v >= fs_version and not (numbered and sig is not None)) or (v < fs_version and n is not None):
             await manager.send_user(
                 me, {"type": "gmsg-rejected", "group": gid, "cid": data.get("cid"), "reason": "bad_n"}
             )
