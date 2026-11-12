@@ -399,3 +399,51 @@ async function chainStep(ck) {
     next: await crypto.subtle.importKey("raw", nextBits, "HKDF", false, ["deriveBits"]),
   };
 }
+
+// A chain's state: { ck: the next link, n: the number of the next message, skipped: { n: key } }.
+// `skipped` holds keys for messages that were passed over (they arrived late or out of order)
+// until they show up. All of these functions return a NEW state and leave the old one alone,
+// so a caller can throw the result away if the message turns out to be fake.
+
+function newChain(ck) {
+  return { ck, n: 0, skipped: {} };
+}
+
+// keep at most MAX_SKIP skipped keys, dropping the oldest
+function pruneSkipped(skipped) {
+  const keys = Object.keys(skipped).map(Number).sort((a, b) => a - b);
+  const out = {};
+  for (const k of keys.slice(Math.max(0, keys.length - MAX_SKIP))) out[k] = skipped[k];
+  return out;
+}
+
+// Lock a new message with the next key. Gives the message number to send along with it.
+async function chainSeal(state, text) {
+  const { mk, next } = await chainStep(state.ck);
+  const { iv, ct } = await encryptText(mk, text);
+  return { n: state.n, iv, ct, state: { ck: next, n: state.n + 1, skipped: state.skipped } };
+}
+
+// Open message number `n`. Throws if its key is gone (already used, or skipped too long ago).
+async function chainOpen(state, n, iv, ct) {
+  if (!Number.isInteger(n) || n < 0) throw new Error("bad message number");
+  if (n < state.n) {
+    const mk = state.skipped[n];
+    if (!mk) throw new Error("that message's key is gone");
+    const text = await decryptText(mk, iv, ct);
+    const skipped = { ...state.skipped };
+    delete skipped[n]; // used once, deleted
+    return { text, state: { ck: state.ck, n: state.n, skipped } };
+  }
+  if (n - state.n > MAX_SKIP) throw new Error("too many messages missed to catch up");
+  let ck = state.ck;
+  const skipped = { ...state.skipped };
+  for (let i = state.n; i < n; i++) {
+    const step = await chainStep(ck);
+    skipped[i] = step.mk; // keep it, that message may still arrive
+    ck = step.next;
+  }
+  const { mk, next } = await chainStep(ck);
+  const text = await decryptText(mk, iv, ct);
+  return { text, state: { ck: next, n: n + 1, skipped: pruneSkipped(skipped) } };
+}
