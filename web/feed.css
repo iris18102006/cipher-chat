@@ -93,7 +93,14 @@
   margin-top: 6px;
 }
 
+#feed-hint {
+  flex: 1;
+  font-size: 11px;
+  color: #888;
+}
+
 #feed-chars {
+  margin-right: 10px;
   font-size: 11px;
   color: #666;
 }
