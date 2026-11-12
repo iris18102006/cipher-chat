@@ -106,7 +106,7 @@ def member_row(conn, gid: int, user_id: int):
 def get_group(conn, gid: int, user):
     """The group, but only for its members. Everyone else gets the same 404."""
     row = conn.execute(
-        "SELECT g.id, g.name, g.owner_id, g.key_version, g.rekey_needed, o.username AS owner "
+        "SELECT g.id, g.name, g.owner_id, g.key_version, g.fs_version, g.rekey_needed, o.username AS owner "
         "FROM chat_groups g JOIN users o ON o.id = g.owner_id WHERE g.id = ?",
         (gid,),
     ).fetchone()
@@ -193,6 +193,7 @@ def summary(conn, row, me_id: int, mem) -> dict:
         "name": row["name"],
         "owner": row["owner"],
         "key_version": row["key_version"],
+        "fs_version": row["fs_version"],
         "rekey_needed": bool(row["rekey_needed"]),
         "members": count,
         "unread": unread_count(conn, row["id"], me_id, mem["joined_version"], mem["last_read_id"]),
@@ -275,7 +276,7 @@ async def create_group(body: NewGroup, user=Depends(current_user), conn=Depends(
 @router.get("/api/groups")
 def list_groups(user=Depends(current_user), conn=Depends(get_conn)):
     rows = conn.execute(
-        "SELECT g.id, g.name, g.owner_id, g.key_version, g.rekey_needed, o.username AS owner "
+        "SELECT g.id, g.name, g.owner_id, g.key_version, g.fs_version, g.rekey_needed, o.username AS owner "
         "FROM chat_group_members m JOIN chat_groups g ON g.id = m.group_id "
         "JOIN users o ON o.id = g.owner_id WHERE m.user_id = ?",
         (user["id"],),
