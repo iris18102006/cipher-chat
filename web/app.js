@@ -725,6 +725,16 @@ async function handleWS(data) {
     if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
       openProfile(data.from);
     }
+  } else if (data.type === "feed") {
+    // a friend posted or shared something: count it, the feed window offers to show them
+    if (typeof setNewCount === "function") {
+      const first = feed.newCount === 0 && !feed.open;
+      setNewCount(feed.newCount + 1);
+      if (first) {
+        const from = state.contacts.get(data.from);
+        toast((from ? shownName(from) : data.from) + " posted in the feed", () => openFeed());
+      }
+    }
   } else if (data.type === "msg-rejected") {
     toast(REJECT_REASONS[data.reason] || "That message wasn't sent.");
     // the copy of the text we kept for it is no use now
