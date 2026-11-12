@@ -240,6 +240,16 @@ def init_db():
         _add_column(conn, "users", "sign_pub", "TEXT")
         # the signature a group message was sent with (base64, 64 bytes), null on older messages
         _add_column(conn, "chat_group_messages", "sig", "TEXT")
+        # the message's number in its sender's key chain (forward secrecy), null on older messages
+        _add_column(conn, "chat_group_messages", "n", "INTEGER")
+        # 1 once a member's device has set up its key chains and had its wrapped copy of the
+        # group key destroyed (iv and wk emptied). The row stays so we know they hold the version
+        _add_column(conn, "chat_group_keys", "consumed", "INTEGER NOT NULL DEFAULT 0")
+        # a number can only be used once per sender and key version, which stops replays
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_group_messages_chain "
+            "ON chat_group_messages (group_id, sender_id, key_version, n) WHERE n IS NOT NULL"
+        )
         conn.commit()
     finally:
         conn.close()
