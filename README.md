@@ -22,6 +22,10 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Group chats: make a group from your friends, up to 30 people. Messages are end-to-end encrypted for the whole group, typing shows who is writing, your own messages say "seen by", and the Members panel lets you rename, add friends, remove people (owner) or leave
 - Chat themes: every conversation (1:1 or group) can have its own look, picked from the Theme button in the chat header: 10 themes, 5 background patterns and an accent colour. It's saved per person on the server, so nobody else sees or changes what you picked. Only fixed names and a hex colour are ever stored, never free text
 - Forward secrecy for 1:1 chats: every message is locked with a one-time key as well, and that key is deleted the moment the message has been read. Someone who later steals your key and has a copy of what the server stored still can't open those messages
+- Signed group messages: every group message is signed with its sender's own key, and each member's browser checks it. A message shows "signed", "not signed" or a warning if it doesn't check out, so one member can't write something that looks like it came from another
+- Forward secrecy for group chats: each member has their own chain of one-use message keys, and the group key itself is deleted from your device and from the server once the chains are set up
+- A song on your profile that people can play: upload an mp3, ogg, wav, flac or m4a (up to 6 MB), with a small player that never starts by itself
+- A feed with its own window: short posts that you and your friends can see, with likes and shares (a share never shows the original to people who couldn't already see it)
 - Too-long messages (over about 11,000 characters) are refused with a notice instead of vanishing, and flooding the socket gets dropped
 - Logging out closes any tab of that session that's still connected
 - Works on phones (one panel at a time)
