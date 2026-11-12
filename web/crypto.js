@@ -447,3 +447,79 @@ async function chainOpen(state, n, iv, ct) {
   const text = await decryptText(mk, iv, ct);
   return { text, state: { ck: next, n: n + 1, skipped: pruneSkipped(skipped) } };
 }
+
+// ---------- keeping the chains on this device ----------
+// A chain is stored per (you, group, key version, sender). The values are CryptoKeys that
+// can't be exported, kept in IndexedDB like the identity key. The text of messages we've
+// already opened is kept too, because their keys are gone and the server only has ciphertext.
+
+const chainSlot = (me, gid, v, sender) => "gchain:" + me + ":" + gid + ":" + v + ":" + sender;
+const groupPlainSlot = (me, gid, id) => "gplain:" + me + ":" + gid + ":" + id;
+const groupPendingSlot = (me, gid, cid) => "gpending:" + me + ":" + gid + ":" + cid;
+
+async function loadChain(me, gid, v, sender) {
+  return (await dbGet(await openDB(), chainSlot(me, gid, v, sender))) || null;
+}
+
+async function saveChain(me, gid, v, sender, state) {
+  await dbSet(await openDB(), chainSlot(me, gid, v, sender), state);
+}
+
+// Two tabs must not both step the same chain. Run `fn` with the chain loaded and, if it
+// returns a new state, save that state before letting go of the lock.
+function withChain(me, gid, v, sender, fn) {
+  return withLock("cc-gchain:" + chainSlot(me, gid, v, sender), async () => {
+    const state = await loadChain(me, gid, v, sender);
+    const out = await fn(state);
+    if (out && out.state) await saveChain(me, gid, v, sender, out.state);
+    return out;
+  });
+}
+
+// Set up the chains of one key version for these senders, from the group key's raw bytes.
+// Chains we already have are left alone (they may be further along). Everything is saved in
+// one go, and only after that returns is it safe to throw the group key away.
+function adoptGroupVersion(me, gid, v, rootRaw, senders) {
+  return withLock("cc-gadopt:" + me + ":" + gid, async () => {
+    const db = await openDB();
+    const entries = [];
+    for (const sender of senders) {
+      if (await dbGet(db, chainSlot(me, gid, v, sender))) continue;
+      entries.push([chainSlot(me, gid, v, sender), newChain(await groupChainStart(rootRaw, gid, v, sender))]);
+    }
+    if (entries.length) await dbSetMany(db, entries);
+    return entries.length;
+  });
+}
+
+// The group key as raw bytes, only for setting up chains and then dropping it.
+async function groupSeedFromKey(groupKey) {
+  return new Uint8Array(await crypto.subtle.exportKey("raw", groupKey));
+}
+
+async function unwrapGroupSeed(wrapKey, iv, wk) {
+  return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, wrapKey, unb64(wk)));
+}
+
+async function saveGroupPlain(me, gid, id, text) {
+  await dbSet(await openDB(), groupPlainSlot(me, gid, id), text);
+}
+
+async function loadGroupPlain(me, gid, id) {
+  const text = await dbGet(await openDB(), groupPlainSlot(me, gid, id));
+  return typeof text === "string" ? text : null;
+}
+
+// what we sent, kept under its client id until the server echoes it back with a real id
+async function saveGroupPending(me, gid, cid, text) {
+  await dbSet(await openDB(), groupPendingSlot(me, gid, cid), text);
+}
+
+async function loadGroupPending(me, gid, cid) {
+  const text = await dbGet(await openDB(), groupPendingSlot(me, gid, cid));
+  return typeof text === "string" ? text : null;
+}
+
+async function dropGroupPending(me, gid, cid) {
+  await dbDelete(await openDB(), groupPendingSlot(me, gid, cid));
+}
