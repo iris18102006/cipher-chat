@@ -140,6 +140,7 @@ function mountSongEditor(box, p, titleInput) {
   const remove = el("button", "", "Remove song");
   remove.type = "button";
 
+  let needsSave = false; // the name was filled in from the file name and isn't saved yet
   const paint = () => {
     stopProfileSong();
     holder.replaceChildren();
@@ -147,6 +148,7 @@ function mountSongEditor(box, p, titleInput) {
     status.textContent = p.song_url
       ? "People can press play on your profile. It never starts by itself."
       : "No song file yet. Add an mp3, ogg, wav, flac or m4a (up to " + SONG_MAX_MB + " MB) and people can listen from your profile.";
+    if (needsSave && p.song_url) status.textContent += " Hit Save to keep the song name too.";
     pick.textContent = p.song_url ? "Replace song" : "Upload a song";
     remove.hidden = !p.song_url;
   };
