@@ -173,6 +173,12 @@ function mountSongEditor(box, p, titleInput) {
     pick.textContent = "uploading...";
     try {
       setUrl((await sendFile("/api/me/song", "PUT", f)).song_url);
+      // nothing written in "Now playing" yet? use the file name (the text still needs Save)
+      if (titleInput && !titleInput.value.trim()) {
+        titleInput.value = f.name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").slice(0, 80);
+        titleInput.dispatchEvent(new Event("input"));
+        needsSave = true;
+      }
     } catch (ex) {
       err.textContent = ex.message;
     } finally {
