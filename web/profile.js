@@ -394,6 +394,8 @@ function effectiveColor(key) {
   const raw = getComputedStyle($("profile-card")).getPropertyValue(CUSTOM_COLOR_VARS[key]).trim().toLowerCase();
   if (/^#[0-9a-f]{6}$/.test(raw)) return raw;
   if (/^#[0-9a-f]{3}$/.test(raw)) return "#" + [...raw.slice(1)].map((c) => c + c).join("");
+  const rgb = raw.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+  if (rgb) return "#" + rgb.slice(1, 4).map((n) => Math.min(255, Number(n)).toString(16).padStart(2, "0")).join("");
   return "#000000";
 }
 
