@@ -127,7 +127,7 @@ function songSection(p) {
 // Like pictures, a song is saved on the server the moment you upload or remove it. The
 // text next to it ("Now playing") is a normal field and waits for the Save button.
 
-function mountSongEditor(box, p) {
+function mountSongEditor(box, p, titleInput) {
   const status = el("p", "pf-note");
   const err = el("p", "pf-error");
   const holder = el("div", "pf-song-holder");
