@@ -462,10 +462,11 @@ function renderEditor(p) {
 
   // ---- about you
   const about = group("About you");
-  for (const f of TEXT_FIELDS) inputs[f[0]] = textRow(about, f, p[f[0]]);
-
-  // ---- profile song (a file people can play)
-  mountSongEditor(group("Profile song"), p);
+  for (const f of TEXT_FIELDS) {
+    inputs[f[0]] = textRow(about, f, p[f[0]]);
+    // the mp3 goes right under the "Now playing" text, so it's obvious they belong together
+    if (f[0] === "song") mountSongEditor(about, p);
+  }
 
   // ---- profile picture
   mountAvatarEditor(group("Profile picture"), p, media);
