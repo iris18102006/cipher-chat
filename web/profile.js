@@ -465,7 +465,7 @@ function renderEditor(p) {
   for (const f of TEXT_FIELDS) {
     inputs[f[0]] = textRow(about, f, p[f[0]]);
     // the mp3 goes right under the "Now playing" text, so it's obvious they belong together
-    if (f[0] === "song") mountSongEditor(about, p);
+    if (f[0] === "song") mountSongEditor(about, p, inputs.song);
   }
 
   // ---- profile picture
