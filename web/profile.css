@@ -984,3 +984,8 @@
 .pf-song-holder {
   margin-bottom: 8px;
 }
+
+/* no gap when there is no song yet, now that it sits inside About you */
+.pf-song-holder:empty {
+  display: none;
+}
