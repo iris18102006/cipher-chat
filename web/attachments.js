@@ -469,6 +469,16 @@ function recDone(r) {
   if (rec === r) rec = null;
   recShow(false);
   r.stream.getTracks().forEach((t) => t.stop()); // turns the microphone light off
+  if (!r.send) return;
+  const secs = Math.min(FC_VOICE_MAX_SECONDS, Math.round((Date.now() - r.started) / 1000));
+  if (!r.chunks.length || secs < 1) {
+    toast("That was too short to send.");
+    return;
+  }
+  const type = fcCleanType(r.recorder.mimeType || "audio/webm");
+  const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  sendFiles([new File(r.chunks, "voice-" + stamp + "." + ext, { type })], "voice", secs, r.target);
 }
 
 $("mic").onclick = recStart;
