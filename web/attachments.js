@@ -375,3 +375,11 @@ attLog.addEventListener("drop", (e) => {
   const files = [...((e.dataTransfer && e.dataTransfer.files) || [])];
   if (files.length) sendFiles(files, "file");
 });
+
+// a picture or file on the clipboard (a screenshot, say) is sent instead of typed in
+$("msg").addEventListener("paste", (e) => {
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+  if (!files.length) return;
+  e.preventDefault();
+  sendFiles(files, "file");
+});
