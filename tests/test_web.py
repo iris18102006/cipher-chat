@@ -128,3 +128,43 @@ def test_file_size_limit_matches_the_backend():
 
 def test_voice_messages_stop_at_five_minutes():
     assert js_number("FC_VOICE_MAX_SECONDS") == 300
+
+
+def test_file_buttons_exist_and_are_labelled():
+    text = page("index.html")
+    for ident in ("attach", "attach-input", "att-status", "att-cancel", "mic", "rec-bar", "rec-send", "rec-cancel", "rec-time", "rec-who"):
+        assert f'id="{ident}"' in text, ident
+    for ident in ("attach", "attach-input", "mic"):
+        assert re.search(rf'id="{ident}"[^>]*aria-label="[^"]+"', text), ident
+
+
+def test_file_scripts_load_in_order():
+    srcs = re.findall(r'<script src="([^"]+)"', page("index.html"))
+    assert srcs.index("crypto.js") < srcs.index("filecrypto.js") < srcs.index("attachments.js")
+    assert srcs.index("app.js") < srcs.index("attachments.js")
+    assert srcs.index("groups.js") < srcs.index("attachments.js")
+
+
+def test_files_are_sent_by_the_same_code_as_text():
+    assert "async function sendDirectText(" in page("app.js")
+    assert "async function sendGroupText(" in page("groups.js")
+    text = page("attachments.js")
+    assert "sendDirectText(" in text and "sendGroupText(" in text
+
+
+def test_messages_are_drawn_through_message_body():
+    assert "messageBody(m)" in page("app.js")
+    assert "function messageBody(" in page("attachments.js")
+
+
+def test_file_code_never_writes_html():
+    # names and types come from other people, they may only ever be put on the page as text
+    for name in ("attachments.js", "filecrypto.js"):
+        text = page(name)
+        for bad in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval("):
+            assert bad not in text, (name, bad)
+
+
+def test_a_download_is_always_saved_as_an_anonymous_file():
+    # only pictures, videos and sounds are opened with the type the sender claimed
+    assert 'new Blob(parts, { type: "application/octet-stream" })' in page("attachments.js")
