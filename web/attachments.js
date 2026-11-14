@@ -64,3 +64,59 @@ async function uploadAttachment(file, kind, dur, onProgress) {
   await api("/api/blobs/" + made.id + "/complete", { method: "POST" });
   return fcDescriptor({ id: made.id, secret, size: file.size, name: file.name, type: file.type, kind, dur });
 }
+
+
+// ---------- opening ----------
+
+const attCache = new Map(); // file id -> blob: address of the opened file, for pictures, videos and sounds
+const attPending = new Map(); // file id -> an open that is already running
+
+// Fetches and opens a file's pieces one after another. `each(plain, index)` gets every piece.
+async function attOpenPieces(desc, each, onProgress) {
+  const key = await fcImport(fcUnb64(desc.key));
+  const prefix = fcUnb64(desc.iv);
+  let total = 0;
+  for (let i = 0; i < desc.chunks; i++) {
+    let res;
+    try {
+      res = await fetch("/api/blobs/" + desc.id + "/pieces/" + i);
+    } catch {
+      throw attFail("failed");
+    }
+    if (res.status === 401) {
+      location.href = "/login.html";
+      throw attFail("failed");
+    }
+    if (res.status === 404) throw attFail("gone");
+    if (!res.ok) throw attFail("failed");
+    let plain;
+    try {
+      plain = await fcOpen(key, prefix, i, i === desc.chunks - 1, new Uint8Array(await res.arrayBuffer()));
+    } catch {
+      throw attFail("corrupt");
+    }
+    total += plain.length;
+    await each(plain, i);
+    if (onProgress) onProgress((i + 1) / desc.chunks);
+  }
+  if (total !== desc.size) throw attFail("corrupt");
+}
+
+// Opens a picture, video or sound for showing in the chat, once: the result is kept.
+async function attLoadUrl(desc, onProgress) {
+  if (attCache.has(desc.id)) return attCache.get(desc.id);
+  if (attPending.has(desc.id)) return attPending.get(desc.id);
+  const job = (async () => {
+    const parts = [];
+    await attOpenPieces(desc, (plain) => parts.push(new Blob([plain])), onProgress);
+    const url = URL.createObjectURL(new Blob(parts, { type: desc.type }));
+    attCache.set(desc.id, url);
+    return url;
+  })();
+  attPending.set(desc.id, job);
+  try {
+    return await job;
+  } finally {
+    attPending.delete(desc.id);
+  }
+}
