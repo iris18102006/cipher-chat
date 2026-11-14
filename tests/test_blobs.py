@@ -70,3 +70,37 @@ def test_the_storage_limit_for_one_person(client, monkeypatch):
     assert start(a, 1, CT).status_code == 200
     assert start(a, 1, CT).status_code == 413
     assert start(b, 1, CT).status_code == 200  # somebody else's space is separate
+
+
+def upload(c, parts):
+    """Sends a whole file, parts being the locked pieces."""
+    blob_id = start(c, len(parts), sum(len(p) for p in parts)).json()["id"]
+    for i, data in enumerate(parts):
+        assert piece(c, blob_id, i, data).status_code == 200
+    assert c.post(f"/api/blobs/{blob_id}/complete").json() == {"ok": True}
+    return blob_id
+
+
+def test_a_file_goes_up_and_comes_back(client):
+    a = signup(client, "alice")
+    b = signup(client, "bob")
+    first, last = bytes(range(CT)), b"x" * 30
+    blob_id = upload(a, [first, last])
+    got = b.get(f"/api/blobs/{blob_id}/pieces/0")  # anybody logged in who knows the id
+    assert got.status_code == 200
+    assert got.content == first
+    assert got.headers["content-type"] == "application/octet-stream"
+    assert got.headers["x-content-type-options"] == "nosniff"
+    assert a.get(f"/api/blobs/{blob_id}/pieces/1").content == last
+
+
+def test_loading_a_piece_needs_login(client):
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 30])
+    assert client.get(f"/api/blobs/{blob_id}/pieces/0").status_code == 401
+
+
+def test_finishing_twice_is_fine(client):
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 30])
+    assert a.post(f"/api/blobs/{blob_id}/complete").json() == {"ok": True}
