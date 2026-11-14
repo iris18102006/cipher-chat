@@ -124,10 +124,12 @@ From a group's `fs_version` on, a group key is only used to **start key chains**
 - `backend/db.py`: the SQLite schema and the connection helper (the database file `backend/cipher.db` is made on first run)
 - `backend/groups.py` and `backend/chat_themes.py`: group chats (with their versioned keys and key chains) and the look of each conversation
 - `backend/songs.py` and `backend/feed.py`: the song on a profile (with seeking) and the feed (posts, likes, shares)
+- `backend/blobs.py`: the encrypted files people send (pieces on disk, removed after 30 days)
 - `web/crypto.js`: all the Web Crypto code (keys, HKDF, AES-GCM, prekeys, signing, group key chains)
 - `web/app.js`: the chat screen (buddy list, messages, typing, receipts, the websocket)
 - `web/profile.js`, `web/profile-media.js`, `web/friends.js`, `web/lists.js`, `web/settings.js`, `web/groups.js`, `web/chat-themes.js`, `web/profile-song.js` and `web/feed.js`: one file for each screen on top of the chat (profiles and pictures, friends, the Requests and Blocked panels, settings, group chats, chat themes, the profile song player, the feed window)
-- `tests/`: the Python tests (`python -m pytest tests`) and the Node crypto tests (`node --test`)
+- `web/filecrypto.js` and `web/attachments.js`: locking files in the browser, and the code that sends, shows and records them
+- `tests/`: the Python tests (`python -m pytest tests`) and the Node tests for the crypto and the files (`node --test`)
 - `server.py`: starts uvicorn
 
 ## Run it
@@ -152,7 +154,7 @@ Unused imports and variables are checked with pyflakes:
 
     python -m pyflakes backend server.py tests
 
-The crypto in the browser (forward secrecy, signing, the group key chains, and a whole group conversation across three simulated devices) has its own tests (Node 20+, nothing to install):
+The crypto in the browser (forward secrecy, signing, the group key chains, and a whole group conversation across three simulated devices, and locking files) has its own tests (Node 20+, nothing to install):
 
     node --test
 
@@ -180,6 +182,10 @@ This is a learning project, not Signal.
 - A profile song is only checked by looking at the first bytes of the file. It's played with a plain `<audio>` element and is served with `nosniff` and a sandbox policy
 - Feed rate limits (15 posts or shares per 10 minutes) are in memory and reset when the server restarts
 - Someone who was removed keeps what they already read and the keys they already held, a new key only protects what's said afterwards
+- The server sees that a file exists, how big it is, who uploaded it and when, but not what it is or which chat it belongs to. Anybody logged in who knows a file's random id can download the locked pieces, which is useless without the key
+- A file is removed from the server after 30 days. The message stays but opening it says the file is gone, so save what you want to keep. Deleting a message doesn't delete the file, and somebody who was in the chat keeps a file they already opened
+- Big downloads: Chrome and Edge write a file over 64 MB straight to disk, other browsers keep it in memory while it downloads, so a very big file can fail on a computer with little memory
+- Voice messages need a microphone and a browser with `MediaRecorder`, over `https` or on `localhost`. The format is whatever the browser records (webm or mp4), so an old browser may not be able to play it
 
 ## Roadmap
 
@@ -207,4 +213,6 @@ This is a learning project, not Signal.
 - [x] Profiles will have the possibility of listening the song into their profile, not just the name
 - [x] Posts will have the ability to get shared
 - [x] The feed will have a special window so it doesn't have to look ugly
+- [x] Send files, photos and videos in chats and groups, end-to-end encrypted, up to 2 GB each
+- [x] Voice messages up to 5 minutes
 
