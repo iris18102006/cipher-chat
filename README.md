@@ -16,6 +16,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Requests and Blocked buttons in the top bar: answer friend requests (with a count) and see or unblock the people you blocked, without hunting through the buddy list
 - Settings: choose what happens to messages from someone whose friend request you haven't accepted yet: let them through, hold them until you accept (up to 3, you only see a count), or make them wait. You answer the request right from the chat
 - Pictures: upload a profile photo, a gallery of up to 12 photos and GIFs (click to view full size), a background picture, and stickers you drag around a small copy of your page. All without writing code
+- Files and voice messages: send any file (up to 2 GB), photos and videos, or record a voice message of up to 5 minutes, in chats and in groups. It is all locked in your browser before it is uploaded
 - Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
 - Friend requests (send, accept, decline, cancel, unfriend) with a popup when one arrives
 - Blocking: a blocked person can't message you, can't see when you're online and can't see your profile
@@ -65,6 +66,16 @@ Things that follow from this:
 3. The key moves to a new version whenever someone **joins**, so a new member can only read from the moment they were added, and whenever someone **leaves or is removed**, so they can't read what comes after. After a removal the owner's browser makes the new key (or another member's, if the owner is offline). Two people changing the key at once is settled by the server: one of them wins and the other is told to retry.
 4. You can only add people who are your friends and haven't blocked you (or you them). A key the person already trusted is checked the same way as in 1:1 chats: if a member's key changed, nobody wraps a new group key for them until you verify it in the Members panel.
 5. If you block someone (or they block you) you don't see their messages in groups and they don't see yours, and nobody is told.
+
+## Files and voice messages
+
+1. The browser cuts a file into pieces of 4 MB and locks every piece with AES-GCM under a random key made for that one file. The number of the piece and whether it is the last one are checked as well, so pieces can't be put in another order, cut short or swapped for pieces of another file.
+2. The locked pieces are uploaded one at a time and the server keeps them on disk (`backend/blobs`) under a random id. It never has the key, the name or the type of the file.
+3. The id, the key, the name and the type go inside a normal end-to-end encrypted chat message, to one person or to a group. So the people in that chat can open the file and nobody else can.
+4. Pictures, videos and sounds are shown or played inside the chat. Everything else is a card with a Download button. Opening a file checks every piece again, so a file that was changed on the server is refused.
+5. A voice message is recorded in the browser (up to 5 minutes) and sent the same way.
+
+Pick files with the paperclip, drop them on the chat, or paste a screenshot.
 
 ## Profiles, friends and blocking
 
