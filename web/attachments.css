@@ -99,3 +99,8 @@
   flex: 1;
   min-width: 60px;
 }
+
+#log.drop {
+  outline: 3px dashed var(--orange-dark, #e07a00);
+  outline-offset: -6px;
+}

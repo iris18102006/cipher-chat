@@ -352,3 +352,26 @@ $("attach-input").onchange = () => {
   $("attach-input").value = "";
   if (files.length) sendFiles(files, "file");
 };
+
+
+// ---------- drag and drop, paste ----------
+
+const attLog = $("log");
+
+attLog.addEventListener("dragover", (e) => {
+  if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) {
+    e.preventDefault(); // that's what allows dropping here
+    attLog.classList.add("drop");
+  }
+});
+
+attLog.addEventListener("dragleave", (e) => {
+  if (!attLog.contains(e.relatedTarget)) attLog.classList.remove("drop");
+});
+
+attLog.addEventListener("drop", (e) => {
+  e.preventDefault();
+  attLog.classList.remove("drop");
+  const files = [...((e.dataTransfer && e.dataTransfer.files) || [])];
+  if (files.length) sendFiles(files, "file");
+});
