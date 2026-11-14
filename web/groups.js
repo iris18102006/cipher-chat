@@ -417,13 +417,28 @@ function markGroupRead(gid) {
 async function sendGroupMessage() {
   const gid = state.openGroup;
   const text = $("msg").value.trim();
+  if (gid == null || !text) return;
+  if (await sendGroupText(gid, text)) {
+    $("msg").value = "";
+    autosize();
+    stopTyping();
+  }
+}
+
+// Locks one message for a group and sends it, and says whether it went out. What you type
+// uses this, and so do files and voice messages (attachments.js).
+async function sendGroupText(gid, text) {
   const g = state.groups.get(gid);
   const d = state.gDetail.get(gid);
-  if (gid == null || !text || !g || !d) return;
-  if (tooLong(text)) return;
+  if (gid == null || !text || !g || !d) return false;
+  if (!g.canWrite) {
+    toast("this group is waiting for a new key, give it a second");
+    return false;
+  }
+  if (tooLong(text)) return false;
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     setConn(false, "offline, message not sent");
-    return;
+    return false;
   }
   const v = d.key_version;
   const cid = crypto.randomUUID();
@@ -440,7 +455,7 @@ async function sendGroupMessage() {
     });
     if (!sealed) {
       toast("you don't have this group's keys on this device yet, give it a second");
-      return;
+      return false;
     }
     const { n, iv, ct } = sealed.sealed;
     const sig = await signGroupMessage(state.signing.privateKey, gid, v, state.me, iv, ct, n);
@@ -450,17 +465,13 @@ async function sendGroupMessage() {
     const key = await groupKey(gid, v);
     if (!key) {
       toast("you don't have this group's key yet, give it a second");
-      return;
+      return false;
     }
     const { iv, ct } = await encryptText(key, text);
     const sig = await signGroupMessage(state.signing.privateKey, gid, v, state.me, iv, ct);
     msg = { type: "gmsg", group: gid, v, iv, ct, sig, cid };
   }
-  if (sendWS(msg)) {
-    $("msg").value = "";
-    autosize();
-    stopTyping();
-  }
+  return sendWS(msg);
 }
 
 // "sent" -> "seen by 2" under my own messages
