@@ -104,3 +104,51 @@ def test_finishing_twice_is_fine(client):
     a = signup(client, "alice")
     blob_id = upload(a, [b"x" * 30])
     assert a.post(f"/api/blobs/{blob_id}/complete").json() == {"ok": True}
+
+
+def test_a_piece_of_the_wrong_size_is_refused(client):
+    a = signup(client, "alice")
+    blob_id = start(a, 2, CT + 30).json()["id"]
+    assert piece(a, blob_id, 0, b"x" * (CT - 1)).status_code == 400  # a middle piece is always full
+    assert piece(a, blob_id, 1, b"x" * 29).status_code == 400  # and the last one has the size you said
+
+
+def test_a_piece_that_is_far_too_big_is_refused(client):
+    a = signup(client, "alice")
+    blob_id = start(a, 1, 50).json()["id"]
+    assert piece(a, blob_id, 0, b"x" * 5000).status_code == 413
+
+
+def test_a_piece_number_that_does_not_exist(client):
+    a = signup(client, "alice")
+    blob_id = start(a, 1, 50).json()["id"]
+    assert piece(a, blob_id, 1, b"x" * 50).status_code == 404
+    assert piece(a, blob_id, -1, b"x" * 50).status_code == 404
+
+
+def test_only_the_sender_can_add_pieces(client):
+    a = signup(client, "alice")
+    b = signup(client, "bob")
+    blob_id = start(a, 1, 50).json()["id"]
+    assert piece(b, blob_id, 0, b"x" * 50).status_code == 404
+    assert b.post(f"/api/blobs/{blob_id}/complete").status_code == 404
+
+
+def test_a_file_with_a_missing_piece_cannot_be_finished(client):
+    a = signup(client, "alice")
+    blob_id = start(a, 2, CT + 30).json()["id"]
+    assert piece(a, blob_id, 0, b"x" * CT).status_code == 200
+    assert a.post(f"/api/blobs/{blob_id}/complete").status_code == 400
+
+
+def test_a_half_sent_file_cannot_be_downloaded(client):
+    a = signup(client, "alice")
+    blob_id = start(a, 1, 50).json()["id"]
+    assert piece(a, blob_id, 0, b"x" * 50).status_code == 200
+    assert a.get(f"/api/blobs/{blob_id}/pieces/0").status_code == 404
+
+
+def test_a_finished_file_cannot_be_changed(client):
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 50])
+    assert piece(a, blob_id, 0, b"y" * 50).status_code == 409
