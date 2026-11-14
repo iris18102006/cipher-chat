@@ -157,3 +157,60 @@ async function attSave(desc, onProgress) {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
+
+// ---------- showing files in the chat ----------
+
+function attNameLine(desc) {
+  return el("div", "att-name", desc.name + " \u00b7 " + fcHumanSize(desc.size));
+}
+
+// A button that opens something, shows how far it got and says why when it fails.
+// `run(progress)` does the work and puts the result on the page itself.
+function attLoadButton(label, run) {
+  const wrap = el("div", "att-action");
+  const btn = el("button", "att-btn", label);
+  btn.type = "button";
+  const note = el("span", "att-note");
+  btn.onclick = async () => {
+    btn.disabled = true;
+    note.classList.remove("bad");
+    note.textContent = "";
+    try {
+      await run((p) => (note.textContent = Math.round(p * 100) + "%"));
+      note.textContent = "";
+    } catch (ex) {
+      note.textContent = attWhy(ex, ATT_ERRORS.failed);
+      note.classList.add("bad");
+    }
+    btn.disabled = false;
+  };
+  wrap.append(btn, note);
+  return wrap;
+}
+
+function attImage(box, desc) {
+  const show = (url) => {
+    const img = el("img");
+    img.src = url;
+    img.alt = desc.name;
+    img.draggable = false;
+    img.title = "click to open";
+    img.onclick = () => window.open(url, "_blank", "noopener");
+    box.replaceChildren(img, attNameLine(desc));
+  };
+  const manual = () => attLoadButton("Show picture", async (progress) => show(await attLoadUrl(desc, progress)));
+  if (attCache.has(desc.id)) {
+    show(attCache.get(desc.id));
+  } else if (desc.size <= ATT_AUTO_IMAGE_MAX) {
+    box.append(el("div", "att-note", "loading picture..."));
+    attLoadUrl(desc)
+      .then(show)
+      .catch((ex) => {
+        const why = el("div", "att-note bad", attWhy(ex, ATT_ERRORS.failed));
+        box.replaceChildren(attNameLine(desc), why, manual());
+      });
+  } else {
+    box.append(attNameLine(desc), manual());
+  }
+}
