@@ -383,3 +383,85 @@ $("msg").addEventListener("paste", (e) => {
   e.preventDefault();
   sendFiles(files, "file");
 });
+
+
+// ---------- voice messages ----------
+// Recorded in the browser (MediaRecorder) and then sent exactly like any other file.
+
+const REC_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+let rec = null; // the recording that's going on: { recorder, stream, chunks, started, target, send, timer }
+let recStarting = false; // waiting for the browser to ask about the microphone
+
+// while you record, the bar takes the place of the text box
+function recShow(on) {
+  $("rec-bar").hidden = !on;
+  $("composer").hidden = on;
+}
+
+function attTargetName(target) {
+  if (target.group != null) {
+    const g = state.groups.get(target.group);
+    return g ? g.name : "the group";
+  }
+  const c = state.contacts.get(target.peer);
+  return c ? shownName(c) : target.peer;
+}
+
+async function recStart() {
+  if (rec || recStarting) return;
+  if (!attCanSend()) {
+    toast("You can't send a voice message here right now.");
+    return;
+  }
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    toast("Your browser can't record audio here.");
+    return;
+  }
+  recStarting = true;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    toast("Couldn't use the microphone. Allow it in your browser and try again.");
+    return;
+  } finally {
+    recStarting = false;
+  }
+  const type = REC_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
+  const r = {
+    recorder: new MediaRecorder(stream, type ? { mimeType: type } : undefined),
+    stream,
+    chunks: [],
+    started: Date.now(),
+    target: attTarget(),
+    send: false,
+    timer: null,
+  };
+  r.recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size) r.chunks.push(e.data);
+  };
+  r.recorder.onstop = () => recDone(r);
+  r.recorder.start(1000);
+  rec = r;
+  $("rec-who").textContent = "Recording to " + attTargetName(r.target);
+  $("rec-time").textContent = "0:00";
+  recShow(true);
+}
+
+// send = true keeps the recording and sends it, false throws it away
+function recStop(send) {
+  if (!rec) return;
+  rec.send = send;
+  if (rec.recorder.state !== "inactive") rec.recorder.stop();
+  else recDone(rec);
+}
+
+function recDone(r) {
+  if (rec === r) rec = null;
+  recShow(false);
+  r.stream.getTracks().forEach((t) => t.stop()); // turns the microphone light off
+}
+
+$("mic").onclick = recStart;
+$("rec-cancel").onclick = () => recStop(false);
+$("rec-send").onclick = () => recStop(true);
