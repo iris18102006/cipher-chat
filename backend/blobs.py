@@ -16,10 +16,11 @@ import re
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
-from .main import current_user, get_conn
+from .main import current_user, get_conn, read_body
 
 router = APIRouter()
 
@@ -70,3 +71,39 @@ def new_blob(body: NewBlob, user=Depends(current_user), conn=Depends(get_conn)):
     conn.commit()
     (BLOB_DIR / blob_id).mkdir(parents=True, exist_ok=True)
     return {"id": blob_id}
+
+
+def my_blob(conn, blob_id: str, user):
+    row = None
+    if ID_RE.fullmatch(blob_id):
+        row = conn.execute("SELECT * FROM blobs WHERE id = ? AND owner_id = ?", (blob_id, user["id"])).fetchone()
+    if not row:
+        raise HTTPException(404, "no such file")
+    return row
+
+
+def piece_path(blob_id: str, index: int) -> Path:
+    return BLOB_DIR / blob_id / str(index)
+
+
+def write_piece(path: Path, raw: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".part")
+    tmp.write_bytes(raw)
+    tmp.replace(path)  # a piece is either all there or not there at all
+
+
+@router.put("/api/blobs/{blob_id}/pieces/{index}")
+async def put_piece(blob_id: str, index: int, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    row = my_blob(conn, blob_id, user)
+    if row["complete"]:
+        raise HTTPException(409, "this file is already sent")
+    if not 0 <= index < row["pieces"]:
+        raise HTTPException(404, "no such piece")
+    raw = await read_body(request, CHUNK_CT)
+    last = index == row["pieces"] - 1
+    want = last_piece_size(row["pieces"], row["size"]) if last else CHUNK_CT
+    if len(raw) != want:
+        raise HTTPException(400, "that piece is the wrong size")
+    await run_in_threadpool(write_piece, piece_path(blob_id, index), raw)
+    return {"ok": True}
