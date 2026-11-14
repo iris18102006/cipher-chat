@@ -98,3 +98,33 @@ def test_every_login_field_is_required():
     text = page("login.html")
     for field in ("login-user", "login-pass", "signup-user", "signup-pass"):
         assert re.search(rf'id="{field}"[^>]*\brequired\b', text), field
+
+
+def js_number(name):
+    """A number like `4 * 1024 * 1024` out of web/filecrypto.js."""
+    expr = re.search(rf"const {name} = ([\d\s*]+);", page("filecrypto.js")).group(1)
+    n = 1
+    for part in expr.split("*"):
+        n *= int(part)
+    return n
+
+
+def test_file_piece_size_matches_the_backend():
+    from backend import main
+
+    assert js_number("FC_CHUNK") == main.blobs.CHUNK
+    assert js_number("FC_TAG") == main.blobs.TAG
+
+
+def test_file_size_limit_matches_the_backend():
+    import os
+
+    from backend import main
+
+    assert js_number("FC_MAX_BYTES") == 2048 * 1024 * 1024
+    if "CIPHER_MAX_FILE_MB" not in os.environ:
+        assert main.blobs.MAX_FILE == js_number("FC_MAX_BYTES")
+
+
+def test_voice_messages_stop_at_five_minutes():
+    assert js_number("FC_VOICE_MAX_SECONDS") == 300
