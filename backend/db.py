@@ -110,6 +110,18 @@ def init_db():
                 data BLOB NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            -- files people send in chats. The bytes live on disk (backend/blobs), the database only
+            -- knows who uploaded a file, how it is cut up and when
+            CREATE TABLE IF NOT EXISTS blobs (
+                id TEXT PRIMARY KEY,
+                owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                pieces INTEGER NOT NULL,
+                size INTEGER NOT NULL,
+                complete INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_blobs_owner ON blobs (owner_id);
+
             -- the feed: short posts that you and your friends can see. A post that has
             -- shared_id set is a share of somebody else's post (body is the note that
             -- came with it, may be empty). If the original is deleted the share stays,
