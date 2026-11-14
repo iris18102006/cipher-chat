@@ -230,3 +230,37 @@ function attPlayer(box, desc, kind) {
   const label = kind === "voice" ? "\u{1f3a4} voice message " + fcClock(desc.dur) : "\u25b6 play " + kind + " (" + fcHumanSize(desc.size) + ")";
   box.append(attLoadButton(label, async (progress) => mount(await attLoadUrl(desc, progress), true)));
 }
+
+
+function attIcon(desc) {
+  const name = desc.name.toLowerCase();
+  if (desc.type.startsWith("image/")) return "\u{1f5bc}\u{fe0f}";
+  if (desc.type.startsWith("video/")) return "\u{1f3ac}";
+  if (desc.type.startsWith("audio/")) return "\u{1f3b5}";
+  if (desc.type === "application/pdf") return "\u{1f4d5}";
+  if (/\.(zip|rar|7z|tar|gz)$/.test(name)) return "\u{1f5dc}\u{fe0f}";
+  return "\u{1f4c4}";
+}
+
+// everything that isn't shown in the chat: a card with a download button
+function attFile(box, desc, tooBigToPlay) {
+  const info = el("div", "att-info");
+  info.append(el("div", "att-title", desc.name), el("div", "att-note", fcHumanSize(desc.size) + (tooBigToPlay ? " \u00b7 too big to play here, download it" : "")));
+  box.append(el("div", "att-icon", attIcon(desc)), info, attLoadButton("Download", (progress) => attSave(desc, progress)));
+}
+
+function attachmentNode(desc) {
+  const kind = fcMediaKind(desc);
+  const playable = desc.size <= ATT_PLAY_MAX;
+  const box = el("div", "att att-" + (kind === "image" || playable ? kind : "file"));
+  if (kind === "image") attImage(box, desc);
+  else if (kind !== "file" && playable) attPlayer(box, desc, kind);
+  else attFile(box, desc, kind !== "file");
+  return box;
+}
+
+// what goes in a message bubble: a file if the message is one, otherwise the text
+function messageBody(m) {
+  const desc = m.failed ? null : fcParse(m.text);
+  return desc ? attachmentNode(desc) : el("div", "text", m.text);
+}
