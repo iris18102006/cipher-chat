@@ -150,3 +150,28 @@
 #rec-time {
   font-family: "Courier New", monospace;
 }
+
+#attach:focus-visible,
+#mic:focus-visible,
+.att-btn:focus-visible {
+  outline: 2px solid var(--orange-dark, #e07a00);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  #attach,
+  #mic {
+    padding: 6px 7px;
+  }
+
+  .att img,
+  .att video {
+    max-height: 240px;
+  }
+}
