@@ -264,3 +264,77 @@ function messageBody(m) {
   const desc = m.failed ? null : fcParse(m.text);
   return desc ? attachmentNode(desc) : el("div", "text", m.text);
 }
+
+
+// ---------- sending ----------
+
+function attTarget() {
+  return { peer: state.open, group: state.openGroup };
+}
+
+// sends a ready-made message (like a file) to one chat, whichever kind of chat it is
+function sendWire(target, text) {
+  return target.group != null ? sendGroupText(target.group, text) : sendDirectText(target.peer, text);
+}
+
+function attCanSend() {
+  return (state.open || state.openGroup != null) && !$("msg").disabled;
+}
+
+// the buttons follow the text box: locked whenever you can't write in this chat
+function attSync() {
+  $("attach").disabled = $("msg").disabled;
+}
+
+let attBusy = false;
+
+function attShowStatus(text, fraction) {
+  $("att-status").hidden = text === null;
+  if (text === null) return;
+  $("att-status-text").textContent = text;
+  $("att-progress").value = Math.round((fraction || 0) * 100);
+}
+
+// Sends files one after another, each as a message of its own. They go to the chat that was
+// open when you picked them, even if you click on another chat while they upload.
+async function sendFiles(files, kind, dur, target) {
+  if (!attCanSend()) {
+    toast("You can't send files here right now.");
+    return;
+  }
+  if (attBusy) {
+    toast("Hold on, the last file is still going.");
+    return;
+  }
+  target = target || attTarget();
+  attBusy = true;
+  try {
+    for (const file of files) {
+      attShowStatus("Sending " + file.name + "...", 0);
+      try {
+        const desc = await uploadAttachment(file, kind, dur, (p) => attShowStatus("Sending " + file.name + "...", p));
+        // keep what we sent, so our own picture or voice message shows up at once
+        if (fcMediaKind(desc) !== "file" && file.size <= ATT_PLAY_MAX) {
+          attCache.set(desc.id, URL.createObjectURL(new Blob([file], { type: desc.type })));
+        }
+        if (!(await sendWire(target, fcWire(desc)))) {
+          api("/api/blobs/" + desc.id, { method: "DELETE" }).catch(() => {});
+          return;
+        }
+      } catch (ex) {
+        toast(attWhy(ex, "Couldn't send " + file.name + ", try again."));
+        return;
+      }
+    }
+  } finally {
+    attBusy = false;
+    attShowStatus(null);
+  }
+}
+
+$("attach").onclick = () => $("attach-input").click();
+$("attach-input").onchange = () => {
+  const files = [...$("attach-input").files];
+  $("attach-input").value = "";
+  if (files.length) sendFiles(files, "file");
+};

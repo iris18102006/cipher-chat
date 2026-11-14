@@ -364,6 +364,7 @@ function renderGroupHeader() {
   // waiting on a new key (someone just left, or just joined): can't write until it arrives
   $("msg").disabled = !g.canWrite;
   $("send").disabled = !g.canWrite;
+  attSync();
   $("msg").placeholder = g.canWrite
     ? "type a message (Enter to send, Shift+Enter for a new line)"
     : "you don't have this group's key yet...";

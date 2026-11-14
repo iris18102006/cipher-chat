@@ -410,6 +410,7 @@ function renderChatHeader() {
   const locked = !c.pub || c.changed || c.blocked;
   $("msg").disabled = locked;
   $("send").disabled = locked;
+  attSync();
 }
 
 async function renderVerify() {
