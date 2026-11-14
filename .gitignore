@@ -7,6 +7,7 @@ __pycache__/
 backend/cipher.db
 backend/cipher.db-wal
 backend/cipher.db-shm
+backend/blobs/
 cookies.txt
 node_modules/
 .DS_Store
