@@ -446,6 +446,14 @@ async function recStart() {
   $("rec-who").textContent = "Recording to " + attTargetName(r.target);
   $("rec-time").textContent = "0:00";
   recShow(true);
+  r.timer = setInterval(() => {
+    const secs = Math.floor((Date.now() - r.started) / 1000);
+    $("rec-time").textContent = fcClock(secs);
+    if (secs >= FC_VOICE_MAX_SECONDS) {
+      toast("That's the 5 minute limit, sending your voice message.");
+      recStop(true);
+    }
+  }, 250);
 }
 
 // send = true keeps the recording and sends it, false throws it away
@@ -457,6 +465,7 @@ function recStop(send) {
 }
 
 function recDone(r) {
+  clearInterval(r.timer);
   if (rec === r) rec = null;
   recShow(false);
   r.stream.getTracks().forEach((t) => t.stop()); // turns the microphone light off
@@ -465,3 +474,9 @@ function recDone(r) {
 $("mic").onclick = recStart;
 $("rec-cancel").onclick = () => recStop(false);
 $("rec-send").onclick = () => recStop(true);
+
+// Escape throws the recording away, and so does leaving the page
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && rec) recStop(false);
+});
+window.addEventListener("pagehide", () => recStop(false));
