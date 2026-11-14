@@ -16,7 +16,7 @@ import re
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -33,6 +33,13 @@ QUOTA = int(os.environ.get("CIPHER_QUOTA_MB", "10240")) * MB  # per person, all 
 KEEP_DAYS = int(os.environ.get("CIPHER_FILE_DAYS", "30"))
 BLOB_DIR = Path(os.environ.get("CIPHER_BLOB_DIR", Path(__file__).parent / "blobs"))
 ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+# what comes back is scrambled bytes, never to be treated as a page or a picture
+PIECE_HEADERS = {
+    "Cache-Control": "private, max-age=3600",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+}
 
 
 class NewBlob(BaseModel):
@@ -125,3 +132,20 @@ def finish_blob(blob_id: str, user=Depends(current_user), conn=Depends(get_conn)
     conn.execute("UPDATE blobs SET complete = 1 WHERE id = ?", (blob_id,))
     conn.commit()
     return {"ok": True}
+
+
+@router.get("/api/blobs/{blob_id}/pieces/{index}")
+def get_piece(blob_id: str, index: int, user=Depends(current_user), conn=Depends(get_conn)):
+    row = None
+    if ID_RE.fullmatch(blob_id):
+        row = conn.execute(
+            "SELECT pieces FROM blobs WHERE id = ? AND complete = 1 AND created_at > datetime('now', ?)",
+            (blob_id, f"-{KEEP_DAYS} days"),
+        ).fetchone()
+    if not row or not 0 <= index < row["pieces"]:
+        raise HTTPException(404, "no such file")
+    try:
+        data = piece_path(blob_id, index).read_bytes()
+    except FileNotFoundError:
+        raise HTTPException(404, "no such file")
+    return Response(content=data, media_type="application/octet-stream", headers=PIECE_HEADERS)
