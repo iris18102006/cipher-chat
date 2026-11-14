@@ -152,3 +152,56 @@ def test_a_finished_file_cannot_be_changed(client):
     a = signup(client, "alice")
     blob_id = upload(a, [b"x" * 50])
     assert piece(a, blob_id, 0, b"y" * 50).status_code == 409
+
+
+def test_the_sender_can_delete_a_file(client, tmp_path):
+    a = signup(client, "alice")
+    b = signup(client, "bob")
+    blob_id = upload(a, [b"x" * 50])
+    assert b.delete(f"/api/blobs/{blob_id}").status_code == 404  # not yours
+    assert a.delete(f"/api/blobs/{blob_id}").json() == {"ok": True}
+    assert a.get(f"/api/blobs/{blob_id}/pieces/0").status_code == 404
+    assert not (tmp_path / "blobs" / blob_id).exists()
+
+
+@pytest.mark.parametrize("bad", ["nope", "A" * 32, "g" * 32, "0" * 31, "0" * 33])
+def test_ids_that_are_not_ids(client, bad):
+    a = signup(client, "alice")
+    assert a.get(f"/api/blobs/{bad}/pieces/0").status_code == 404
+    assert a.delete(f"/api/blobs/{bad}").status_code == 404
+
+
+def age(blob_id, when):
+    conn = db.connect()
+    try:
+        conn.execute("UPDATE blobs SET created_at = datetime('now', ?) WHERE id = ?", (when, blob_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_old_files_are_gone(client, tmp_path):
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 50])
+    age(blob_id, "-31 days")
+    assert a.get(f"/api/blobs/{blob_id}/pieces/0").status_code == 404
+    conn = db.connect()
+    try:
+        assert blobs.purge(conn) == 1
+    finally:
+        conn.close()
+    assert not (tmp_path / "blobs" / blob_id).exists()
+
+
+def test_unfinished_uploads_are_cleaned_up_after_a_day(client, tmp_path):
+    a = signup(client, "alice")
+    blob_id = start(a, 1, 50).json()["id"]
+    assert piece(a, blob_id, 0, b"x" * 50).status_code == 200
+    age(blob_id, "-2 days")
+    conn = db.connect()
+    try:
+        assert blobs.purge(conn) == 1
+    finally:
+        conn.close()
+    assert not (tmp_path / "blobs" / blob_id).exists()
+    assert piece(a, blob_id, 0, b"x" * 50).status_code == 404
