@@ -489,7 +489,7 @@ function renderMessages(keepScroll) {
     if (inGroup && !mine && !(prev && prev.from === m.from)) {
       row.append(el("div", "sender", memberName(state.openGroup, m.from)));
     }
-    row.append(el("div", "text", m.text));
+    row.append(messageBody(m));
     const meta = el("div", "meta");
     if (firstFS && m.v !== 2 && m.id > firstFS.id) {
       const nofs = el("span", "nofs", "no forward secrecy");
