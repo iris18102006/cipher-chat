@@ -107,3 +107,21 @@ async def put_piece(blob_id: str, index: int, request: Request, user=Depends(cur
         raise HTTPException(400, "that piece is the wrong size")
     await run_in_threadpool(write_piece, piece_path(blob_id, index), raw)
     return {"ok": True}
+
+
+@router.post("/api/blobs/{blob_id}/complete")
+def finish_blob(blob_id: str, user=Depends(current_user), conn=Depends(get_conn)):
+    row = my_blob(conn, blob_id, user)
+    if row["complete"]:
+        return {"ok": True}
+    total = 0
+    for index in range(row["pieces"]):
+        path = piece_path(blob_id, index)
+        if not path.is_file():
+            raise HTTPException(400, f"piece {index} never arrived")
+        total += path.stat().st_size
+    if total != row["size"]:
+        raise HTTPException(400, "the pieces don't add up to the size you said")
+    conn.execute("UPDATE blobs SET complete = 1 WHERE id = ?", (blob_id,))
+    conn.commit()
+    return {"ok": True}
