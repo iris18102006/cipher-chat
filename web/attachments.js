@@ -294,7 +294,7 @@ function attCanSend() {
 
 // the buttons follow the text box: locked whenever you can't write in this chat
 function attSync() {
-  $("attach").disabled = $("msg").disabled;
+  for (const id of ["attach", "mic"]) $(id).disabled = $("msg").disabled;
 }
 
 let attBusy = false;

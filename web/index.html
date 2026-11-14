@@ -93,10 +93,19 @@
           <button id="att-cancel" type="button">Cancel</button>
         </div>
 
+        <div id="rec-bar" hidden>
+          <span class="rec-dot" aria-hidden="true"></span>
+          <span id="rec-who"></span>
+          <span id="rec-time">0:00</span><span class="rec-max"> / 5:00</span>
+          <button id="rec-cancel" type="button">Cancel</button>
+          <button id="rec-send" type="button">Send</button>
+        </div>
+
         <form id="composer" autocomplete="off">
           <button id="attach" type="button" aria-label="send a file, photo or video" title="send a file, photo or video" disabled>&#128206;</button>
           <input id="attach-input" type="file" multiple hidden aria-label="choose files to send">
           <textarea id="msg" rows="1" maxlength="4000" aria-label="message" placeholder="type a message (Enter to send, Shift+Enter for a new line)"></textarea>
+          <button id="mic" type="button" aria-label="record a voice message" title="record a voice message (up to 5 minutes)" disabled>&#127908;</button>
           <button id="send" type="submit">Send</button>
         </form>
       </div>

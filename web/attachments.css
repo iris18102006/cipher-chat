@@ -63,14 +63,16 @@
   gap: 2px;
 }
 
-#attach {
+#attach,
+#mic {
   align-self: flex-end;
   padding: 6px 10px;
   font-size: 16px;
   line-height: 1;
 }
 
-#attach:disabled {
+#attach:disabled,
+#mic:disabled {
   opacity: 0.5;
 }
 
@@ -103,4 +105,48 @@
 #log.drop {
   outline: 3px dashed var(--orange-dark, #e07a00);
   outline-offset: -6px;
+}
+
+#composer[hidden] {
+  display: none;
+}
+
+#rec-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--c-bar, var(--mist));
+  border-top: 1px solid var(--c-line, #c5d4ea);
+  font-size: 13px;
+}
+
+#rec-bar[hidden] {
+  display: none;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d22;
+  animation: rec-blink 1s steps(2) infinite;
+}
+
+@keyframes rec-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+#rec-who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#rec-time {
+  font-family: "Courier New", monospace;
 }
