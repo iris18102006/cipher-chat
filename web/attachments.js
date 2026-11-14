@@ -120,3 +120,40 @@ async function attLoadUrl(desc, onProgress) {
     attPending.delete(desc.id);
   }
 }
+
+
+// Saves a file under its own name. Big files in Chrome and Edge are written straight to disk
+// piece by piece, so a 2 GB file never has to fit in memory. Other browsers keep it in a Blob.
+async function attSave(desc, onProgress) {
+  if (window.showSaveFilePicker && desc.size > ATT_DISK_MIN) {
+    let handle = null;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName: desc.name });
+    } catch (ex) {
+      if (ex && ex.name === "AbortError") return; // they changed their mind
+    }
+    if (handle) {
+      const out = await handle.createWritable();
+      try {
+        await attOpenPieces(desc, (plain) => out.write(plain), onProgress);
+        await out.close();
+      } catch (ex) {
+        await out.abort().catch(() => {});
+        throw ex;
+      }
+      return;
+    }
+  }
+  const parts = [];
+  await attOpenPieces(desc, (plain) => parts.push(new Blob([plain])), onProgress);
+  // always saved as an anonymous download, never opened as a page, whatever type the sender said
+  const url = URL.createObjectURL(new Blob(parts, { type: "application/octet-stream" }));
+  const link = el("a");
+  link.href = url;
+  link.download = desc.name;
+  link.rel = "noopener";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
