@@ -14,6 +14,7 @@ Imported by main.py at the very bottom, after everything it needs is defined.
 import os
 import re
 import secrets
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -149,3 +150,17 @@ def get_piece(blob_id: str, index: int, user=Depends(current_user), conn=Depends
     except FileNotFoundError:
         raise HTTPException(404, "no such file")
     return Response(content=data, media_type="application/octet-stream", headers=PIECE_HEADERS)
+
+
+def remove_files(blob_id: str) -> None:
+    if ID_RE.fullmatch(blob_id):
+        shutil.rmtree(BLOB_DIR / blob_id, ignore_errors=True)
+
+
+@router.delete("/api/blobs/{blob_id}")
+def delete_blob(blob_id: str, user=Depends(current_user), conn=Depends(get_conn)):
+    my_blob(conn, blob_id, user)
+    conn.execute("DELETE FROM blobs WHERE id = ?", (blob_id,))
+    conn.commit()
+    remove_files(blob_id)
+    return {"ok": True}
