@@ -41,7 +41,7 @@ async function attPut(path, body) {
 }
 
 // Locks a file and uploads it piece by piece. Gives back what goes in the chat message.
-async function uploadAttachment(file, kind, dur, onProgress) {
+async function uploadAttachment(file, kind, dur, onProgress, stop) {
   if (file.size > FC_MAX_BYTES) {
     const err = new Error("that file is too big (max " + fcHumanSize(FC_MAX_BYTES) + ")");
     err.code = "toobig";
@@ -55,13 +55,24 @@ async function uploadAttachment(file, kind, dur, onProgress) {
   });
   const secret = fcNewSecret();
   const key = await fcImport(secret.key);
-  for (let i = 0; i < pieces; i++) {
-    const plain = new Uint8Array(await file.slice(i * FC_CHUNK, (i + 1) * FC_CHUNK).arrayBuffer());
-    const sealed = await fcSeal(key, secret.prefix, i, i === pieces - 1, plain);
-    await attPut("/api/blobs/" + made.id + "/pieces/" + i, sealed);
-    if (onProgress) onProgress((i + 1) / pieces);
+  try {
+    for (let i = 0; i < pieces; i++) {
+      if (stop && stop.stop) {
+        const err = new Error("cancelled");
+        err.code = "cancelled";
+        throw err;
+      }
+      const plain = new Uint8Array(await file.slice(i * FC_CHUNK, (i + 1) * FC_CHUNK).arrayBuffer());
+      const sealed = await fcSeal(key, secret.prefix, i, i === pieces - 1, plain);
+      await attPut("/api/blobs/" + made.id + "/pieces/" + i, sealed);
+      if (onProgress) onProgress((i + 1) / pieces);
+    }
+    await api("/api/blobs/" + made.id + "/complete", { method: "POST" });
+  } catch (ex) {
+    // don't leave half a file on the server
+    api("/api/blobs/" + made.id, { method: "DELETE" }).catch(() => {});
+    throw ex;
   }
-  await api("/api/blobs/" + made.id + "/complete", { method: "POST" });
   return fcDescriptor({ id: made.id, secret, size: file.size, name: file.name, type: file.type, kind, dur });
 }
 
@@ -287,6 +298,7 @@ function attSync() {
 }
 
 let attBusy = false;
+const attStop = { stop: false }; // turns true when you press Cancel
 
 function attShowStatus(text, fraction) {
   $("att-status").hidden = text === null;
@@ -311,8 +323,9 @@ async function sendFiles(files, kind, dur, target) {
   try {
     for (const file of files) {
       attShowStatus("Sending " + file.name + "...", 0);
+      attStop.stop = false;
       try {
-        const desc = await uploadAttachment(file, kind, dur, (p) => attShowStatus("Sending " + file.name + "...", p));
+        const desc = await uploadAttachment(file, kind, dur, (p) => attShowStatus("Sending " + file.name + "...", p), attStop);
         // keep what we sent, so our own picture or voice message shows up at once
         if (fcMediaKind(desc) !== "file" && file.size <= ATT_PLAY_MAX) {
           attCache.set(desc.id, URL.createObjectURL(new Blob([file], { type: desc.type })));
@@ -322,7 +335,7 @@ async function sendFiles(files, kind, dur, target) {
           return;
         }
       } catch (ex) {
-        toast(attWhy(ex, "Couldn't send " + file.name + ", try again."));
+        if (ex.code !== "cancelled") toast(attWhy(ex, "Couldn't send " + file.name + ", try again."));
         return;
       }
     }
@@ -333,6 +346,7 @@ async function sendFiles(files, kind, dur, target) {
 }
 
 $("attach").onclick = () => $("attach-input").click();
+$("att-cancel").onclick = () => (attStop.stop = true);
 $("attach-input").onchange = () => {
   const files = [...$("attach-input").files];
   $("attach-input").value = "";
