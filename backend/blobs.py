@@ -15,6 +15,7 @@ import os
 import re
 import secrets
 import shutil
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -69,6 +70,7 @@ def used_bytes(conn, owner_id: int) -> int:
 @router.post("/api/blobs")
 def new_blob(body: NewBlob, user=Depends(current_user), conn=Depends(get_conn)):
     check_shape(body.pieces, body.size)
+    housekeeping(conn)
     if used_bytes(conn, user["id"]) + body.size > QUOTA:
         raise HTTPException(413, f"you've used up your file space ({QUOTA // MB} MB), files are removed after {KEEP_DAYS} days")
     blob_id = secrets.token_hex(16)
@@ -137,6 +139,7 @@ def finish_blob(blob_id: str, user=Depends(current_user), conn=Depends(get_conn)
 
 @router.get("/api/blobs/{blob_id}/pieces/{index}")
 def get_piece(blob_id: str, index: int, user=Depends(current_user), conn=Depends(get_conn)):
+    housekeeping(conn)
     row = None
     if ID_RE.fullmatch(blob_id):
         row = conn.execute(
@@ -164,3 +167,28 @@ def delete_blob(blob_id: str, user=Depends(current_user), conn=Depends(get_conn)
     conn.commit()
     remove_files(blob_id)
     return {"ok": True}
+
+
+def purge(conn) -> int:
+    """Forget files that are too old, and uploads that were never finished."""
+    old = conn.execute(
+        "SELECT id FROM blobs WHERE created_at <= datetime('now', ?) "
+        "OR (complete = 0 AND created_at <= datetime('now', '-1 day'))",
+        (f"-{KEEP_DAYS} days",),
+    ).fetchall()
+    for row in old:
+        remove_files(row["id"])
+    conn.executemany("DELETE FROM blobs WHERE id = ?", [(row["id"],) for row in old])
+    conn.commit()
+    return len(old)
+
+
+_last_purge = 0.0
+
+
+def housekeeping(conn) -> None:
+    """Clean up at most once an hour, whenever somebody uses files."""
+    global _last_purge
+    if time.monotonic() - _last_purge > 3600:
+        _last_purge = time.monotonic()
+        purge(conn)
