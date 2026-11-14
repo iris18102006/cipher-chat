@@ -794,12 +794,22 @@ async function sendMessage() {
   const peer = state.open;
   const text = $("msg").value.trim();
   if (!peer || !text) return;
+  if (await sendDirectText(peer, text)) {
+    $("msg").value = "";
+    autosize();
+    stopTyping();
+  }
+}
+
+// Locks one message for one person and sends it, and says whether it went out. What you type
+// uses this, and so do files and voice messages (attachments.js).
+async function sendDirectText(peer, text) {
   const c = state.contacts.get(peer);
-  if (!c || !c.pub || c.changed) return;
-  if (tooLong(text)) return;
+  if (!peer || !text || !c || !c.pub || c.changed) return false;
+  if (tooLong(text)) return false;
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     setConn(false, "offline, message not sent");
-    return;
+    return false;
   }
   // Each message takes one of their one-time prekeys. The server hands it out once and
   // deletes it, so no two messages ever share one.
@@ -808,11 +818,11 @@ async function sendMessage() {
     claim = await api("/api/prekeys/claim/" + encodeURIComponent(peer), { method: "POST" });
   } catch (ex) {
     toast(whyFailed(ex, "Couldn't send that, try again."));
-    return;
+    return false;
   }
   if (claim.refused) {
     toast(REJECT_REASONS[claim.refused] || "That message wasn't sent.");
-    return;
+    return false;
   }
   const cid = crypto.randomUUID();
   let body;
@@ -829,13 +839,9 @@ async function sendMessage() {
     body = await encryptText(key, text);
     toast("Sent without forward secrecy: they're out of one-time keys. It will be fixed when they're back online.");
   }
-  if (sendWS({ type: "msg", to: peer, cid, ...body })) {
-    $("msg").value = "";
-    autosize();
-    stopTyping();
-  } else {
-    dropPending(state.me, cid).catch(() => {});
-  }
+  if (sendWS({ type: "msg", to: peer, cid, ...body })) return true;
+  dropPending(state.me, cid).catch(() => {});
+  return false;
 }
 
 // ---------- wiring ----------
