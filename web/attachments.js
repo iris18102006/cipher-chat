@@ -214,3 +214,19 @@ function attImage(box, desc) {
     box.append(attNameLine(desc), manual());
   }
 }
+
+
+// videos, songs and voice messages: a button first, the player after it has been opened
+function attPlayer(box, desc, kind) {
+  const mount = (url, autoplay) => {
+    const media = el(kind === "video" ? "video" : "audio");
+    media.controls = true;
+    media.preload = "metadata";
+    media.src = url;
+    box.replaceChildren(...(kind === "voice" ? [] : [attNameLine(desc)]), media);
+    if (autoplay) media.play().catch(() => {});
+  };
+  if (attCache.has(desc.id)) return mount(attCache.get(desc.id), false);
+  const label = kind === "voice" ? "\u{1f3a4} voice message " + fcClock(desc.dur) : "\u25b6 play " + kind + " (" + fcHumanSize(desc.size) + ")";
+  box.append(attLoadButton(label, async (progress) => mount(await attLoadUrl(desc, progress), true)));
+}
