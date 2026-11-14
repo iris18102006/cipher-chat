@@ -87,7 +87,15 @@
         </div>
         <div id="typing" hidden><span></span><span></span><span></span> <em id="typing-name"></em></div>
 
+        <div id="att-status" role="status" aria-live="polite" hidden>
+          <span id="att-status-text"></span>
+          <progress id="att-progress" max="100" value="0"></progress>
+          <button id="att-cancel" type="button">Cancel</button>
+        </div>
+
         <form id="composer" autocomplete="off">
+          <button id="attach" type="button" aria-label="send a file, photo or video" title="send a file, photo or video" disabled>&#128206;</button>
+          <input id="attach-input" type="file" multiple hidden aria-label="choose files to send">
           <textarea id="msg" rows="1" maxlength="4000" aria-label="message" placeholder="type a message (Enter to send, Shift+Enter for a new line)"></textarea>
           <button id="send" type="submit">Send</button>
         </form>

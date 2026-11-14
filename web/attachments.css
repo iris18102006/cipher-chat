@@ -62,3 +62,40 @@
   align-items: flex-start;
   gap: 2px;
 }
+
+#attach {
+  align-self: flex-end;
+  padding: 6px 10px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+#attach:disabled {
+  opacity: 0.5;
+}
+
+#att-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--c-bar, var(--mist));
+  border-top: 1px solid var(--c-line, #c5d4ea);
+  font-size: 13px;
+}
+
+#att-status[hidden] {
+  display: none;
+}
+
+#att-status-text {
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#att-progress {
+  flex: 1;
+  min-width: 60px;
+}
