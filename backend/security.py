@@ -144,3 +144,12 @@ class SlidingLimiter:
         now = time.time()
         recent = [t for t in self.hits.get(key, ()) if now - t < self.window]
         return len(recent) >= self.limit
+
+    def hit(self, key: str) -> None:
+        now = time.time()
+        recent = [t for t in self.hits.get(key, ()) if now - t < self.window]
+        recent.append(now)
+        self.hits[key] = recent
+
+    def clear(self) -> None:
+        self.hits.clear()
