@@ -189,6 +189,7 @@ Environment variables, set before you start the server:
 - `backend/groups.py` and `backend/chat_themes.py`: group chats (with their versioned keys and key chains) and the look of each conversation
 - `backend/songs.py` and `backend/feed.py`: the song on a profile (with seeking) and the feed (posts, likes, shares)
 - `backend/blobs.py`: the encrypted files people send (pieces on disk, removed after 30 days)
+- `backend/security.py`: the security headers and the Content-Security-Policy, the rate limiters, and working out a visitor's real address behind a proxy
 - `web/crypto.js`: all the Web Crypto code (keys, HKDF, AES-GCM, prekeys, signing, group key chains)
 - `web/app.js`: the chat screen (buddy list, messages, typing, receipts, the websocket)
 - `web/profile.js`, `web/profile-media.js`, `web/friends.js`, `web/lists.js`, `web/settings.js`, `web/groups.js`, `web/chat-themes.js`, `web/profile-song.js` and `web/feed.js`: one file for each screen on top of the chat (profiles and pictures, friends, the Requests and Blocked panels, settings, group chats, chat themes, the profile song player, the feed window)
