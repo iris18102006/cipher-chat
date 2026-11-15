@@ -83,6 +83,7 @@ These can be changed with environment variables before you start the server:
 - `CIPHER_MAX_FILE_MB`: the biggest file, 2048 (2 GB, like a WhatsApp document)
 - `CIPHER_QUOTA_MB`: all the files one person has on the server at the same time, 10240
 - `CIPHER_FILE_DAYS`: how long a file is kept, 30. After that the message stays in the chat but the file is gone
+- `CIPHER_UNFINISHED_HOURS`: how long an upload that never finished is kept, 6
 - `CIPHER_BLOB_DIR`: where the pieces are kept, `backend/blobs` by default
 
 Only png, jpg, gif and webp pictures, mp4, webm, ogg and mov videos and the usual audio formats are shown in the chat. An svg, a web page or anything else is only ever a download, saved as an anonymous file whatever type the sender said it was. Pictures over 10 MB wait for a click, and videos and sounds over 200 MB are downloads because they have to fit in memory to play.
