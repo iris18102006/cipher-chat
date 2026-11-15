@@ -110,9 +110,6 @@ CUSTOM_CHOICES = {
 CUSTOM_RANGES = {"border_width": (0, 6), "radius": (0, 24)}
 CUSTOM_FLAGS = ("marquee",)
 
-# set CIPHER_SECURE_COOKIES=1 when serving over https
-SECURE_COOKIES = os.environ.get("CIPHER_SECURE_COOKIES") == "1"
-
 log = logging.getLogger("cipher")
 app = FastAPI(docs_url=None, redoc_url=None)
 app.add_middleware(SecurityHeaders)
