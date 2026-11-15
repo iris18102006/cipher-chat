@@ -80,3 +80,12 @@ def client_ip(conn: HTTPConnection) -> str:
         if len(parts) >= hops:
             return parts[-hops]
     return conn.client.host if conn.client else "?"
+
+
+def is_https(conn: HTTPConnection) -> bool:
+    """Was this request made over https? Behind a proxy the proxy says so in X-Forwarded-Proto."""
+    if conn.url.scheme in ("https", "wss"):
+        return True
+    if proxy_hops() == 0:
+        return False
+    return conn.headers.get("x-forwarded-proto", "").split(",")[-1].strip().lower() == "https"
