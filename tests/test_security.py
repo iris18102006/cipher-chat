@@ -169,3 +169,9 @@ def tiny_app(page_headers=None):
     app = Starlette(routes=[Route("/", page), Route("/data", data), WebSocketRoute("/ws", sock)])
     app.add_middleware(security.SecurityHeaders)
     return app
+
+
+def test_the_middleware_adds_every_header():
+    r = TestClient(tiny_app()).get("/")
+    for name, value in security.SECURITY_HEADERS.items():
+        assert r.headers[name] == value
