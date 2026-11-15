@@ -119,6 +119,24 @@ From a group's `fs_version` on, a group key is only used to **start key chains**
 5. The server refuses a message without a signature and a number, and refuses a number that was already used by that sender in that key version, so a replay is stopped there too.
 6. Groups that existed before this are marked once when the server starts: the first member to open one makes a new key version, and everything from it on is forward secret. Older messages keep the old key and stay readable the old way.
 
+## Security hardening
+
+These protect the pages and the server. They are separate from the encryption of the messages.
+
+### Headers
+
+Every page and every answer carries:
+
+- a `Content-Security-Policy` that only lets a page load scripts, styles, pictures, sounds, fonts and connections from the server itself (plus `data:` for the little svg shapes in the css and `blob:` for files unlocked in your browser). No inline scripts, no inline styles, no `eval`, no framing and no `<base>` tags, so even if somebody found a way to slip markup into a page the browser would refuse to run it
+- `X-Frame-Options: DENY` and `frame-ancestors 'none'`, so nobody can put cipher-chat in an invisible frame and trick you into clicking (clickjacking)
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, a `Permissions-Policy` that only gives our own pages the microphone (voice messages), and `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` set to `same-origin`
+- `Strict-Transport-Security` when the site is served over https
+- `Cache-Control: no-store` on JSON answers, so a browser or a proxy doesn't keep them
+
+Files and songs keep their own, stricter policy (`default-src 'none'; sandbox`). The headers live in `backend/security.py`. `tests/test_csp_compat.py` fails if a page ever gets an inline script, an inline style or something loaded from another site, because that would stop working under the policy.
+
+The policy needs a recent browser: a websocket to the same address under `connect-src 'self'` works in Chrome, Edge and Firefox, and in Safari 15.4 and newer.
+
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
