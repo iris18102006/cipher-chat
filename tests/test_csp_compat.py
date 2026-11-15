@@ -38,3 +38,23 @@ def test_no_page_has_inline_styles_or_event_handlers():
         assert not re.search(r"\sstyle\s*=", text), page.name
         assert not re.search(r"\son[a-z]+\s*=\s*[\"']", text), page.name
         assert "javascript:" not in text, page.name
+
+
+def test_scripts_dont_write_inline_style_text_or_handler_attributes():
+    for script in SCRIPTS:
+        code = code_of(script)
+        assert not re.search(r"setAttribute\(\s*[\"']style", code), script.name
+        assert not re.search(r"setAttribute\(\s*[\"']on", code), script.name
+        assert ".cssText" not in code, script.name
+        assert "javascript:" not in code, script.name
+
+
+def test_scripts_never_build_code_or_markup_from_text():
+    for script in SCRIPTS:
+        code = code_of(script)
+        assert not re.search(r"\beval\(", code), script.name
+        assert not re.search(r"new Function\(", code), script.name
+        assert not re.search(r"set(Timeout|Interval)\(\s*[\"'`]", code), script.name
+        assert not re.search(r"\.(inner|outer)HTML\s*[+]?=", code), script.name
+        assert "insertAdjacentHTML" not in code, script.name
+        assert "document.write" not in code, script.name
