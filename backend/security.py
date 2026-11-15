@@ -180,6 +180,8 @@ class SecurityHeaders:
                         headers[name] = value
                 if secure:
                     headers.setdefault("Strict-Transport-Security", HSTS)
+                if headers.get("content-type", "").startswith("application/json"):
+                    headers.setdefault("Cache-Control", "no-store")
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
