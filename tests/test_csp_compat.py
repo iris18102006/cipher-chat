@@ -22,3 +22,10 @@ def code_of(path):
 
 def test_there_is_something_to_check():
     assert PAGES and SCRIPTS and STYLES
+
+
+def test_no_page_has_an_inline_script():
+    for page in PAGES:
+        for tag in re.findall(r"<script\b[^>]*>", page.read_text()):
+            assert re.search(r"\bsrc=", tag), (page.name, tag)
+        assert not re.search(r"<script\b[^>]*>\s*[^<\s]", page.read_text()), page.name
