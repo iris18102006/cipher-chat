@@ -418,6 +418,11 @@ def check_rate_limit(key: str):
         raise HTTPException(429, "too many tries, wait a few minutes")
 
 
+SIGNUP_LIMIT = int(os.environ.get("CIPHER_SIGNUPS_PER_HOUR", "10"))  # accounts one address can make per hour
+SIGNUP_WINDOW = 60 * 60
+signup_limiter = SlidingLimiter(SIGNUP_LIMIT, SIGNUP_WINDOW)
+
+
 # ---------- prekey claim limiting (in memory, per claimer + target) ----------
 
 _claims: dict[tuple[int, int], list[float]] = defaultdict(list)
