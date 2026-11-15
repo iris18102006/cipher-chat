@@ -49,3 +49,8 @@ def test_the_policy_still_allows_what_the_app_needs():
     assert "media-src 'self' blob:" in security.CSP
     assert "connect-src 'self'" in security.CSP
     assert "font-src 'self'" in security.CSP
+
+
+def test_only_our_own_pages_get_the_microphone():
+    assert "microphone=(self)" in security.PERMISSIONS_POLICY
+    assert "camera=()" in security.PERMISSIONS_POLICY
