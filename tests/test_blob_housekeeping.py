@@ -33,3 +33,11 @@ def test_an_unfinished_upload_is_dropped_after_six_hours(client, tmp_path):
     age(blob_id, "-7 hours")
     assert purge_now() == 1
     assert not (tmp_path / "blobs" / blob_id).exists()
+
+
+def test_a_finished_file_is_not_dropped_by_the_unfinished_rule(client):
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 50])
+    age(blob_id, "-7 hours")
+    assert purge_now() == 0
+    assert a.get(f"/api/blobs/{blob_id}/pieces/0").status_code == 200
