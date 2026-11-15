@@ -126,3 +126,19 @@ def test_the_pruner_only_works_once_a_minute():
     assert pruner.maybe(1030.0) == 0
     assert "old2" in store
     assert pruner.maybe(1061.0) == 1
+
+
+def test_a_limiter_blocks_after_its_limit():
+    limiter = security.SlidingLimiter(limit=3, window=60)
+    for _ in range(3):
+        assert not limiter.blocked("a")
+        limiter.hit("a")
+    assert limiter.blocked("a")
+
+
+def test_a_limiter_forgets_events_outside_the_window():
+    limiter = security.SlidingLimiter(limit=2, window=60)
+    limiter.hits["a"] = [time.time() - 120, time.time() - 90]
+    assert not limiter.blocked("a")
+    limiter.hit("a")
+    assert len(limiter.hits["a"]) == 1
