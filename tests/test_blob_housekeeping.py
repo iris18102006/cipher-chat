@@ -41,3 +41,12 @@ def test_a_finished_file_is_not_dropped_by_the_unfinished_rule(client):
     age(blob_id, "-7 hours")
     assert purge_now() == 0
     assert a.get(f"/api/blobs/{blob_id}/pieces/0").status_code == 200
+
+
+def test_housekeeping_runs_in_the_background_once_an_hour(client, monkeypatch):
+    jobs = []
+    monkeypatch.setattr(blobs, "_spawn", jobs.append)
+    monkeypatch.setattr(blobs, "_last_purge", float("-inf"))
+    blobs.housekeeping()
+    blobs.housekeeping()
+    assert jobs == [blobs._purge_in_background]
