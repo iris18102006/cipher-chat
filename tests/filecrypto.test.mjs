@@ -17,7 +17,7 @@ const lib = new Function(
     `
 return { FC_CHUNK, FC_TAG, FC_MAX_BYTES, FC_PREFIX, FC_VOICE_MAX_SECONDS, fcB64, fcUnb64, fcCount, fcCipherSize,
   fcNewSecret, fcImport, fcIv, fcSeal, fcOpen, fcCleanName, fcCleanType, fcDescriptor, fcWire, fcParse,
-  fcMediaKind, fcHumanSize, fcClock };`,
+  fcMediaKind, fcHumanSize, fcClock, FC_MEM_SAVE_MAX, fcCanSaveHere };`,
 )(globalThis.crypto, globalThis.btoa, globalThis.atob);
 
 async function setup() {
