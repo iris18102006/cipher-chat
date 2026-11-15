@@ -12,6 +12,7 @@ const ATT_ERRORS = {
   gone: "this file isn't on the server any more (files are only kept for a while)",
   corrupt: "this file was damaged or changed on the way, so it wasn't opened",
   failed: "couldn't download this file, try again",
+  toobig: "this file is too big to save in this browser, open cipher-chat in Chrome or Edge to download it",
 };
 
 function attFail(code) {
