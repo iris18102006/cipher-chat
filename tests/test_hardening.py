@@ -154,3 +154,13 @@ def test_signups_refused_for_other_reasons_dont_count(client, monkeypatch):
     short = client.post("/api/signup", json={"username": "short_pw", "password": "short"})
     assert short.status_code == 400
     assert [sign_up(client, name).status_code for name in ("aaa", "bbb", "ccc")] == [200, 200, 429]
+
+
+def test_each_address_has_its_own_signup_count(client, monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    monkeypatch.setattr(main.signup_limiter, "limit", 1)
+    first = {"X-Forwarded-For": "198.51.100.1"}
+    other = {"X-Forwarded-For": "198.51.100.2"}
+    assert sign_up(client, "aaa", first).status_code == 200
+    assert sign_up(client, "bbb", first).status_code == 429
+    assert sign_up(client, "ccc", other).status_code == 200
