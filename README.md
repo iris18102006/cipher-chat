@@ -281,6 +281,11 @@ This is a learning project, not Signal.
 - [x] The feed will have a special window so it doesn't have to look ugly
 - [x] Send files, photos and videos in chats and groups, end-to-end encrypted, up to 2 GB each
 - [x] Voice messages up to 5 minutes
+- [x] Security headers and a Content-Security-Policy
+- [x] Rate limit signups and failed logins per address
+- [x] Secure cookies on https without a setting
+- [x] Clean up old files in the background
+- [ ] Stream big downloads in Firefox and Safari (a service worker) so the 1 GB cap can go
 
 
 
