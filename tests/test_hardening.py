@@ -164,3 +164,13 @@ def test_each_address_has_its_own_signup_count(client, monkeypatch):
     assert sign_up(client, "aaa", first).status_code == 200
     assert sign_up(client, "bbb", first).status_code == 429
     assert sign_up(client, "ccc", other).status_code == 200
+
+
+def test_old_failed_logins_are_forgotten(client):
+    now = time.time()
+    main._fails["203.0.113.1|ghost"] = [now - 10_000]
+    main._fails["203.0.113.1|fresh"] = [now]
+    main._fails_pruner.last = 0.0
+    main.check_rate_limit("203.0.113.1|someone")
+    assert "203.0.113.1|ghost" not in main._fails
+    assert "203.0.113.1|fresh" in main._fails
