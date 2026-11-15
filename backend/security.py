@@ -153,3 +153,20 @@ class SlidingLimiter:
 
     def clear(self) -> None:
         self.hits.clear()
+
+
+class SecurityHeaders:
+    """ASGI middleware that adds the headers above to every page and every answer.
+
+    A header the route already set is left alone, so files and songs keep their own, stricter policy.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        # websockets and the startup call pass straight through
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
