@@ -112,3 +112,15 @@ def test_a_good_login_does_not_reset_the_address_count(client, monkeypatch):
     assert good.status_code == 200
     assert bad_login(client, "user3") == 401
     assert bad_login(client, "user4") == 429
+
+
+def test_the_real_address_is_used_behind_a_proxy(client, monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    monkeypatch.setattr(main.ip_fail_limiter, "limit", 2)
+
+    def bad(ip, name):
+        return bad_login(client, name, {"X-Forwarded-For": ip})
+
+    assert [bad("198.51.100.1", n) for n in ("a1", "b1", "c1")] == [401, 401, 429]
+    # somebody else behind the same proxy isn't locked out by it
+    assert bad("198.51.100.2", "a1") == 401
