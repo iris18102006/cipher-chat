@@ -59,3 +59,13 @@ def test_only_our_own_pages_get_the_microphone():
 def test_client_ip_is_the_socket_address_without_a_proxy():
     # anybody can send this header, so without a proxy it means nothing
     assert security.client_ip(conn({"X-Forwarded-For": "198.51.100.1"})) == "203.0.113.9"
+
+
+def test_client_ip_behind_one_proxy_is_the_last_address(monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    assert security.client_ip(conn({"X-Forwarded-For": "198.51.100.7"})) == "198.51.100.7"
+
+
+def test_client_ip_ignores_addresses_the_client_made_up(monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    assert security.client_ip(conn({"X-Forwarded-For": "6.6.6.6, 198.51.100.7"})) == "198.51.100.7"
