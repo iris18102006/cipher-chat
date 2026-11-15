@@ -168,3 +168,16 @@ def test_file_code_never_writes_html():
 def test_a_download_is_always_saved_as_an_anonymous_file():
     # only pictures, videos and sounds are opened with the type the sender claimed
     assert 'new Blob(parts, { type: "application/octet-stream" })' in page("attachments.js")
+
+
+def test_the_memory_limit_for_saving_is_one_gigabyte():
+    assert js_number("FC_MEM_SAVE_MAX") == 1024 * 1024 * 1024
+    assert js_number("FC_MEM_SAVE_MAX") < js_number("FC_MAX_BYTES")
+
+
+def test_saving_a_file_checks_that_the_browser_can_hold_it():
+    code = page("attachments.js")
+    save = code[code.index("async function attSave") :]
+    check = save.index("fcCanSaveHere(desc.size, window.showSaveFilePicker)")
+    assert check < save.index("showSaveFilePicker({")
+    assert 'attFail("toobig")' in save[check : check + 200]
