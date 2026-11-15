@@ -169,6 +169,16 @@ With nginx, pass the headers on and let the websocket through (files go up in 4 
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
 
+### Settings
+
+Environment variables, set before you start the server:
+
+- `CIPHER_HOST` and `CIPHER_PORT`: where to listen, `127.0.0.1` and `8000`
+- `CIPHER_PROXY_HOPS`: how many reverse proxies are in front, `0`
+- `CIPHER_SECURE_COOKIES`: `1` always Secure, `0` never, not set means Secure when the request is https
+- `CIPHER_SIGNUPS_PER_HOUR`: accounts one address can make per hour, `10`
+- `CIPHER_MAX_FILE_MB`, `CIPHER_QUOTA_MB`, `CIPHER_FILE_DAYS`, `CIPHER_UNFINISHED_HOURS` and `CIPHER_BLOB_DIR`: files, see above
+
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
