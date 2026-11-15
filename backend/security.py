@@ -102,3 +102,28 @@ def cookie_secure(conn: HTTPConnection) -> bool:
     if mode == "0":
         return False
     return is_https(conn)
+
+
+class Pruner:
+    """Forgets the keys of a {key: [timestamps]} dict once all of their timestamps are too old.
+
+    A rate limiter only looks at a key when it comes back, so keys that never come back would pile
+    up for as long as the server runs. maybe() is cheap enough to call on every request: it only
+    does the work once every `every` seconds.
+    """
+
+    def __init__(self, store: dict, window: float, every: float = 60.0):
+        self.store = store
+        self.window = window
+        self.every = every
+        self.last = 0.0
+
+    def maybe(self, now: float | None = None) -> int:
+        now = time.time() if now is None else now
+        if now - self.last < self.every:
+            return 0
+        self.last = now
+        stale = [key for key, times in list(self.store.items()) if not times or now - times[-1] >= self.window]
+        for key in stale:
+            self.store.pop(key, None)
+        return len(stale)
