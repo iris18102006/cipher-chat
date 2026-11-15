@@ -142,3 +142,13 @@ def test_a_limiter_forgets_events_outside_the_window():
     assert not limiter.blocked("a")
     limiter.hit("a")
     assert len(limiter.hits["a"]) == 1
+
+
+def test_limiter_keys_are_separate_and_looking_costs_nothing():
+    limiter = security.SlidingLimiter(limit=1, window=60)
+    limiter.hit("a")
+    assert limiter.blocked("a")
+    assert not limiter.blocked("b")
+    assert "b" not in limiter.hits
+    limiter.clear()
+    assert not limiter.blocked("a")
