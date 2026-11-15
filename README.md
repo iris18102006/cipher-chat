@@ -143,6 +143,10 @@ The policy needs a recent browser: a websocket to the same address under `connec
 - Signups: 10 accounts per address per hour (`CIPHER_SIGNUPS_PER_HOUR`). A signup that is refused for a bad username or password doesn't count
 - The counters are in memory and forgotten when their window is over, so they don't grow while the server runs, but they start over when it restarts
 
+### https and the session cookie
+
+The session cookie is `HttpOnly` and `SameSite=Lax`. It is marked `Secure` by itself whenever the request came in over https (or your proxy says it did, see below). `CIPHER_SECURE_COOKIES=1` forces it on and `CIPHER_SECURE_COOKIES=0` forces it off. If you start the server on a network address without https and without a proxy, it prints a warning.
+
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
