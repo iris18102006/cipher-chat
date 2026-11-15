@@ -89,3 +89,16 @@ def is_https(conn: HTTPConnection) -> bool:
     if proxy_hops() == 0:
         return False
     return conn.headers.get("x-forwarded-proto", "").split(",")[-1].strip().lower() == "https"
+
+
+def cookie_secure(conn: HTTPConnection) -> bool:
+    """Should the session cookie be marked Secure (only ever sent over https)?
+
+    CIPHER_SECURE_COOKIES=1 always, =0 never, and when it isn't set: whenever this request is https.
+    """
+    mode = os.environ.get("CIPHER_SECURE_COOKIES", "").strip()
+    if mode == "1":
+        return True
+    if mode == "0":
+        return False
+    return is_https(conn)
