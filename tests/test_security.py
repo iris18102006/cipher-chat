@@ -189,3 +189,9 @@ def test_hsts_is_only_sent_over_https():
     assert "strict-transport-security" not in TestClient(app).get("/").headers
     secure = TestClient(app, base_url="https://testserver").get("/")
     assert secure.headers["strict-transport-security"] == security.HSTS
+
+
+def test_json_answers_are_not_cached_but_other_pages_are_left_alone():
+    client = TestClient(tiny_app())
+    assert client.get("/data").headers["cache-control"] == "no-store"
+    assert "cache-control" not in client.get("/").headers
