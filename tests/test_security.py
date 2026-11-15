@@ -54,3 +54,8 @@ def test_the_policy_still_allows_what_the_app_needs():
 def test_only_our_own_pages_get_the_microphone():
     assert "microphone=(self)" in security.PERMISSIONS_POLICY
     assert "camera=()" in security.PERMISSIONS_POLICY
+
+
+def test_client_ip_is_the_socket_address_without_a_proxy():
+    # anybody can send this header, so without a proxy it means nothing
+    assert security.client_ip(conn({"X-Forwarded-For": "198.51.100.1"})) == "203.0.113.9"
