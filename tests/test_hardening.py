@@ -124,3 +124,17 @@ def test_the_real_address_is_used_behind_a_proxy(client, monkeypatch):
     assert [bad("198.51.100.1", n) for n in ("a1", "b1", "c1")] == [401, 401, 429]
     # somebody else behind the same proxy isn't locked out by it
     assert bad("198.51.100.2", "a1") == 401
+
+
+def test_a_made_up_forwarded_address_doesnt_dodge_the_limit(client, monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    monkeypatch.setattr(main.ip_fail_limiter, "limit", 2)
+    codes = [bad_login(client, f"u{i}", {"X-Forwarded-For": f"6.6.6.{i}, 198.51.100.1"}) for i in range(3)]
+    assert codes == [401, 401, 429]
+
+
+def test_forwarded_addresses_mean_nothing_without_a_proxy(client, monkeypatch):
+    monkeypatch.delenv("CIPHER_PROXY_HOPS", raising=False)
+    monkeypatch.setattr(main.ip_fail_limiter, "limit", 2)
+    codes = [bad_login(client, f"u{i}", {"X-Forwarded-For": f"6.6.6.{i}"}) for i in range(3)]
+    assert codes == [401, 401, 429]
