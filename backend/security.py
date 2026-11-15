@@ -185,3 +185,19 @@ class SecurityHeaders:
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
+def startup_warnings(env=None) -> list[str]:
+    """Things worth telling the person who starts the server (server.py prints them)."""
+    env = os.environ if env is None else env
+    host = env.get("CIPHER_HOST", "127.0.0.1")
+    behind_proxy = env.get("CIPHER_PROXY_HOPS", "0").strip() not in ("", "0")
+    if host in LOCAL_HOSTS or behind_proxy or env.get("CIPHER_SECURE_COOKIES") == "1":
+        return []
+    return [
+        f"listening on {host} without https: passwords and session cookies can be read by anybody on "
+        "the network. Put it behind https and set CIPHER_SECURE_COOKIES=1 (see the README)."
+    ]
