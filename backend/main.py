@@ -399,6 +399,7 @@ FAIL_WINDOW = 5 * 60
 IP_FAIL_LIMIT = 40  # failed logins from one address, whatever usernames it tries, per FAIL_WINDOW
 _fails: dict[str, list[float]] = defaultdict(list)
 ip_fail_limiter = SlidingLimiter(IP_FAIL_LIMIT, FAIL_WINDOW)
+_fails_pruner = Pruner(_fails, FAIL_WINDOW)
 
 
 def _fail_key(ip: str, username: str) -> str:
@@ -411,6 +412,7 @@ def _note_failed_login(key: str, ip: str):
 
 
 def check_rate_limit(key: str):
+    _fails_pruner.maybe()
     now = time.time()
     recent = [t for t in _fails[key] if now - t < FAIL_WINDOW]
     _fails[key] = recent
