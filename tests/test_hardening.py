@@ -174,3 +174,14 @@ def test_old_failed_logins_are_forgotten(client):
     main.check_rate_limit("203.0.113.1|someone")
     assert "203.0.113.1|ghost" not in main._fails
     assert "203.0.113.1|fresh" in main._fails
+
+
+def test_old_prekey_claims_are_forgotten(client):
+    now = time.time()
+    main._claims.clear()
+    main._claims[(1, 2)] = [now - 2 * main.CLAIM_WINDOW]
+    main._claims[(3, 4)] = [now]
+    main._claims_pruner.last = 0.0
+    main.check_claim_limit(5, 6)
+    assert (1, 2) not in main._claims
+    assert (3, 4) in main._claims
