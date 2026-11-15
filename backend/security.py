@@ -127,3 +127,20 @@ class Pruner:
         for key in stale:
             self.store.pop(key, None)
         return len(stale)
+
+
+class SlidingLimiter:
+    """Counts events per key (an address, say) over a sliding window of `window` seconds."""
+
+    def __init__(self, limit: int, window: float):
+        self.limit = limit
+        self.window = window
+        self.hits: dict[str, list[float]] = defaultdict(list)
+        self._pruner = Pruner(self.hits, window)
+
+    def blocked(self, key: str) -> bool:
+        """Has this key used up its events? Looking never counts as an event."""
+        self._pruner.maybe()
+        now = time.time()
+        recent = [t for t in self.hits.get(key, ()) if now - t < self.window]
+        return len(recent) >= self.limit
