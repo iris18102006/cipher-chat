@@ -145,3 +145,12 @@ def test_one_address_can_only_make_so_many_accounts(client, monkeypatch):
     results = [sign_up(client, name) for name in ("aaa", "bbb", "ccc")]
     assert [r.status_code for r in results] == [200, 200, 429]
     assert "too many accounts" in results[2].json()["detail"]
+
+
+def test_signups_refused_for_other_reasons_dont_count(client, monkeypatch):
+    monkeypatch.setattr(main.signup_limiter, "limit", 2)
+    assert sign_up(client, "x").status_code == 400
+    assert sign_up(client, "A B").status_code == 400
+    short = client.post("/api/signup", json={"username": "short_pw", "password": "short"})
+    assert short.status_code == 400
+    assert [sign_up(client, name).status_code for name in ("aaa", "bbb", "ccc")] == [200, 200, 429]
