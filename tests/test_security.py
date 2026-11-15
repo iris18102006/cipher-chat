@@ -42,3 +42,10 @@ def test_the_policy_allows_no_inline_code():
 def test_the_policy_forbids_framing_plugins_and_base_tags():
     for part in ("frame-ancestors 'none'", "object-src 'none'", "base-uri 'none'", "form-action 'self'"):
         assert part in security.CSP
+
+
+def test_the_policy_still_allows_what_the_app_needs():
+    assert "img-src 'self' data: blob:" in security.CSP
+    assert "media-src 'self' blob:" in security.CSP
+    assert "connect-src 'self'" in security.CSP
+    assert "font-src 'self'" in security.CSP
