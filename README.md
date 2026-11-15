@@ -147,6 +147,28 @@ The policy needs a recent browser: a websocket to the same address under `connec
 
 The session cookie is `HttpOnly` and `SameSite=Lax`. It is marked `Secure` by itself whenever the request came in over https (or your proxy says it did, see below). `CIPHER_SECURE_COOKIES=1` forces it on and `CIPHER_SECURE_COOKIES=0` forces it off. If you start the server on a network address without https and without a proxy, it prints a warning.
 
+### Behind a reverse proxy
+
+If nginx, Caddy or something like it sits in front of the server, every request seems to come from the proxy. Tell the server how many proxies there are:
+
+    CIPHER_PROXY_HOPS=1 python server.py
+
+Then it takes the visitor's address from the last entry of `X-Forwarded-For` (the one your proxy added, the earlier ones are sent by the visitor and could be made up) and sees https from `X-Forwarded-Proto`. Leave it unset when people connect directly, because then anybody could fake those headers.
+
+With Caddy this is all it takes, it sets both headers and handles the websocket by itself:
+
+    chat.example.com {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+With nginx, pass the headers on and let the websocket through (files go up in 4 MB pieces, so `client_max_body_size 5m;` is enough):
+
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
