@@ -3,8 +3,11 @@
 Set CIPHER_HOST and CIPHER_PORT to listen somewhere else.
 """
 import os
+import sys
 
 import uvicorn
+
+from backend.security import startup_warnings
 
 if __name__ == "__main__":
     uvicorn.run(
