@@ -10,6 +10,7 @@
 const FC_CHUNK = 4 * 1024 * 1024; // the same number as CHUNK in backend/blobs.py
 const FC_TAG = 16; // what AES-GCM adds to every piece
 const FC_MAX_BYTES = 2048 * 1024 * 1024; // like a WhatsApp document, the same as MAX_FILE on the server
+const FC_MEM_SAVE_MAX = 1024 * 1024 * 1024; // the most a browser without a save dialog is asked to hold in memory
 
 function fcB64(bytes) {
   // in slices, because spreading a big array into fromCharCode blows the stack
