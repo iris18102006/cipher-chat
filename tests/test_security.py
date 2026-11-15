@@ -152,3 +152,20 @@ def test_limiter_keys_are_separate_and_looking_costs_nothing():
     assert "b" not in limiter.hits
     limiter.clear()
     assert not limiter.blocked("a")
+
+
+def tiny_app(page_headers=None):
+    async def page(request):
+        return PlainTextResponse("hi", headers=page_headers)
+
+    async def data(request):
+        return JSONResponse({"ok": True})
+
+    async def sock(ws):
+        await ws.accept()
+        await ws.send_text("hello")
+        await ws.close()
+
+    app = Starlette(routes=[Route("/", page), Route("/data", data), WebSocketRoute("/ws", sock)])
+    app.add_middleware(security.SecurityHeaders)
+    return app
