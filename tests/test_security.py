@@ -200,3 +200,19 @@ def test_json_answers_are_not_cached_but_other_pages_are_left_alone():
 def test_websockets_pass_straight_through():
     with TestClient(tiny_app()).websocket_connect("/ws") as ws:
         assert ws.receive_text() == "hello"
+
+
+def test_no_warning_on_localhost():
+    assert security.startup_warnings({}) == []
+    assert security.startup_warnings({"CIPHER_HOST": "localhost"}) == []
+
+
+def test_a_public_address_without_https_gets_a_warning():
+    notes = security.startup_warnings({"CIPHER_HOST": "0.0.0.0"})
+    assert len(notes) == 1
+    assert "0.0.0.0" in notes[0] and "CIPHER_SECURE_COOKIES" in notes[0]
+
+
+def test_no_warning_behind_a_proxy_or_with_secure_cookies():
+    assert security.startup_warnings({"CIPHER_HOST": "0.0.0.0", "CIPHER_PROXY_HOPS": "1"}) == []
+    assert security.startup_warnings({"CIPHER_HOST": "0.0.0.0", "CIPHER_SECURE_COOKIES": "1"}) == []
