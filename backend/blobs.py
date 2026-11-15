@@ -174,8 +174,8 @@ def purge(conn) -> int:
     """Forget files that are too old, and uploads that were never finished."""
     old = conn.execute(
         "SELECT id FROM blobs WHERE created_at <= datetime('now', ?) "
-        "OR (complete = 0 AND created_at <= datetime('now', '-1 day'))",
-        (f"-{KEEP_DAYS} days",),
+        "OR (complete = 0 AND created_at <= datetime('now', ?))",
+        (f"-{KEEP_DAYS} days", f"-{UNFINISHED_HOURS} hours"),
     ).fetchall()
     for row in old:
         remove_files(row["id"])
