@@ -202,3 +202,16 @@ test("sizes and times read well", () => {
   assert.equal(lib.fcClock(NaN), "0:00");
   assert.equal(lib.fcClock(-3), "0:00");
 });
+
+test("small files can be saved in any browser", () => {
+  assert.equal(lib.fcCanSaveHere(5 * 1024 * 1024, false), true);
+  assert.equal(lib.fcCanSaveHere(lib.FC_MEM_SAVE_MAX, false), true);
+});
+
+test("a big file needs a browser that can write to disk", () => {
+  const big = lib.FC_MEM_SAVE_MAX + 1;
+  assert.equal(lib.fcCanSaveHere(big, false), false);
+  assert.equal(lib.fcCanSaveHere(big, undefined), false);
+  assert.equal(lib.fcCanSaveHere(big, function showSaveFilePicker() {}), true);
+  assert.equal(lib.fcCanSaveHere(2048 * 1024 * 1024, true), true);
+});
