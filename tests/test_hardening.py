@@ -138,3 +138,10 @@ def test_forwarded_addresses_mean_nothing_without_a_proxy(client, monkeypatch):
     monkeypatch.setattr(main.ip_fail_limiter, "limit", 2)
     codes = [bad_login(client, f"u{i}", {"X-Forwarded-For": f"6.6.6.{i}"}) for i in range(3)]
     assert codes == [401, 401, 429]
+
+
+def test_one_address_can_only_make_so_many_accounts(client, monkeypatch):
+    monkeypatch.setattr(main.signup_limiter, "limit", 2)
+    results = [sign_up(client, name) for name in ("aaa", "bbb", "ccc")]
+    assert [r.status_code for r in results] == [200, 200, 429]
+    assert "too many accounts" in results[2].json()["detail"]
