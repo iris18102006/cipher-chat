@@ -219,3 +219,4 @@ This is a learning project, not Signal.
 
 
 so far this project has been worked on daily
+soon it will be provided with pictures of the app itself after it's done
