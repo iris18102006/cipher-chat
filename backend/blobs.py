@@ -11,10 +11,12 @@ The pieces live on disk, not in the database, and files are removed after a whil
 Imported by main.py at the very bottom, after everything it needs is defined.
 """
 
+import logging
 import os
 import re
 import secrets
 import shutil
+import threading
 import time
 from pathlib import Path
 
@@ -22,9 +24,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from .db import connect
 from .main import current_user, get_conn, read_body
 
 router = APIRouter()
+log = logging.getLogger("cipher")
 
 MB = 1024 * 1024
 CHUNK = 4 * MB  # plain bytes in one piece, the same number as FC_CHUNK in web/filecrypto.js
