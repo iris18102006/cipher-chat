@@ -99,3 +99,12 @@ def test_forwarded_proto_only_counts_behind_a_proxy(monkeypatch):
     monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
     assert security.is_https(conn(headers))
     assert not security.is_https(conn({"X-Forwarded-Proto": "http"}))
+
+
+def test_cookies_are_secure_when_asked_never_or_automatically(monkeypatch):
+    assert security.cookie_secure(conn(scheme="https")) is True
+    assert security.cookie_secure(conn()) is False
+    monkeypatch.setenv("CIPHER_SECURE_COOKIES", "1")
+    assert security.cookie_secure(conn()) is True
+    monkeypatch.setenv("CIPHER_SECURE_COOKIES", "0")
+    assert security.cookie_secure(conn(scheme="https")) is False
