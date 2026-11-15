@@ -517,6 +517,8 @@ def login(
     ip = client_ip(request)
     key = _fail_key(ip, username)
     check_rate_limit(key)
+    if ip_fail_limiter.blocked(ip):
+        raise HTTPException(429, "too many tries from this network, wait a few minutes")
     if len(creds.password) > 128:
         # signup never allows this, so it can't be right (and we don't hash megabytes)
         _note_failed_login(key, ip)
