@@ -137,6 +137,7 @@ async function attLoadUrl(desc, onProgress) {
 // Saves a file under its own name. Big files in Chrome and Edge are written straight to disk
 // piece by piece, so a 2 GB file never has to fit in memory. Other browsers keep it in a Blob.
 async function attSave(desc, onProgress) {
+  if (!fcCanSaveHere(desc.size, window.showSaveFilePicker)) throw attFail("toobig");
   if (window.showSaveFilePicker && desc.size > ATT_DISK_MIN) {
     let handle = null;
     try {
