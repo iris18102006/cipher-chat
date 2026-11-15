@@ -58,3 +58,16 @@ def test_scripts_never_build_code_or_markup_from_text():
         assert not re.search(r"\.(inner|outer)HTML\s*[+]?=", code), script.name
         assert "insertAdjacentHTML" not in code, script.name
         assert "document.write" not in code, script.name
+
+
+def test_nothing_is_loaded_from_another_site():
+    for page in PAGES:
+        text = page.read_text()
+        assert not re.search(r"<(script|img|iframe|audio|video|source|link)\b[^>]*\b(src|href)=[\"']?(https?:)?//", text), page.name
+    for style in STYLES:
+        assert not re.search(r"url\(\s*[\"']?(https?:)?//", style.read_text()), style.name
+        assert "@import" not in style.read_text(), style.name
+    for script in SCRIPTS:
+        code = code_of(script)
+        assert not re.search(r"fetch\(\s*[\"'`]https?://", code), script.name
+        assert not re.search(r"new WebSocket\(\s*[\"'`]wss?://", code), script.name
