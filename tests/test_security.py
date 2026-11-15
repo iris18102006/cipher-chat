@@ -182,3 +182,10 @@ def test_the_middleware_keeps_a_header_the_route_set_itself():
     r = TestClient(tiny_app({"Content-Security-Policy": own})).get("/")
     assert r.headers["content-security-policy"] == own
     assert r.headers["x-frame-options"] == "DENY"
+
+
+def test_hsts_is_only_sent_over_https():
+    app = tiny_app()
+    assert "strict-transport-security" not in TestClient(app).get("/").headers
+    secure = TestClient(app, base_url="https://testserver").get("/")
+    assert secure.headers["strict-transport-security"] == security.HSTS
