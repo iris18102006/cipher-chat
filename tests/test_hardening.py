@@ -29,3 +29,13 @@ def test_api_answers_are_not_cached(client):
         assert r.headers["content-type"].startswith("application/json")
         assert r.headers["cache-control"] == "no-store"
         assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_files_keep_their_own_stricter_policy(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(main.blobs, "BLOB_DIR", tmp_path / "blobs")
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 50])
+    r = a.get(f"/api/blobs/{blob_id}/pieces/0")
+    assert r.headers["content-security-policy"] == "default-src 'none'; sandbox"
+    assert r.headers["cache-control"] == "private, max-age=3600"
+    assert r.headers["x-frame-options"] == "DENY"
