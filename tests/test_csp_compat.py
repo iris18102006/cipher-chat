@@ -29,3 +29,12 @@ def test_no_page_has_an_inline_script():
         for tag in re.findall(r"<script\b[^>]*>", page.read_text()):
             assert re.search(r"\bsrc=", tag), (page.name, tag)
         assert not re.search(r"<script\b[^>]*>\s*[^<\s]", page.read_text()), page.name
+
+
+def test_no_page_has_inline_styles_or_event_handlers():
+    for page in PAGES:
+        text = page.read_text()
+        assert "<style" not in text, page.name
+        assert not re.search(r"\sstyle\s*=", text), page.name
+        assert not re.search(r"\son[a-z]+\s*=\s*[\"']", text), page.name
+        assert "javascript:" not in text, page.name
