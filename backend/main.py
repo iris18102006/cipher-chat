@@ -509,7 +509,8 @@ def login(
     creds: Credentials, request: Request, response: Response, conn=Depends(get_conn)
 ):
     username = creds.username.strip().lower()
-    key = _fail_key(request.client.host if request.client else "?", username)
+    ip = client_ip(request)
+    key = _fail_key(ip, username)
     check_rate_limit(key)
     if len(creds.password) > 128:
         # signup never allows this, so it can't be right (and we don't hash megabytes)
