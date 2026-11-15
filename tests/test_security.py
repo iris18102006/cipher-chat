@@ -108,3 +108,21 @@ def test_cookies_are_secure_when_asked_never_or_automatically(monkeypatch):
     assert security.cookie_secure(conn()) is True
     monkeypatch.setenv("CIPHER_SECURE_COOKIES", "0")
     assert security.cookie_secure(conn(scheme="https")) is False
+
+
+def test_the_pruner_forgets_keys_that_never_came_back():
+    now = 10_000.0
+    store = {"old": [now - 500], "empty": [], "fresh": [now - 5]}
+    pruner = security.Pruner(store, window=300)
+    assert pruner.maybe(now) == 2
+    assert list(store) == ["fresh"]
+
+
+def test_the_pruner_only_works_once_a_minute():
+    store = {"old": [1.0]}
+    pruner = security.Pruner(store, window=300)
+    assert pruner.maybe(1000.0) == 1
+    store["old2"] = [1.0]
+    assert pruner.maybe(1030.0) == 0
+    assert "old2" in store
+    assert pruner.maybe(1061.0) == 1
