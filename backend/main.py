@@ -396,7 +396,9 @@ def purge_image_refs(conn, user_id: int, image_id: int):
 
 FAIL_LIMIT = 8
 FAIL_WINDOW = 5 * 60
+IP_FAIL_LIMIT = 40  # failed logins from one address, whatever usernames it tries, per FAIL_WINDOW
 _fails: dict[str, list[float]] = defaultdict(list)
+ip_fail_limiter = SlidingLimiter(IP_FAIL_LIMIT, FAIL_WINDOW)
 
 
 def _fail_key(ip: str, username: str) -> str:
