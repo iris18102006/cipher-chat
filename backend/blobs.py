@@ -191,6 +191,22 @@ def purge(conn) -> int:
 _last_purge = 0.0
 
 
+def _spawn(job) -> None:
+    threading.Thread(target=job, name="blob-purge", daemon=True).start()
+
+
+def _purge_in_background() -> None:
+    """Has its own database connection, because it outlives the request that started it."""
+    try:
+        conn = connect()
+        try:
+            purge(conn)
+        finally:
+            conn.close()
+    except Exception:
+        log.exception("cleaning up old files failed")
+
+
 def housekeeping(conn) -> None:
     """Clean up at most once an hour, whenever somebody uses files."""
     global _last_purge
