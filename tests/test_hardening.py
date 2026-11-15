@@ -60,3 +60,17 @@ def test_the_session_cookie_is_not_secure_over_plain_http(client, auto_cookies):
     assert r.status_code == 200
     assert not is_secure(r)
     assert "httponly" in r.headers["set-cookie"].lower()
+
+
+def test_the_session_cookie_is_secure_over_https(client, auto_cookies):
+    r = sign_up(TestClient(main.app, base_url="https://testserver"))
+    assert r.status_code == 200
+    assert is_secure(r)
+
+
+def test_logging_in_over_https_is_secure_too(client, auto_cookies):
+    signup(client, "alice")
+    https = TestClient(main.app, base_url="https://testserver")
+    r = https.post("/api/login", json={"username": "alice", "password": "password123"})
+    assert r.status_code == 200
+    assert is_secure(r)
