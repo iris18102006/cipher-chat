@@ -66,3 +66,17 @@ def proxy_hops() -> int:
         return max(0, int(os.environ.get("CIPHER_PROXY_HOPS", "0")))
     except ValueError:
         return 0
+
+
+def client_ip(conn: HTTPConnection) -> str:
+    """The address a request really came from.
+
+    With CIPHER_PROXY_HOPS=1 (one proxy in front) that is the last address in X-Forwarded-For, the one
+    our own proxy added. The ones before it were sent by the client and could be made up.
+    """
+    hops = proxy_hops()
+    if hops:
+        parts = [p.strip() for p in conn.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+        if len(parts) >= hops:
+            return parts[-hops]
+    return conn.client.host if conn.client else "?"
