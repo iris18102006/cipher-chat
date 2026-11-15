@@ -9,3 +9,23 @@ from collections import defaultdict
 
 from starlette.datastructures import MutableHeaders
 from starlette.requests import HTTPConnection
+
+
+# What a page of cipher-chat is allowed to load. Everything comes from our own address: no inline
+# scripts or styles and no other sites. data: is for the little svg shapes in the css and blob: is
+# for files and pictures that were unlocked in your browser.
+CSP = "; ".join(
+    (
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self' data: blob:",
+        "media-src 'self' blob:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    )
+)
