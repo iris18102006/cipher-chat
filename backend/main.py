@@ -405,6 +405,11 @@ def _fail_key(ip: str, username: str) -> str:
     return f"{ip}|{username}"
 
 
+def _note_failed_login(key: str, ip: str):
+    _fails[key].append(time.time())
+    ip_fail_limiter.hit(ip)
+
+
 def check_rate_limit(key: str):
     now = time.time()
     recent = [t for t in _fails[key] if now - t < FAIL_WINDOW]
@@ -514,7 +519,7 @@ def login(
     check_rate_limit(key)
     if len(creds.password) > 128:
         # signup never allows this, so it can't be right (and we don't hash megabytes)
-        _fails[key].append(time.time())
+        _note_failed_login(key, ip)
         raise HTTPException(401, "wrong username or password")
     row = conn.execute(
         "SELECT id, password_hash FROM users WHERE username = ?", (username,)
@@ -524,7 +529,7 @@ def login(
         if not row:
             raise VerifyMismatchError()
     except VerifyMismatchError:
-        _fails[key].append(time.time())
+        _note_failed_login(key, ip)
         raise HTTPException(401, "wrong username or password")
     _fails.pop(key, None)
     start_session(conn, request, response, row["id"])
