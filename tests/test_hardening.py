@@ -92,3 +92,13 @@ def test_the_cookie_is_secure_behind_a_proxy_that_speaks_https(client, auto_cook
 def test_a_forwarded_proto_header_means_nothing_without_a_proxy(client, auto_cookies):
     r = sign_up(client, headers={"X-Forwarded-Proto": "https"})
     assert not is_secure(r)
+
+
+def bad_login(c, name, headers=None):
+    r = c.post("/api/login", json={"username": name, "password": "wrong-pass"}, headers=headers or {})
+    return r.status_code
+
+
+def test_one_address_cant_guess_across_many_usernames(client, monkeypatch):
+    monkeypatch.setattr(main.ip_fail_limiter, "limit", 3)
+    assert [bad_login(client, f"user{i}") for i in range(5)] == [401, 401, 401, 429, 429]
