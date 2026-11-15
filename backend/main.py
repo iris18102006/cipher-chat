@@ -115,6 +115,7 @@ SECURE_COOKIES = os.environ.get("CIPHER_SECURE_COOKIES") == "1"
 
 log = logging.getLogger("cipher")
 app = FastAPI(docs_url=None, redoc_url=None)
+app.add_middleware(SecurityHeaders)
 ph = PasswordHasher()
 init_db()
 
