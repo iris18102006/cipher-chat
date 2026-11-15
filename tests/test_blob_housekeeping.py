@@ -60,3 +60,11 @@ def test_a_request_never_waits_for_the_clean_up(client, monkeypatch):
     a = signup(client, "alice")
     assert start(a, 1, 50).status_code == 200
     assert len(jobs) == 1
+
+
+def test_the_background_job_removes_old_files(client, tmp_path):
+    a = signup(client, "alice")
+    blob_id = upload(a, [b"x" * 50])
+    age(blob_id, "-31 days")
+    blobs._purge_in_background()
+    assert not (tmp_path / "blobs" / blob_id).exists()
