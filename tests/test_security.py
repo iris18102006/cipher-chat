@@ -175,3 +175,10 @@ def test_the_middleware_adds_every_header():
     r = TestClient(tiny_app()).get("/")
     for name, value in security.SECURITY_HEADERS.items():
         assert r.headers[name] == value
+
+
+def test_the_middleware_keeps_a_header_the_route_set_itself():
+    own = "default-src 'none'; sandbox"
+    r = TestClient(tiny_app({"Content-Security-Policy": own})).get("/")
+    assert r.headers["content-security-policy"] == own
+    assert r.headers["x-frame-options"] == "DENY"
