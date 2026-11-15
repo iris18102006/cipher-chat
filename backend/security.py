@@ -40,3 +40,7 @@ CROSS_ORIGIN_HEADERS = {
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
 }
+
+
+# Only sent over https. Six months, and not for subdomains, so it can't lock anything else out.
+HSTS = "max-age=15552000"
