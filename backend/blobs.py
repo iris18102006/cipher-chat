@@ -33,6 +33,7 @@ CHUNK_CT = CHUNK + TAG
 MAX_FILE = int(os.environ.get("CIPHER_MAX_FILE_MB", "2048")) * MB  # like a WhatsApp document
 QUOTA = int(os.environ.get("CIPHER_QUOTA_MB", "10240")) * MB  # per person, all their files together
 KEEP_DAYS = int(os.environ.get("CIPHER_FILE_DAYS", "30"))
+UNFINISHED_HOURS = int(os.environ.get("CIPHER_UNFINISHED_HOURS", "6"))  # an upload that never finished is dropped after this
 BLOB_DIR = Path(os.environ.get("CIPHER_BLOB_DIR", Path(__file__).parent / "blobs"))
 ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
