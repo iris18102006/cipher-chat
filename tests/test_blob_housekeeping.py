@@ -68,3 +68,13 @@ def test_the_background_job_removes_old_files(client, tmp_path):
     age(blob_id, "-31 days")
     blobs._purge_in_background()
     assert not (tmp_path / "blobs" / blob_id).exists()
+
+
+def test_the_background_job_survives_a_failure(monkeypatch, caplog):
+    def broken():
+        raise RuntimeError("the database is gone")
+
+    monkeypatch.setattr(blobs, "connect", broken)
+    with caplog.at_level(logging.ERROR, logger="cipher"):
+        blobs._purge_in_background()
+    assert "cleaning up old files failed" in caplog.text
