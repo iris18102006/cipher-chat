@@ -195,3 +195,8 @@ def test_json_answers_are_not_cached_but_other_pages_are_left_alone():
     client = TestClient(tiny_app())
     assert client.get("/data").headers["cache-control"] == "no-store"
     assert "cache-control" not in client.get("/").headers
+
+
+def test_websockets_pass_straight_through():
+    with TestClient(tiny_app()).websocket_connect("/ws") as ws:
+        assert ws.receive_text() == "hello"
