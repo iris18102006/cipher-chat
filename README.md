@@ -29,6 +29,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - A feed with its own window: short posts that you and your friends can see, with likes and shares (a share never shows the original to people who couldn't already see it)
 - Too-long messages (over about 11,000 characters) are refused with a notice instead of vanishing, and flooding the socket gets dropped
 - Logging out closes any tab of that session that's still connected
+- Hardening: every page has a strict Content-Security-Policy and anti-clickjacking headers, signups and failed logins are rate limited per address, and the session cookie is marked Secure by itself whenever the site is on https
 - Works on phones (one panel at a time)
 
 ## How it works
