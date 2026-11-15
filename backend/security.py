@@ -29,3 +29,7 @@ CSP = "; ".join(
         "frame-ancestors 'none'",
     )
 )
+
+
+# Only our own pages may use the microphone (voice messages). Nothing here needs the rest.
+PERMISSIONS_POLICY = "microphone=(self), camera=(), geolocation=(), payment=(), usb=()"
