@@ -170,12 +170,16 @@ class SecurityHeaders:
             await self.app(scope, receive, send)
             return
 
+        secure = is_https(HTTPConnection(scope))
+
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 for name, value in SECURITY_HEADERS.items():
                     if name not in headers:
                         headers[name] = value
+                if secure:
+                    headers.setdefault("Strict-Transport-Security", HSTS)
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
