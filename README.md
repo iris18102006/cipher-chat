@@ -137,6 +137,12 @@ Files and songs keep their own, stricter policy (`default-src 'none'; sandbox`).
 
 The policy needs a recent browser: a websocket to the same address under `connect-src 'self'` works in Chrome, Edge and Firefox, and in Safari 15.4 and newer.
 
+### Rate limits
+
+- Failed logins: 8 per username and address in 5 minutes, and also 40 per address whatever the usernames, so one address can't try one password on thousands of accounts. A good login doesn't reset the address count
+- Signups: 10 accounts per address per hour (`CIPHER_SIGNUPS_PER_HOUR`). A signup that is refused for a bad username or password doesn't count
+- The counters are in memory and forgotten when their window is over, so they don't grow while the server runs, but they start over when it restarts
+
 ## Project layout
 
 - `backend/main.py`: the API routes, the websocket and the rules for accounts, profiles, friends, blocks and messages
