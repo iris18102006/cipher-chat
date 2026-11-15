@@ -74,3 +74,21 @@ def test_logging_in_over_https_is_secure_too(client, auto_cookies):
     r = https.post("/api/login", json={"username": "alice", "password": "password123"})
     assert r.status_code == 200
     assert is_secure(r)
+
+
+@pytest.mark.parametrize("mode, scheme, expected", [("1", "http", True), ("0", "https", False)])
+def test_the_cookie_setting_can_force_the_flag(client, auto_cookies, monkeypatch, mode, scheme, expected):
+    monkeypatch.setenv("CIPHER_SECURE_COOKIES", mode)
+    r = sign_up(TestClient(main.app, base_url=f"{scheme}://testserver"))
+    assert is_secure(r) is expected
+
+
+def test_the_cookie_is_secure_behind_a_proxy_that_speaks_https(client, auto_cookies, monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    r = sign_up(client, headers={"X-Forwarded-Proto": "https"})
+    assert is_secure(r)
+
+
+def test_a_forwarded_proto_header_means_nothing_without_a_proxy(client, auto_cookies):
+    r = sign_up(client, headers={"X-Forwarded-Proto": "https"})
+    assert not is_secure(r)
