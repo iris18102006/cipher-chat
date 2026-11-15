@@ -10,6 +10,8 @@ import uvicorn
 from backend.security import startup_warnings
 
 if __name__ == "__main__":
+    for note in startup_warnings():
+        print("warning:", note, file=sys.stderr)
     uvicorn.run(
         "backend.main:app",
         host=os.environ.get("CIPHER_HOST", "127.0.0.1"),
