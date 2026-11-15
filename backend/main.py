@@ -433,7 +433,7 @@ def check_claim_limit(claimer_id: int, target_id: int):
 # ---------- sessions ----------
 
 
-def start_session(conn, response: Response, user_id: int):
+def start_session(conn, request: Request, response: Response, user_id: int):
     # clean out expired sessions while we're here
     conn.execute(
         "DELETE FROM sessions WHERE created_at < datetime('now', ?)",
@@ -450,7 +450,7 @@ def start_session(conn, response: Response, user_id: int):
         token,
         httponly=True,
         samesite="lax",
-        secure=SECURE_COOKIES,
+        secure=cookie_secure(request),
         max_age=60 * 60 * 24 * SESSION_DAYS,
     )
 
@@ -487,7 +487,7 @@ def get_peer(conn, username: str):
 
 
 @app.post("/api/signup")
-def signup(creds: Credentials, response: Response, conn=Depends(get_conn)):
+def signup(creds: Credentials, request: Request, response: Response, conn=Depends(get_conn)):
     username = creds.username.strip().lower()
     if not USERNAME_RE.fullmatch(username):
         raise HTTPException(400, "username must be 3-20 chars: a-z, 0-9, _")
@@ -501,7 +501,7 @@ def signup(creds: Credentials, response: Response, conn=Depends(get_conn)):
         conn.commit()
     except sqlite3.IntegrityError:
         raise HTTPException(409, "that username is taken")
-    start_session(conn, response, cur.lastrowid)
+    start_session(conn, request, response, cur.lastrowid)
     return {"username": username}
 
 
@@ -527,7 +527,7 @@ def login(
         _fails[key].append(time.time())
         raise HTTPException(401, "wrong username or password")
     _fails.pop(key, None)
-    start_session(conn, response, row["id"])
+    start_session(conn, request, response, row["id"])
     return {"username": username}
 
 
