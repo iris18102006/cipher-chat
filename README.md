@@ -216,3 +216,6 @@ This is a learning project, not Signal.
 - [x] Send files, photos and videos in chats and groups, end-to-end encrypted, up to 2 GB each
 - [x] Voice messages up to 5 minutes
 
+
+
+so far this project has been worked on daily
