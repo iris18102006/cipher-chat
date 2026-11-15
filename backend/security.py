@@ -44,3 +44,13 @@ CROSS_ORIGIN_HEADERS = {
 
 # Only sent over https. Six months, and not for subdomains, so it can't lock anything else out.
 HSTS = "max-age=15552000"
+
+
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CSP,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": PERMISSIONS_POLICY,
+    **CROSS_ORIGIN_HEADERS,
+}
