@@ -50,3 +50,13 @@ def test_housekeeping_runs_in_the_background_once_an_hour(client, monkeypatch):
     blobs.housekeeping()
     blobs.housekeeping()
     assert jobs == [blobs._purge_in_background]
+
+
+def test_a_request_never_waits_for_the_clean_up(client, monkeypatch):
+    jobs = []
+    monkeypatch.setattr(blobs, "_spawn", jobs.append)
+    monkeypatch.setattr(blobs, "_last_purge", float("-inf"))
+    monkeypatch.setattr(blobs, "purge", lambda conn: pytest.fail("purged inside a request"))
+    a = signup(client, "alice")
+    assert start(a, 1, 50).status_code == 200
+    assert len(jobs) == 1
