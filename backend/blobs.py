@@ -188,7 +188,8 @@ def purge(conn) -> int:
     return len(old)
 
 
-_last_purge = 0.0
+# time.monotonic() can be small on a machine that just started, so start from minus infinity
+_last_purge = float("-inf")
 
 
 def _spawn(job) -> None:
