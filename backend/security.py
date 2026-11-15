@@ -33,3 +33,10 @@ CSP = "; ".join(
 
 # Only our own pages may use the microphone (voice messages). Nothing here needs the rest.
 PERMISSIONS_POLICY = "microphone=(self), camera=(), geolocation=(), payment=(), usb=()"
+
+
+# Nobody else's page gets a window into ours, or gets to load our answers as its own.
+CROSS_ORIGIN_HEADERS = {
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
