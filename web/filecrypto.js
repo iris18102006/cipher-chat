@@ -180,6 +180,12 @@ function fcHumanSize(bytes) {
   return (i === 0 || n >= 10 ? Math.round(n) : Math.round(n * 10) / 10) + " " + units[i];
 }
 
+// Can this browser save a file this big? Browsers that can ask where to save (Chrome, Edge) write it to
+// disk piece by piece. The others have to hold the whole file in memory first.
+function fcCanSaveHere(size, canPickFile) {
+  return Boolean(canPickFile) || size <= FC_MEM_SAVE_MAX;
+}
+
 function fcClock(seconds) {
   const s = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
