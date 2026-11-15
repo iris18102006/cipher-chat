@@ -54,3 +54,15 @@ SECURITY_HEADERS = {
     "Permissions-Policy": PERMISSIONS_POLICY,
     **CROSS_ORIGIN_HEADERS,
 }
+
+
+def proxy_hops() -> int:
+    """How many reverse proxies (nginx, Caddy...) sit in front of this server, 0 if people connect directly.
+
+    Only when this is set are X-Forwarded-For and X-Forwarded-Proto believed, because anybody can send
+    those headers. Set it with CIPHER_PROXY_HOPS.
+    """
+    try:
+        return max(0, int(os.environ.get("CIPHER_PROXY_HOPS", "0")))
+    except ValueError:
+        return 0
