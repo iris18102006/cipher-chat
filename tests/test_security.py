@@ -86,3 +86,16 @@ def test_a_garbage_proxy_count_means_no_proxy(monkeypatch):
     assert security.proxy_hops() == 0
     monkeypatch.setenv("CIPHER_PROXY_HOPS", "-3")
     assert security.proxy_hops() == 0
+
+
+def test_https_is_seen_from_the_scheme():
+    assert security.is_https(conn(scheme="https"))
+    assert not security.is_https(conn())
+
+
+def test_forwarded_proto_only_counts_behind_a_proxy(monkeypatch):
+    headers = {"X-Forwarded-Proto": "https"}
+    assert not security.is_https(conn(headers))
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    assert security.is_https(conn(headers))
+    assert not security.is_https(conn({"X-Forwarded-Proto": "http"}))
