@@ -69,3 +69,20 @@ def test_client_ip_behind_one_proxy_is_the_last_address(monkeypatch):
 def test_client_ip_ignores_addresses_the_client_made_up(monkeypatch):
     monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
     assert security.client_ip(conn({"X-Forwarded-For": "6.6.6.6, 198.51.100.7"})) == "198.51.100.7"
+
+
+def test_client_ip_behind_two_proxies(monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "2")
+    assert security.client_ip(conn({"X-Forwarded-For": "6.6.6.6, 198.51.100.7, 10.0.0.2"})) == "198.51.100.7"
+
+
+def test_client_ip_falls_back_when_the_proxy_header_is_missing(monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "1")
+    assert security.client_ip(conn()) == "203.0.113.9"
+
+
+def test_a_garbage_proxy_count_means_no_proxy(monkeypatch):
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "lots")
+    assert security.proxy_hops() == 0
+    monkeypatch.setenv("CIPHER_PROXY_HOPS", "-3")
+    assert security.proxy_hops() == 0
