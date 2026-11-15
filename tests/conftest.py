@@ -11,6 +11,11 @@ def client(tmp_path, monkeypatch):
     from backend import main
 
     main._fails.clear()
+    main.ip_fail_limiter.clear()
+    main.signup_limiter.clear()
+    # plenty of tests make lots of accounts from one address, the limits get their own tests
+    monkeypatch.setattr(main.ip_fail_limiter, "limit", 10**6)
+    monkeypatch.setattr(main.signup_limiter, "limit", 10**6)
     main.manager.sockets.clear()
     with TestClient(main.app) as c:
         yield c
