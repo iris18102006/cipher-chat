@@ -502,6 +502,10 @@ def signup(creds: Credentials, request: Request, response: Response, conn=Depend
         raise HTTPException(400, "username must be 3-20 chars: a-z, 0-9, _")
     if not 8 <= len(creds.password) <= 128:
         raise HTTPException(400, "password must be 8-128 characters")
+    ip = client_ip(request)
+    if signup_limiter.blocked(ip):
+        raise HTTPException(429, "too many accounts made from this network, try again later")
+    signup_limiter.hit(ip)
     try:
         cur = conn.execute(
             "INSERT INTO users (username, password_hash) VALUES (?, ?)",
