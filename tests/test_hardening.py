@@ -21,3 +21,11 @@ def test_the_redirect_for_logged_out_visitors_has_them_too(client):
     assert r.status_code == 302
     assert r.headers["x-frame-options"] == "DENY"
     assert r.headers["content-security-policy"] == security.CSP
+
+
+def test_api_answers_are_not_cached(client):
+    a = signup(client, "alice")
+    for r in (a.get("/api/me"), a.get("/api/friends"), client.get("/api/me")):
+        assert r.headers["content-type"].startswith("application/json")
+        assert r.headers["cache-control"] == "no-store"
+        assert r.headers["x-content-type-options"] == "nosniff"
