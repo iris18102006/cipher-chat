@@ -238,7 +238,8 @@ This is a learning project, not Signal.
 - Message settings only cover people who sent you a friend request. Nobody can message someone they have no friend request or friendship with. Being refused ("wait") is shown to the sender, unlike a block
 - Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
 - The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
-- Login rate limiting is in memory and resets when the server restarts
+- Login and signup rate limiting is in memory and resets when the server restarts. It counts per address, so many people behind one shared address (a school, say) share the same counts
+- Usernames can be found out: signing up with a taken name says so. That is normal for a chat where people look each other up by name, and logging in doesn't give anything away
 - Group messages are signed, but signing keys are trusted on first use just like identity keys: a malicious server that swaps someone's signing key before you ever saw it can't be caught. Comparing signing key fingerprints in the Members panel is what protects you. Messages from before signing existed show as "not signed", and a message from someone who has left the group shows "can't check"
 - If a member loses their private key (clears site data, new browser) they can't read the group until someone removes them and adds them again, or the key is next replaced
 - The server knows who is in which group, when messages are sent and how big they are
