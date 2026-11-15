@@ -428,9 +428,11 @@ signup_limiter = SlidingLimiter(SIGNUP_LIMIT, SIGNUP_WINDOW)
 # ---------- prekey claim limiting (in memory, per claimer + target) ----------
 
 _claims: dict[tuple[int, int], list[float]] = defaultdict(list)
+_claims_pruner = Pruner(_claims, CLAIM_WINDOW)
 
 
 def check_claim_limit(claimer_id: int, target_id: int):
+    _claims_pruner.maybe()
     now = time.time()
     key = (claimer_id, target_id)
     recent = [t for t in _claims[key] if now - t < CLAIM_WINDOW]
