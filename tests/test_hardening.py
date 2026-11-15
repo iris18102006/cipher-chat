@@ -102,3 +102,13 @@ def bad_login(c, name, headers=None):
 def test_one_address_cant_guess_across_many_usernames(client, monkeypatch):
     monkeypatch.setattr(main.ip_fail_limiter, "limit", 3)
     assert [bad_login(client, f"user{i}") for i in range(5)] == [401, 401, 401, 429, 429]
+
+
+def test_a_good_login_does_not_reset_the_address_count(client, monkeypatch):
+    signup(client, "alice")
+    monkeypatch.setattr(main.ip_fail_limiter, "limit", 3)
+    assert [bad_login(client, "user1"), bad_login(client, "user2")] == [401, 401]
+    good = client.post("/api/login", json={"username": "alice", "password": "password123"})
+    assert good.status_code == 200
+    assert bad_login(client, "user3") == 401
+    assert bad_login(client, "user4") == 429
