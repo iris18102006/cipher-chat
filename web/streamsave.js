@@ -3,3 +3,5 @@
 // memory. Chrome and Edge don't need this, they write straight to disk. If anything here is
 // missing or fails before the first piece, attachments.js falls back to the old way.
 
+const SS_READY_MS = 5000; // how long to wait for the helper to wake up before giving up
+
