@@ -43,3 +43,16 @@ function loadPage() {
   return new Function(pageSource + "\nreturn { ssOpenPort, ssSupported };")();
 }
 
+const ID = "0123456789abcdef0123456789abcdef";
+
+async function readAll(body) {
+  const parts = [];
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+  }
+  return Buffer.concat(parts);
+}
+
