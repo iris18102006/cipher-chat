@@ -166,3 +166,14 @@ test("every other request goes through untouched", async () => {
   assert.equal(await worker.fetch("/_dl/" + ID, "https://evil.example"), null);
 });
 
+test("a forged or broken prepare message is ignored", async () => {
+  const worker = loadWorker();
+  const channel = new MessageChannel();
+  worker.handlers.message({ data: { type: "prepare", id: "../../etc", name: "a", size: 1 }, ports: [channel.port2] });
+  worker.handlers.message({ data: { type: "prepare", id: ID, name: "a", size: 1 }, ports: [] });
+  worker.handlers.message({ data: { type: "nope" }, ports: [channel.port2] });
+  worker.handlers.message({ data: null, ports: [] });
+  assert.equal((await worker.fetch("/_dl/" + ID)).status, 404);
+  channel.port1.close();
+});
+
