@@ -54,3 +54,7 @@ function dlHeader(name) {
 function dlAnswer(id) {
   const job = jobs.get(id);
   if (!job) return new Response("not found", { status: 404, headers: { "Cache-Control": "no-store" } });
+  // one use only: a second request for the same id finds nothing
+  jobs.delete(id);
+  clearTimeout(job.timer);
+  const port = job.port;
