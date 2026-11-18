@@ -106,3 +106,6 @@ async function ssOpen(name, size) {
   if (!ssSupported()) throw new Error("nostream");
   const reg = await ssWithTimeout(navigator.serviceWorker.ready, SS_READY_MS);
   if (!reg.active) throw new Error("nostream");
+  const id = ssRandomId();
+  const channel = new MessageChannel();
+  reg.active.postMessage({ type: "prepare", id, name, size }, [channel.port2]);
