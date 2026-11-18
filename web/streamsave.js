@@ -69,3 +69,5 @@ async function ssOpenPort(port, startDownload) {
       }
     };
   });
+  await ssWithTimeout(ready, SS_READY_MS);
+
