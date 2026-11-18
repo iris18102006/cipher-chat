@@ -86,3 +86,9 @@ function dlAnswer(id) {
           port.postMessage({ type: "next" });
         }
       },
+      cancel() {
+        // the person cancelled the download in the browser
+        port.postMessage({ type: "cancelled" });
+        port.close();
+      },
+    },
