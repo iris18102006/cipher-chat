@@ -8,3 +8,4 @@
 // other request goes straight through, as if this worker wasn't here.
 
 const DL_PREFIX = "/_dl/";
+const DL_WAIT_MS = 30 * 1000; // how long a prepared download waits for the browser to ask for it
