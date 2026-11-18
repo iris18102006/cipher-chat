@@ -27,3 +27,7 @@ self.addEventListener("message", (event) => {
     port.postMessage({ type: "expired" });
     port.close();
   }, DL_WAIT_MS);
+  jobs.set(data.id, job);
+  port.postMessage({ type: "ready" });
+});
+
