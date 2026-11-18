@@ -47,3 +47,6 @@ function ssWithTimeout(promise, ms) {
 // makes the browser ask the helper for the file (a click on a link). It is a parameter so the
 // message handling can be tested without a browser.
 async function ssOpenPort(port, startDownload) {
+  let onNext = null; // what write() is waiting for
+  let dead = null; // set once the helper says the download is over
+
