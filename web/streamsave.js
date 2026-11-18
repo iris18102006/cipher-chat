@@ -120,3 +120,4 @@ async function ssOpen(name, size) {
   });
 }
 
+ssRegister();
