@@ -117,3 +117,18 @@ test("the page waits when the browser is slow, so memory stays small", async () 
   assert.equal((await body).length, 30);
 });
 
+test("abort makes the browser's download fail instead of saving half a file", async () => {
+  const worker = loadWorker();
+  const { ssOpenPort } = loadPage();
+  const port = worker.prepare(ID, "half.bin", 100);
+  let response = null;
+  const out = await ssOpenPort(port, () => {
+    worker.fetch("/_dl/" + ID).then((r) => (response = r));
+  });
+  while (!response) await new Promise((r) => setTimeout(r, 1));
+  const body = readAll(response.body);
+  await out.write(new Uint8Array(10));
+  out.abort();
+  await assert.rejects(body);
+});
+
