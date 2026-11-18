@@ -58,3 +58,5 @@ function dlAnswer(id) {
   jobs.delete(id);
   clearTimeout(job.timer);
   const port = job.port;
+  let waiting = false; // a chunk came in while the browser was still busy with the last one
+
