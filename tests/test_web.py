@@ -22,7 +22,8 @@ def test_no_script_is_left_unloaded():
     loaded = set()
     for name in ("index.html", "login.html"):
         loaded |= set(re.findall(r'<script src="([^"]+)"', page(name)))
-    assert {p.name for p in WEB.glob("*.js")} == loaded
+    # sw.js is not a script tag, the page registers it as a service worker (see streamsave.js)
+    assert {p.name for p in WEB.glob("*.js")} - {"sw.js"} == loaded
 
 
 def test_no_stylesheet_is_left_unloaded():
