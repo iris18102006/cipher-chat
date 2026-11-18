@@ -51,3 +51,6 @@ function dlHeader(name) {
   return "attachment; filename*=UTF-8''" + encoded;
 }
 
+function dlAnswer(id) {
+  const job = jobs.get(id);
+  if (!job) return new Response("not found", { status: 404, headers: { "Cache-Control": "no-store" } });
