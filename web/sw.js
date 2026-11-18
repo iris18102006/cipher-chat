@@ -80,3 +80,9 @@ function dlAnswer(id) {
         };
         port.postMessage({ type: "started" });
       },
+      pull() {
+        if (waiting) {
+          waiting = false;
+          port.postMessage({ type: "next" });
+        }
+      },
