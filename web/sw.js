@@ -70,3 +70,13 @@ function dlAnswer(id) {
             // the page waits for this answer before it sends the next piece
             if (controller.desiredSize > 0) port.postMessage({ type: "next" });
             else waiting = true;
+          } else if (msg.type === "end") {
+            controller.close();
+            port.close();
+          } else if (msg.type === "abort") {
+            controller.error(new TypeError("download stopped"));
+            port.close();
+          }
+        };
+        port.postMessage({ type: "started" });
+      },
