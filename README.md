@@ -78,6 +78,12 @@ Things that follow from this:
 
 Pick files with the paperclip, drop them on the chat, or paste a screenshot.
 
+### Big downloads
+
+A file never has to fit in memory when you save it:
+
+- **Chrome and Edge** ask where to save it and write every piece straight to that file (`showSaveFilePicker`), for anything over 64 MB.
+
 These can be changed with environment variables before you start the server:
 
 - `CIPHER_MAX_FILE_MB`: the biggest file, 2048 (2 GB, like a WhatsApp document)
