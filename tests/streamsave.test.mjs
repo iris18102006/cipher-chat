@@ -159,3 +159,10 @@ test("an id works once and unknown ids get a 404", async () => {
   await first.body.getReader().read().catch(() => {});
 });
 
+test("every other request goes through untouched", async () => {
+  const worker = loadWorker();
+  assert.equal(await worker.fetch("/api/me"), null);
+  assert.equal(await worker.fetch("/app.js"), null);
+  assert.equal(await worker.fetch("/_dl/" + ID, "https://evil.example"), null);
+});
+
