@@ -197,3 +197,8 @@ def test_big_downloads_can_stream_through_the_service_worker():
     assert 'desc.size > FC_MEM_SAVE_MAX) throw attFail("toobig")' in save
 
 
+def test_the_service_worker_is_served_from_the_root_with_a_javascript_type(client):
+    res = client.get("/sw.js")
+    assert res.status_code == 200
+    assert "javascript" in res.headers["content-type"]
+    assert "default-src 'self'" in res.headers["content-security-policy"]
