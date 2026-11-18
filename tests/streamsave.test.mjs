@@ -56,3 +56,7 @@ async function readAll(body) {
   return Buffer.concat(parts);
 }
 
+test("the page is not supported outside a browser, so it falls back", () => {
+  assert.equal(loadPage().ssSupported(), false);
+});
+
