@@ -179,6 +179,9 @@ async function attSave(desc, onProgress) {
       return;
     }
   }
+  if (!window.showSaveFilePicker && desc.size > ATT_DISK_MIN && ssSupported()) {
+    if (await attStreamSave(desc, onProgress)) return;
+  }
   const parts = [];
   await attOpenPieces(desc, (plain) => parts.push(new Blob([plain])), onProgress);
   // always saved as an anonymous download, never opened as a page, whatever type the sender said
