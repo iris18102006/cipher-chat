@@ -20,3 +20,4 @@ self.addEventListener("message", (event) => {
   const port = event.ports && event.ports[0];
   if (!data || data.type !== "prepare" || !port) return;
   if (typeof data.id !== "string" || !/^[0-9a-f]{32}$/.test(data.id)) return;
+  if (jobs.has(data.id)) return;
