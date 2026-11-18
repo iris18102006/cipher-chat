@@ -159,7 +159,7 @@ async function attStreamSave(desc, onProgress) {
 // piece by piece, so a 2 GB file never has to fit in memory. Firefox and Safari stream it through
 // the download helper (sw.js) when they can. Anything else keeps it in a Blob.
 async function attSave(desc, onProgress) {
-  if (!fcCanSaveHere(desc.size, window.showSaveFilePicker)) throw attFail("toobig");
+  if (!fcCanSaveHere(desc.size, window.showSaveFilePicker || ssSupported())) throw attFail("toobig");
   if (window.showSaveFilePicker && desc.size > ATT_DISK_MIN) {
     let handle = null;
     try {

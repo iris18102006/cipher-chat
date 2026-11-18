@@ -180,6 +180,6 @@ def test_the_memory_limit_for_saving_is_one_gigabyte():
 def test_saving_a_file_checks_that_the_browser_can_hold_it():
     code = page("attachments.js")
     save = code[code.index("async function attSave") :]
-    check = save.index("fcCanSaveHere(desc.size, window.showSaveFilePicker)")
+    check = save.index("fcCanSaveHere(desc.size, window.showSaveFilePicker || ssSupported())")
     assert check < save.index("showSaveFilePicker({")
     assert 'attFail("toobig")' in save[check : check + 200]
