@@ -82,3 +82,12 @@ async function ssOpenPort(port, startDownload) {
   startDownload();
   await ssWithTimeout(started, SS_READY_MS);
 
+  return {
+    async write(plain) {
+      if (dead) throw dead;
+      // a copy, so handing it over doesn't empty the caller's array
+      const copy = plain.slice().buffer;
+      const wait = new Promise((resolve, reject) => (onNext = { resolve, reject }));
+      port.postMessage({ type: "chunk", data: copy }, [copy]);
+      await wait;
+    },
