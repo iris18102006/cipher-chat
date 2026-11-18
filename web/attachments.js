@@ -134,6 +134,27 @@ async function attLoadUrl(desc, onProgress) {
 }
 
 
+// Streams a file to the browser's download through the helper in sw.js (Firefox, Safari), piece
+// by piece. Returns false if the helper isn't there, before anything was sent, so the caller can
+// fall back to the Blob way.
+async function attStreamSave(desc, onProgress) {
+  let out = null;
+  try {
+    out = await ssOpen(desc.name, desc.size);
+  } catch {
+    return false;
+  }
+  try {
+    await attOpenPieces(desc, (plain) => out.write(plain), onProgress);
+    out.close();
+  } catch (ex) {
+    out.abort();
+    if (ex && ex.message === "cancelled") return true; // they cancelled in the browser's downloads
+    throw ex;
+  }
+  return true;
+}
+
 // Saves a file under its own name. Big files in Chrome and Edge are written straight to disk
 // piece by piece, so a 2 GB file never has to fit in memory. Other browsers keep it in a Blob.
 async function attSave(desc, onProgress) {
