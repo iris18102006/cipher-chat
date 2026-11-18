@@ -10,3 +10,32 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const swSource = fs.readFileSync(path.join(here, "..", "web", "sw.js"), "utf8");
 const pageSource = fs.readFileSync(path.join(here, "..", "web", "streamsave.js"), "utf8");
 
+const ORIGIN = "https://chat.example";
+
+// loads sw.js against a fake `self` and gives back what it registered
+function loadWorker() {
+  const handlers = {};
+  const self = {
+    location: { origin: ORIGIN },
+    addEventListener: (name, fn) => (handlers[name] = fn),
+    skipWaiting: () => {},
+    clients: { claim: async () => {} },
+  };
+  new Function("self", swSource)(self);
+  return {
+    handlers,
+    // a message from the page: prepares a download and returns the page's end of the channel
+    prepare(id, name, size) {
+      const channel = new MessageChannel();
+      handlers.message({ data: { type: "prepare", id, name, size }, ports: [channel.port2] });
+      return channel.port1;
+    },
+    // the browser asking for /_dl/<id>: returns the Response, or null if the worker let it through
+    async fetch(urlPath, origin = ORIGIN) {
+      let answer = null;
+      handlers.fetch({ request: { url: origin + urlPath }, respondWith: (p) => (answer = p) });
+      return answer ? await answer : null;
+    },
+  };
+}
+
