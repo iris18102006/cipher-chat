@@ -60,3 +60,26 @@ test("the page is not supported outside a browser, so it falls back", () => {
   assert.equal(loadPage().ssSupported(), false);
 });
 
+test("a file is streamed through in order with the right headers", async () => {
+  const worker = loadWorker();
+  const { ssOpenPort } = loadPage();
+  const port = worker.prepare(ID, 'my "report".pdf', 21);
+  let response = null;
+  const out = await ssOpenPort(port, () => {
+    worker.fetch("/_dl/" + ID).then((r) => (response = r));
+  });
+  while (!response) await new Promise((r) => setTimeout(r, 1));
+  const body = readAll(response.body);
+  for (let i = 0; i < 7; i++) await out.write(new Uint8Array([i, i, i]));
+  out.close();
+  const got = await body;
+  assert.deepEqual([...got], [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6]);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "application/octet-stream");
+  assert.equal(response.headers.get("content-length"), "21");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.match(response.headers.get("content-security-policy"), /sandbox/);
+  // quotes can't break out of the header
+  assert.equal(response.headers.get("content-disposition"), "attachment; filename*=UTF-8''my%20_report_.pdf");
+});
+
