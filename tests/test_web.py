@@ -183,3 +183,17 @@ def test_saving_a_file_checks_that_the_browser_can_hold_it():
     check = save.index("fcCanSaveHere(desc.size, window.showSaveFilePicker || ssSupported())")
     assert check < save.index("showSaveFilePicker({")
     assert 'attFail("toobig")' in save[check : check + 200]
+
+
+def test_big_downloads_can_stream_through_the_service_worker():
+    index = page("index.html")
+    assert index.index("streamsave.js") < index.index("attachments.js")
+    save = page("attachments.js")
+    save = save[save.index("async function attSave") :]
+    # Chrome and Edge keep the save dialog, the helper is only for browsers without one
+    assert save.index("showSaveFilePicker({") < save.index("attStreamSave(desc")
+    assert "!window.showSaveFilePicker" in save
+    # if the helper isn't there a file that doesn't fit in memory is refused, not loaded into it
+    assert 'desc.size > FC_MEM_SAVE_MAX) throw attFail("toobig")' in save
+
+
