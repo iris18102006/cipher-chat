@@ -7,3 +7,4 @@
 // the page. It only answers requests for /_dl/<id>, and only for an id the page just made. Every
 // other request goes straight through, as if this worker wasn't here.
 
+const DL_PREFIX = "/_dl/";
