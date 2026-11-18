@@ -83,3 +83,14 @@ test("a file is streamed through in order with the right headers", async () => {
   assert.equal(response.headers.get("content-disposition"), "attachment; filename*=UTF-8''my%20_report_.pdf");
 });
 
+test("a name with odd characters is made safe", async () => {
+  const worker = loadWorker();
+  const port = worker.prepare(ID, "../../é\r\nSet-Cookie: x=1.txt", 1);
+  const response = await worker.fetch("/_dl/" + ID);
+  const header = response.headers.get("content-disposition");
+  assert.ok(!/[\r\n"/\\]/.test(header.replace("attachment; filename*=UTF-8''", "")));
+  assert.match(header, /^attachment; filename\*=UTF-8''/);
+  port.postMessage({ type: "abort" });
+  await response.body.getReader().read().catch(() => {});
+});
+
