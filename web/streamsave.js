@@ -43,3 +43,7 @@ function ssWithTimeout(promise, ms) {
   });
 }
 
+// Talks to the helper over `port` and hands back { write, close, abort }. `startDownload` is what
+// makes the browser ask the helper for the file (a click on a link). It is a parameter so the
+// message handling can be tested without a browser.
+async function ssOpenPort(port, startDownload) {
