@@ -16,7 +16,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Requests and Blocked buttons in the top bar: answer friend requests (with a count) and see or unblock the people you blocked, without hunting through the buddy list
 - Settings: choose what happens to messages from someone whose friend request you haven't accepted yet: let them through, hold them until you accept (up to 3, you only see a count), or make them wait. You answer the request right from the chat
 - Pictures: upload a profile photo, a gallery of up to 12 photos and GIFs (click to view full size), a background picture, and stickers you drag around a small copy of your page. All without writing code
-- Files and voice messages: send any file (up to 2 GB), photos and videos, or record a voice message of up to 5 minutes, in chats and in groups. It is all locked in your browser before it is uploaded
+- Files and voice messages: send any file (up to 2 GB), photos and videos, or record a voice message of up to 5 minutes, in chats and in groups. It is all locked in your browser before it is uploaded, and big files stream straight to disk when you download them, in every browser
 - Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
 - Friend requests (send, accept, decline, cancel, unfriend) with a popup when one arrives
 - Blocking: a blocked person can't message you, can't see when you're online and can't see your profile
