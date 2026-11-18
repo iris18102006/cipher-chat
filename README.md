@@ -85,6 +85,7 @@ A file never has to fit in memory when you save it:
 - **Chrome and Edge** ask where to save it and write every piece straight to that file (`showSaveFilePicker`), for anything over 64 MB.
 - **Firefox and Safari** have no such dialog, so the page streams the unlocked pieces through a small service worker, `web/sw.js`. The worker answers one request, `/_dl/<id>`, with a normal download (`Content-Disposition: attachment`, the right size, an anonymous type) and hands the browser each piece as it arrives. The page sends the next piece only when the browser has taken the last one, so memory stays at a few pieces whatever the file size. If the download is cancelled the page stops sending, and if a piece fails its check the download is made to fail instead of saving half a file.
 - The worker never touches the network and never sees a key. The pieces it gets are already unlocked by the page, it answers only for an id the page just made (32 random hex characters, good for one request, forgotten after 30 seconds), and every other request goes through as if it wasn't there.
+- A service worker needs `https` or `localhost`. Without it (or if the worker couldn't start) the old way is used: a file up to 1 GB is kept in memory while it downloads, a bigger one is refused with a message.
 
 These can be changed with environment variables before you start the server:
 
