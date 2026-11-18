@@ -5,3 +5,14 @@
 
 const SS_READY_MS = 5000; // how long to wait for the helper to wake up before giving up
 
+function ssSupported() {
+  return Boolean(
+    typeof navigator !== "undefined" &&
+      navigator.serviceWorker &&
+      typeof window !== "undefined" &&
+      window.isSecureContext &&
+      typeof ReadableStream !== "undefined" &&
+      typeof MessageChannel !== "undefined",
+  );
+}
+
