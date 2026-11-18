@@ -132,3 +132,18 @@ test("abort makes the browser's download fail instead of saving half a file", as
   await assert.rejects(body);
 });
 
+test("cancelling in the browser stops the page from sending more", async () => {
+  const worker = loadWorker();
+  const { ssOpenPort } = loadPage();
+  const port = worker.prepare(ID, "x.bin", 100);
+  let response = null;
+  const out = await ssOpenPort(port, () => {
+    worker.fetch("/_dl/" + ID).then((r) => (response = r));
+  });
+  while (!response) await new Promise((r) => setTimeout(r, 1));
+  await out.write(new Uint8Array(10));
+  await response.body.cancel();
+  await new Promise((r) => setTimeout(r, 20));
+  await assert.rejects(out.write(new Uint8Array(10)), /cancelled/);
+});
+
