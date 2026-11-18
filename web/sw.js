@@ -22,3 +22,8 @@ self.addEventListener("message", (event) => {
   if (typeof data.id !== "string" || !/^[0-9a-f]{32}$/.test(data.id)) return;
   if (jobs.has(data.id)) return;
   const job = { name: dlName(data.name), size: Number.isSafeInteger(data.size) && data.size >= 0 ? data.size : -1, port };
+  job.timer = setTimeout(() => {
+    jobs.delete(data.id);
+    port.postMessage({ type: "expired" });
+    port.close();
+  }, DL_WAIT_MS);
