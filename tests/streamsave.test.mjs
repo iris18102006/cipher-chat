@@ -94,3 +94,26 @@ test("a name with odd characters is made safe", async () => {
   await response.body.getReader().read().catch(() => {});
 });
 
+test("the page waits when the browser is slow, so memory stays small", async () => {
+  const worker = loadWorker();
+  const { ssOpenPort } = loadPage();
+  const port = worker.prepare(ID, "big.bin", 100);
+  let response = null;
+  const out = await ssOpenPort(port, () => {
+    worker.fetch("/_dl/" + ID).then((r) => (response = r));
+  });
+  while (!response) await new Promise((r) => setTimeout(r, 1));
+  // nobody is reading yet: the first piece fits in the queue, the second has to wait
+  await out.write(new Uint8Array(10));
+  let secondDone = false;
+  const second = out.write(new Uint8Array(10)).then(() => (secondDone = true));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(secondDone, false);
+  const body = readAll(response.body);
+  await second;
+  assert.equal(secondDone, true);
+  await out.write(new Uint8Array(10));
+  out.close();
+  assert.equal((await body).length, 30);
+});
+
