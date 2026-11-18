@@ -177,3 +177,6 @@ test("a forged or broken prepare message is ignored", async () => {
   channel.port1.close();
 });
 
+test("the worker doesn't touch the network or keys", () => {
+  assert.ok(!/\bfetch\(|XMLHttpRequest|indexedDB|importScripts|crypto\./.test(swSource.replace(/\/\/.*$/gm, "")));
+});
