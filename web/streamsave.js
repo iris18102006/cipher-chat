@@ -16,3 +16,9 @@ function ssSupported() {
   );
 }
 
+// started once when the page loads, so the helper is ready by the time somebody clicks Download
+function ssRegister() {
+  if (!ssSupported()) return;
+  navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+}
+
