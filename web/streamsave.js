@@ -109,3 +109,14 @@ async function ssOpen(name, size) {
   const id = ssRandomId();
   const channel = new MessageChannel();
   reg.active.postMessage({ type: "prepare", id, name, size }, [channel.port2]);
+  return ssOpenPort(channel.port1, () => {
+    const link = document.createElement("a");
+    link.href = "/_dl/" + id;
+    link.rel = "noopener";
+    link.download = "";
+    document.body.append(link);
+    link.click();
+    link.remove();
+  });
+}
+
