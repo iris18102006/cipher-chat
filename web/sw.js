@@ -21,3 +21,4 @@ self.addEventListener("message", (event) => {
   if (!data || data.type !== "prepare" || !port) return;
   if (typeof data.id !== "string" || !/^[0-9a-f]{32}$/.test(data.id)) return;
   if (jobs.has(data.id)) return;
+  const job = { name: dlName(data.name), size: Number.isSafeInteger(data.size) && data.size >= 0 ? data.size : -1, port };
