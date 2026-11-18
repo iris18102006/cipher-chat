@@ -95,3 +95,10 @@ function dlAnswer(id) {
     { highWaterMark: 2, size: () => 1 },
   );
 
+  const headers = {
+    "Content-Type": "application/octet-stream",
+    "Content-Disposition": dlHeader(job.name),
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    "Cache-Control": "no-store",
+  };
