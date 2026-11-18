@@ -100,3 +100,7 @@ async function ssOpenPort(port, startDownload) {
   };
 }
 
+// Opens a streaming download for a file called `name` that is `size` bytes. Throws an error with
+// the message "nostream" if this browser or this page can't do it.
+async function ssOpen(name, size) {
+  if (!ssSupported()) throw new Error("nostream");
