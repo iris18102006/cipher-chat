@@ -182,6 +182,7 @@ async function attSave(desc, onProgress) {
   if (!window.showSaveFilePicker && desc.size > ATT_DISK_MIN && ssSupported()) {
     if (await attStreamSave(desc, onProgress)) return;
   }
+  if (desc.size > FC_MEM_SAVE_MAX) throw attFail("toobig"); // the helper wasn't there and it won't fit in memory
   const parts = [];
   await attOpenPieces(desc, (plain) => parts.push(new Blob([plain])), onProgress);
   // always saved as an anonymous download, never opened as a page, whatever type the sender said
