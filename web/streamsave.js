@@ -50,3 +50,22 @@ async function ssOpenPort(port, startDownload) {
   let onNext = null; // what write() is waiting for
   let dead = null; // set once the helper says the download is over
 
+  const ready = new Promise((resolve, reject) => {
+    port.onmessage = (event) => {
+      const msg = event.data || {};
+      if (msg.type === "ready") resolve();
+      else if (msg.type === "expired") reject(new Error("nostream"));
+      else if (msg.type === "next" && onNext) {
+        const done = onNext;
+        onNext = null;
+        done.resolve();
+      } else if (msg.type === "cancelled") {
+        dead = new Error("cancelled");
+        if (onNext) {
+          const done = onNext;
+          onNext = null;
+          done.reject(dead);
+        }
+      }
+    };
+  });
