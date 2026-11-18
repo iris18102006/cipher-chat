@@ -104,3 +104,5 @@ async function ssOpenPort(port, startDownload) {
 // the message "nostream" if this browser or this page can't do it.
 async function ssOpen(name, size) {
   if (!ssSupported()) throw new Error("nostream");
+  const reg = await ssWithTimeout(navigator.serviceWorker.ready, SS_READY_MS);
+  if (!reg.active) throw new Error("nostream");
