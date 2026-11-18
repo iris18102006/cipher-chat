@@ -37,3 +37,12 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(dlAnswer(url.pathname.slice(DL_PREFIX.length)));
 });
 
+// a file name that is safe to put in a header: no slashes, no control characters, no quotes
+function dlName(name) {
+  const clean = String(name || "")
+    .replace(/[\u0000-\u001f\u007f"\\/:*?<>|]/g, "_")
+    .trim()
+    .slice(0, 200);
+  return clean || "file";
+}
+
