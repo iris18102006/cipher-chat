@@ -39,3 +39,7 @@ function loadWorker() {
   };
 }
 
+function loadPage() {
+  return new Function(pageSource + "\nreturn { ssOpenPort, ssSupported };")();
+}
+
