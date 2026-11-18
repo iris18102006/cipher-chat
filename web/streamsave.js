@@ -71,3 +71,14 @@ async function ssOpenPort(port, startDownload) {
   });
   await ssWithTimeout(ready, SS_READY_MS);
 
+  // the first piece is only sent once the browser has really asked for the file
+  const started = new Promise((resolve) => {
+    const old = port.onmessage;
+    port.onmessage = (event) => {
+      if (event.data && event.data.type === "started") resolve();
+      old(event);
+    };
+  });
+  startDownload();
+  await ssWithTimeout(started, SS_READY_MS);
+
