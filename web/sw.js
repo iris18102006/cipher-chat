@@ -63,3 +63,10 @@ function dlAnswer(id) {
   const body = new ReadableStream(
     {
       start(controller) {
+        port.onmessage = (event) => {
+          const msg = event.data || {};
+          if (msg.type === "chunk" && msg.data instanceof ArrayBuffer) {
+            controller.enqueue(new Uint8Array(msg.data));
+            // the page waits for this answer before it sends the next piece
+            if (controller.desiredSize > 0) port.postMessage({ type: "next" });
+            else waiting = true;
