@@ -46,3 +46,8 @@ function dlName(name) {
   return clean || "file";
 }
 
+function dlHeader(name) {
+  const encoded = encodeURIComponent(name).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+  return "attachment; filename*=UTF-8''" + encoded;
+}
+
