@@ -14,3 +14,9 @@ const jobs = new Map();
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
+// The page sends { type: "prepare", id, name, size } and one end of a MessageChannel.
+self.addEventListener("message", (event) => {
+  const data = event.data;
+  const port = event.ports && event.ports[0];
+  if (!data || data.type !== "prepare" || !port) return;
+  if (typeof data.id !== "string" || !/^[0-9a-f]{32}$/.test(data.id)) return;
