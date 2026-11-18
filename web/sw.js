@@ -60,3 +60,6 @@ function dlAnswer(id) {
   const port = job.port;
   let waiting = false; // a chunk came in while the browser was still busy with the last one
 
+  const body = new ReadableStream(
+    {
+      start(controller) {
