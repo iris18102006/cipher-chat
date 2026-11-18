@@ -147,3 +147,15 @@ test("cancelling in the browser stops the page from sending more", async () => {
   await assert.rejects(out.write(new Uint8Array(10)), /cancelled/);
 });
 
+test("an id works once and unknown ids get a 404", async () => {
+  const worker = loadWorker();
+  const port = worker.prepare(ID, "once.bin", 1);
+  const first = await worker.fetch("/_dl/" + ID);
+  assert.equal(first.status, 200);
+  const second = await worker.fetch("/_dl/" + ID);
+  assert.equal(second.status, 404);
+  assert.equal((await worker.fetch("/_dl/ffffffffffffffffffffffffffffffff")).status, 404);
+  port.postMessage({ type: "abort" });
+  await first.body.getReader().read().catch(() => {});
+});
+
