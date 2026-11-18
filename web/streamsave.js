@@ -91,3 +91,12 @@ async function ssOpenPort(port, startDownload) {
       port.postMessage({ type: "chunk", data: copy }, [copy]);
       await wait;
     },
+    close() {
+      port.postMessage({ type: "end" });
+    },
+    abort() {
+      port.postMessage({ type: "abort" });
+    },
+  };
+}
+
