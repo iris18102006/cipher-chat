@@ -31,3 +31,9 @@ self.addEventListener("message", (event) => {
   port.postMessage({ type: "ready" });
 });
 
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(DL_PREFIX)) return;
+  event.respondWith(dlAnswer(url.pathname.slice(DL_PREFIX.length)));
+});
+
