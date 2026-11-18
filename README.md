@@ -83,6 +83,7 @@ Pick files with the paperclip, drop them on the chat, or paste a screenshot.
 A file never has to fit in memory when you save it:
 
 - **Chrome and Edge** ask where to save it and write every piece straight to that file (`showSaveFilePicker`), for anything over 64 MB.
+- **Firefox and Safari** have no such dialog, so the page streams the unlocked pieces through a small service worker, `web/sw.js`. The worker answers one request, `/_dl/<id>`, with a normal download (`Content-Disposition: attachment`, the right size, an anonymous type) and hands the browser each piece as it arrives. The page sends the next piece only when the browser has taken the last one, so memory stays at a few pieces whatever the file size. If the download is cancelled the page stops sending, and if a piece fails its check the download is made to fail instead of saving half a file.
 
 These can be changed with environment variables before you start the server:
 
