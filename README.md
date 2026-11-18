@@ -295,7 +295,7 @@ This is a learning project, not Signal.
 - [x] Rate limit signups and failed logins per address
 - [x] Secure cookies on https without a setting
 - [x] Clean up old files in the background
-- [ ] Stream big downloads in Firefox and Safari (a service worker) so the 1 GB cap can go
+- [x] Stream big downloads in Firefox and Safari (a service worker) so the 1 GB cap can go
 
 
 
