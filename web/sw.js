@@ -92,3 +92,6 @@ function dlAnswer(id) {
         port.close();
       },
     },
+    { highWaterMark: 2, size: () => 1 },
+  );
+
