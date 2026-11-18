@@ -203,6 +203,7 @@ Environment variables, set before you start the server:
 - `web/app.js`: the chat screen (buddy list, messages, typing, receipts, the websocket)
 - `web/profile.js`, `web/profile-media.js`, `web/friends.js`, `web/lists.js`, `web/settings.js`, `web/groups.js`, `web/chat-themes.js`, `web/profile-song.js` and `web/feed.js`: one file for each screen on top of the chat (profiles and pictures, friends, the Requests and Blocked panels, settings, group chats, chat themes, the profile song player, the feed window)
 - `web/filecrypto.js` and `web/attachments.js`: locking files in the browser, and the code that sends, shows and records them
+- `web/streamsave.js` and `web/sw.js`: the page side and the service worker for streaming big downloads in Firefox and Safari
 - `tests/`: the Python tests (`python -m pytest tests`) and the Node tests for the crypto and the files (`node --test`)
 - `server.py`: starts uvicorn
 
