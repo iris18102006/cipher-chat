@@ -102,3 +102,6 @@ function dlAnswer(id) {
     "Content-Security-Policy": "default-src 'none'; sandbox",
     "Cache-Control": "no-store",
   };
+  if (job.size >= 0) headers["Content-Length"] = String(job.size);
+  return new Response(body, { status: 200, headers });
+}
