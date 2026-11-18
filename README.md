@@ -260,7 +260,7 @@ This is a learning project, not Signal.
 - Someone who was removed keeps what they already read and the keys they already held, a new key only protects what's said afterwards
 - The server sees that a file exists, how big it is, who uploaded it and when, but not what it is or which chat it belongs to. Anybody logged in who knows a file's random id can download the locked pieces, which is useless without the key
 - A file is removed from the server after 30 days. The message stays but opening it says the file is gone, so save what you want to keep. Deleting a message doesn't delete the file, and somebody who was in the chat keeps a file they already opened
-- Big downloads: Chrome and Edge write a file over 64 MB straight to disk. Other browsers keep it in memory while it downloads, so they refuse to save a file over 1 GB (the Download button says so and suggests Chrome or Edge), and a smaller one can still fail on a computer with little memory
+- Big downloads: Chrome and Edge write a file over 64 MB straight to disk. Firefox and Safari stream it through the download helper (`web/sw.js`), which needs `https` or `localhost` and a browser that allows service workers (private windows sometimes don't). Without it a file up to 1 GB is kept in memory while it downloads and a bigger one is refused. A download that is streamed can't be resumed: if the browser or the tab dies halfway you start it again. This has been tested with a pretend worker in Node, not yet in every real browser, so a report from Safari is welcome
 - Voice messages need a microphone and a browser with `MediaRecorder`, over `https` or on `localhost`. The format is whatever the browser records (webm or mp4), so an old browser may not be able to play it
 
 ## Roadmap
