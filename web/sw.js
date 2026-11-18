@@ -11,3 +11,6 @@ const DL_PREFIX = "/_dl/";
 const DL_WAIT_MS = 30 * 1000; // how long a prepared download waits for the browser to ask for it
 const jobs = new Map();
 
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
