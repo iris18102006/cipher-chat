@@ -299,6 +299,7 @@ This is a learning project, not Signal.
 - [x] Stream big downloads in Firefox and Safari (a service worker) so the 1 GB cap can go
 - [ ] Delete whole chat conversations for yourself or for everyone.
 - [ ] Delete post comments and edit them.
+- [ ] When viewing images or videos and any other image related chat, there won't be a new window showing it.
 
 so far this project has been worked on daily,
 soon it will be provided with pictures of the app itself after it's done
