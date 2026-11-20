@@ -363,3 +363,48 @@ function renderFeed() {
 
 // ---------- loading ----------
 
+async function loadFeed(older) {
+  if (feed.loading) return;
+  feed.loading = true;
+  feedError("");
+  const tab = feed.tab;
+  try {
+    const q = new URLSearchParams({ tab });
+    if (older && feed.posts.length) q.set("before", String(feed.posts[feed.posts.length - 1].id));
+    const data = await api("/api/feed?" + q);
+    if (tab !== feed.tab || feed.single != null) return; // they moved on while it loaded
+    feed.posts = older ? feed.posts.concat(data.posts) : data.posts;
+    feed.more = data.more;
+    renderFeed();
+  } catch (ex) {
+    feedError(ex.server ? ex.message : "couldn't load the feed, try again");
+  } finally {
+    feed.loading = false;
+  }
+}
+
+async function loadSingle(id) {
+  feedError("");
+  $("feed-list").replaceChildren(el("p", "feed-empty", "loading..."));
+  try {
+    const p = await api("/api/posts/" + id);
+    if (feed.single !== id) return;
+    feed.posts = [p];
+    renderFeed();
+  } catch (ex) {
+    if (feed.single !== id) return;
+    feed.posts = [];
+    $("feed-list").replaceChildren(el("p", "feed-empty", ex.status === 404 ? "This post isn't available to you. It may have been deleted, or it isn't shared with you." : "couldn't load that post, try again"));
+  }
+}
+
+async function loadFeedExtras() {
+  try {
+    const [meta, settings] = await Promise.all([api("/api/feed/meta"), api("/api/settings")]);
+    feed.admin = meta.admin;
+    feed.settings = settings;
+    $("feed-admin").hidden = !meta.admin;
+    if (meta.admin) loadReports();
+  } catch {}
+}
+
