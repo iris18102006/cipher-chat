@@ -169,3 +169,61 @@ function likeLabel(p) {
   return (p.liked ? "\u2665 Liked" : "\u2661 Like") + (p.likes && !p.likes_hidden ? " " + p.likes : "");
 }
 
+function paintEngage(card, p) {
+  const engage = card.querySelector(".feed-engage");
+  // a repost's original is what gets reposted, shared and reported
+  const target = p.is_repost && p.original && !p.original.gone && !p.original.hidden ? p.original : p.is_repost ? null : p;
+  const bar = el("div", "feed-actions");
+
+  const like = plainButton(likeLabel(p), null, p.liked ? "on" : "");
+  like.setAttribute("aria-pressed", String(p.liked));
+  like.onclick = async () => {
+    like.disabled = true;
+    try {
+      Object.assign(p, await sendJson("/api/posts/" + p.id + "/like", p.liked ? "DELETE" : "POST"));
+      paintEngage(card, p);
+    } catch (ex) {
+      feedError(ex.message);
+      like.disabled = false;
+    }
+  };
+  bar.append(like);
+
+  if (target && target.can_repost) {
+    const n = target.reposts ? " " + target.reposts : "";
+    bar.append(plainButton("\u21bb Repost" + n, () => repostDialog(target)));
+  }
+  if (target && target.can_send) bar.append(plainButton("\u2708 Share", () => shareDialog(target)));
+
+  if (p.mine) {
+    bar.append(plainButton("Edit", () => editDialog(p, card)));
+    bar.append(plainButton("Delete", () => deletePost(p), "danger"));
+  } else if (target && !target.mine) {
+    bar.append(plainButton(target.reported ? "Reported" : "Report", () => reportDialog(target, card), "quiet"));
+    if (target.reported) bar.lastChild.disabled = true;
+  }
+  engage.replaceChildren(...[likeSummary(p), bar].filter(Boolean));
+}
+
+async function showLikes(p) {
+  const list = el("div", "likes-list", "loading...");
+  openDialog("Liked by", list);
+  try {
+    const data = await api("/api/posts/" + p.id + "/likes");
+    if (!data.likers.length) return list.replaceChildren(el("p", "list-empty", "Nobody yet."));
+    list.replaceChildren(
+      ...data.likers.map((u) => {
+        const row = plainButton("", () => {
+          openProfile(u.username);
+        }, "likes-row");
+        const who = el("span", "who");
+        who.append(el("b", "", shownName(u)), el("small", "", "@" + u.username));
+        row.append(avatarNode(u, "small"), who);
+        return row;
+      })
+    );
+  } catch (ex) {
+    list.replaceChildren(el("p", "feed-error-text", whyFailed(ex, "couldn't load the list")));
+  }
+}
+
