@@ -444,3 +444,60 @@ body.on-feed #app {
   object-fit: contain;
 }
 
+.feed-pics.n3 img:first-child {
+  grid-column: span 2;
+}
+
+.feed-big {
+  display: block;
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0 auto;
+}
+
+.feed-video {
+  display: block;
+  width: 100%;
+  max-height: 460px;
+  background: #000;
+}
+
+.feed-song {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #f3f6fc;
+  border: 1px solid #7f9db9;
+}
+
+.feed-song audio {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+}
+
+/* ---------- likes and buttons ---------- */
+
+.feed-engage {
+  margin-top: 8px;
+}
+
+.feed-likes {
+  display: block;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  font-weight: normal;
+  color: #555;
+  text-align: left;
+}
+
+.feed-likes.link {
+  color: #0a246a;
+  cursor: pointer;
+}
+
