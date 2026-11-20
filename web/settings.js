@@ -29,3 +29,52 @@ function closeSettings() {
   settingsReturnFocus = null;
 }
 
+// Saves one or more settings, tells the person how it went, and puts the old choice back if it fails.
+async function saveSetting(status, patch) {
+  status.className = "";
+  status.textContent = "saving...";
+  try {
+    const fresh = await api("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (typeof feed !== "undefined") feed.settings = fresh;
+    status.textContent = "saved";
+    return fresh;
+  } catch {
+    status.className = "bad";
+    status.textContent = "couldn't save that, try again";
+    return null;
+  }
+}
+
+// a group of radio buttons that saves when you pick one
+function radioGroup(legend, name, options, current, status, field, after) {
+  const box = el("fieldset");
+  box.append(el("legend", "", legend));
+  for (const [value, label, hint] of options) {
+    const row = el("label", "opt");
+    const input = el("input");
+    input.type = "radio";
+    input.name = name;
+    input.value = value;
+    input.checked = value === current;
+    input.onchange = async () => {
+      const fresh = await saveSetting(status, { [field]: value });
+      if (fresh) {
+        current = value;
+        if (after) after(value);
+      } else {
+        for (const other of box.querySelectorAll("input")) other.checked = other.value === current;
+      }
+    };
+    const text = el("span");
+    text.append(label);
+    text.append(el("small", "", hint));
+    row.append(input, text);
+    box.append(row);
+  }
+  return box;
+}
+
