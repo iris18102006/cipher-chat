@@ -556,3 +556,40 @@ setInterval(() => {
 
 // ---------- for moderators: reported posts ----------
 
+async function loadReports() {
+  const box = $("feed-admin-list");
+  try {
+    const data = await api("/api/admin/reports");
+    $("feed-admin-count").textContent = String(data.reports.length);
+    box.replaceChildren();
+    if (!data.reports.length) return box.append(el("p", "list-empty", "Nothing waiting."));
+    for (const r of data.reports) box.append(reportCard(r));
+  } catch {
+    box.replaceChildren(el("p", "list-empty", "couldn't load the reports"));
+  }
+}
+
+function reportCard(r) {
+  const card = el("div", "admin-report");
+  const reasons = Object.entries(r.reasons).map(([k, n]) => k + " \u00d7" + n).join(", ");
+  card.append(postHead(r.post), ...postBody(r.post));
+  card.append(el("p", "pf-hint", r.reports + " report" + (r.reports === 1 ? "" : "s") + ": " + reasons + (r.hidden ? " (hidden)" : "")));
+  const act = async (path, method) => {
+    try {
+      await sendJson(path, method);
+      loadReports();
+      if (feed.single == null) loadFeed(false);
+    } catch (ex) {
+      feedError(ex.message);
+    }
+  };
+  const row = el("div", "feed-actions");
+  row.append(
+    plainButton("Keep it", () => act("/api/admin/posts/" + r.post.id + "/keep", "POST")),
+    plainButton("Remove it", () => confirm("Delete this post for good?") && act("/api/admin/posts/" + r.post.id, "DELETE"), "danger")
+  );
+  card.append(row);
+  return card;
+}
+
+// routeFromHash() is called at the end of feed-compose.js, once the writing box exists
