@@ -558,3 +558,59 @@ body.on-feed #app {
   border: 1px solid #e0a060;
 }
 
+/* ---------- little windows on top of the page ---------- */
+
+.dlg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 10px;
+  overflow-y: auto;
+  background: rgba(10, 25, 55, 0.65);
+}
+
+.dlg-card {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border: 2px solid #7f9db9;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.dlg-card.wide {
+  max-width: 640px;
+}
+
+.dlg-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(#2a5da8, #17407f);
+  border-bottom: 3px solid #ff9933;
+}
+
+.dlg-x {
+  padding: 0 8px;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.dlg-body {
+  padding: 12px;
+}
+
+.dlg-body .opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
