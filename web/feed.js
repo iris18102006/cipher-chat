@@ -408,3 +408,37 @@ async function loadFeedExtras() {
   } catch {}
 }
 
+// ---------- the page: opening, closing, tabs ----------
+
+function setNewCount(n) {
+  feed.newCount = n;
+  const badge = $("feed-count-new");
+  badge.textContent = String(n);
+  badge.hidden = n === 0;
+  const pill = $("feed-new");
+  pill.hidden = n === 0 || !feed.open || feed.single != null;
+  pill.textContent = n === 1 ? "1 new post, show it" : n + " new posts, show them";
+}
+
+function paintTabs() {
+  for (const b of document.querySelectorAll("#feed-tabs button")) {
+    const on = b.dataset.tab === feed.tab && feed.single == null;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  }
+  $("feed-compose-box").hidden = feed.single != null;
+  $("feed-tabs").hidden = feed.single != null;
+  $("feed-back-feed").hidden = feed.single == null;
+  $("feed-title").textContent = feed.single != null ? "Post" : "Feed";
+}
+
+function showPage() {
+  if (!feed.open) {
+    feed.open = true;
+    document.body.classList.add("on-feed");
+    $("feed-page").hidden = false;
+    $("feed-btn").classList.add("on");
+    loadFeedExtras();
+  }
+}
+
