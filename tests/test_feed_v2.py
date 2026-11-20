@@ -309,3 +309,53 @@ def test_settings_round_trip(client):
 
 # ---------- GIFs ----------
 
+def test_gif_library(client):
+    a, b, c = trio(client)
+    gif = make_image("GIF", frames=3)
+    raw = gif.getvalue() if hasattr(gif, "getvalue") else gif
+    r = a.post("/api/me/gifs", content=raw)
+    assert r.status_code == 200 and len(r.json()["gifs"]) == 1 and r.json()["gifs"][0]["animated"]
+    url = r.json()["gifs"][0]["url"]
+    assert a.get(url).headers["content-type"] == "image/gif"
+    assert a.post("/api/me/gifs", content=b"nope").status_code == 400
+    gid = r.json()["gifs"][0]["id"]
+    assert b.delete(f"/api/me/gifs/{gid}").status_code == 404
+    assert a.delete(f"/api/me/gifs/{gid}").json()["gifs"] == []
+
+
+def test_gif_search_needs_a_key_and_goes_through_the_server(client, monkeypatch):
+    a, b, c = trio(client)
+    assert a.get("/api/gifs/status").json()["search"] is False
+    assert a.get("/api/gifs/search?q=cat").status_code == 404
+    monkeypatch.setenv("CIPHER_GIPHY_KEY", "test")
+    seen = {}
+    def fake_api(path, params):
+        seen.update(path=path, **params)
+        return {"data": [
+            {"id": "abc123", "title": "a cat", "images": {
+                "fixed_width_small": {"url": "https://media2.giphy.com/media/abc123/100w.gif", "width": "100", "height": "60"},
+                "downsized": {"url": "https://media2.giphy.com/media/abc123/giphy.gif"}}},
+            {"id": "evil1", "images": {"fixed_width": {"url": "https://evil.example/x.gif"}, "downsized": {"url": "http://169.254.169.254/"}}},
+        ]}
+    fetched = []
+    def fake_media(url):
+        fetched.append(url)
+        return b"GIF89a" + b"\x00" * 20, "image/gif"
+    monkeypatch.setattr(gifs, "_api", fake_api)
+    monkeypatch.setattr(gifs, "_media", fake_media)
+    r = a.get("/api/gifs/search?q=cat").json()
+    assert seen["path"] == "search" and seen["q"] == "cat" and seen["limit"] == gifs.PAGE
+    assert [g["id"] for g in r["gifs"]] == ["abc123"]  # the one with a foreign address is dropped
+    assert a.get(r["gifs"][0]["preview"]).status_code == 200
+    assert a.get("/api/gifs/media/abc123/full").status_code == 200
+    assert fetched[1] == "https://media2.giphy.com/media/abc123/giphy.gif"
+    assert a.get("/api/gifs/media/neverseen/full").status_code == 404
+    assert a.get("/api/gifs/media/abc123/huge").status_code == 404
+    a.get("/api/gifs/search")
+    assert seen["path"] == "trending"
+
+
+def test_gif_media_host_allow_list():
+    for bad in ("http://media.giphy.com/x.gif", "https://giphy.com.evil.com/x.gif", "https://127.0.0.1/x", "file:///etc/passwd"):
+        with pytest.raises(OSError):
+            gifs._media(bad)
