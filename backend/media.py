@@ -206,3 +206,46 @@ async def upload_post_media(request: Request, user=Depends(current_user), conn=D
     return media_json(row)
 
 
+@router.delete("/api/post-media/{media_id}")
+def delete_draft(media_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    """Throw away a file that isn't on a post yet. (A file on a post goes when the post is edited.)"""
+    cur = conn.execute(
+        "DELETE FROM post_media WHERE id = ? AND owner_id = ? AND post_id IS NULL", (media_id, user["id"])
+    )
+    conn.commit()
+    if not cur.rowcount:
+        raise HTTPException(404, "no such file")
+    return {"ok": True}
+
+
+@router.get("/api/post-media/{media_id}")
+def get_post_media(media_id: int, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        "SELECT owner_id, post_id, kind, mime, LENGTH(data) AS size FROM post_media WHERE id = ?", (media_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "no such file")
+    if row["owner_id"] != user["id"]:
+        # somebody else's file: only through a post they can see (or a reported one, for a moderator).
+        # The answer is the same "no such file" whichever way it fails
+        if row["post_id"] is None:
+            raise HTTPException(404, "no such file")
+        viewer = Viewer(conn, user)
+        if not viewer.row(row["post_id"]) and not (viewer.admin and viewer.has_reports(row["post_id"])):
+            raise HTTPException(404, "no such file")
+    size = row["size"]
+    piece = byte_range(request.headers.get("range", ""), size)
+    if piece is None:
+        data = conn.execute("SELECT data FROM post_media WHERE id = ?", (media_id,)).fetchone()["data"]
+        return Response(content=bytes(data), media_type=row["mime"], headers=MEDIA_HEADERS)
+    start, end = piece
+    # substr on a blob counts bytes and starts at 1, so only the asked-for piece is read
+    data = conn.execute(
+        "SELECT SUBSTR(data, ?, ?) AS part FROM post_media WHERE id = ?", (start + 1, end - start + 1, media_id)
+    ).fetchone()["part"]
+    return Response(
+        content=bytes(data),
+        status_code=206,
+        media_type=row["mime"],
+        headers={**MEDIA_HEADERS, "Content-Range": f"bytes {start}-{end}/{size}"},
+    )
