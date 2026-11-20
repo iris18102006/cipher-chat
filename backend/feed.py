@@ -128,3 +128,49 @@ def engagement(viewer: Viewer, row) -> dict:
     }
 
 
+def plain_post(viewer: Viewer, row, media_map: dict) -> dict:
+    mine = row["author_id"] == viewer.id
+    open_post = row["audience"] == "friends" and not row["hidden"]
+    return {
+        "id": row["id"],
+        "author": person(row),
+        "body": row["body"],
+        "created_at": row["created_at"],
+        "edited": row["edited_at"] is not None,
+        "audience": row["audience"],
+        "mine": mine,
+        "hidden": bool(row["hidden"]) and mine,  # only the author is told it is hidden
+        "reported": bool(row["reported"]),
+        "reposts": row["reposts"],
+        "media": media_map.get(row["id"], []),
+        # only posts for all friends can leave the circle they were made for, and only if the author allows it
+        "can_repost": open_post and bool(row["allow_reposts"]),
+        "can_send": open_post and bool(row["allow_chat_shares"]),
+        **engagement(viewer, row),
+    }
+
+
+def post_dicts(viewer: Viewer, rows) -> list[dict]:
+    """Posts for the browser. For a repost, `original` is the post it points at, or says why it can't be shown."""
+    originals: dict = {}
+    for r in rows:
+        if r["is_share"] and r["shared_id"] is not None and r["shared_id"] not in originals:
+            originals[r["shared_id"]] = viewer.row(r["shared_id"])
+    ids = [r["id"] for r in rows] + [o["id"] for o in originals.values() if o]
+    media_map = media.media_for(viewer.conn, ids)
+    out = []
+    for r in rows:
+        d = plain_post(viewer, r, media_map)
+        d["is_repost"] = bool(r["is_share"])
+        if d["is_repost"]:
+            if r["shared_id"] is None:
+                d["original"] = {"gone": True}
+            elif originals[r["shared_id"]] is None:
+                # it was reposted to you, but it isn't yours to read: say nothing about it
+                d["original"] = {"hidden": True}
+            else:
+                d["original"] = plain_post(viewer, originals[r["shared_id"]], media_map)
+        out.append(d)
+    return out
+
+
