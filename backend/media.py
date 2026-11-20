@@ -165,3 +165,44 @@ def clear_old_drafts(conn, user_id: int):
     )
 
 
+@router.post("/api/post-media")
+async def upload_post_media(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    key = str(user["id"])
+    if upload_limiter.blocked(key):
+        raise HTTPException(429, "slow down, you've uploaded a lot in the last few minutes")
+    clear_old_drafts(conn, user["id"])
+    drafts = conn.execute(
+        "SELECT COUNT(*) FROM post_media WHERE owner_id = ? AND post_id IS NULL", (user["id"],)
+    ).fetchone()[0]
+    if drafts >= DRAFT_LIMIT:
+        raise HTTPException(400, "post what you have first, or remove some of those files")
+    raw = await read_body(request, MAX_VIDEO_UPLOAD)
+    found = classify(raw)
+    if not found:
+        raise HTTPException(400, TYPES_TEXT)
+    kind, mime = found
+    if kind == "image" and len(raw) > MAX_PHOTO_UPLOAD:
+        raise HTTPException(413, f"that picture is too big (max {MAX_PHOTO_UPLOAD // (1024 * 1024)} MB)")
+    if kind == "audio" and len(raw) > MAX_SONG_UPLOAD:
+        raise HTTPException(413, f"that song is too big (max {MAX_SONG_UPLOAD // (1024 * 1024)} MB)")
+    width = height = animated = 0
+    data = raw
+    if kind == "image":
+        img = await run_in_threadpool(process_image, raw, "post")
+        reason = await run_in_threadpool(moderation.check_image, img["data"])
+        if reason:
+            raise HTTPException(400, reason)
+        mime, data = img["mime"], img["data"]
+        width, height, animated = img["width"], img["height"], img["animated"]
+    upload_limiter.hit(key)
+    cur = conn.execute(
+        "INSERT INTO post_media (owner_id, kind, mime, data, width, height, animated) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user["id"], kind, mime, data, width, height, animated),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, kind, mime, width, height, animated FROM post_media WHERE id = ?", (cur.lastrowid,)
+    ).fetchone()
+    return media_json(row)
+
+
