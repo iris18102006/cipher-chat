@@ -56,3 +56,58 @@ body.on-feed #app {
   cursor: pointer;
 }
 
+#feed-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  background: #ece9d8;
+  border: 2px solid #0a246a;
+  border-top: 0;
+}
+
+#feed-main {
+  flex: 1;
+  min-width: 0;
+}
+
+#feed-side {
+  width: 220px;
+  flex: none;
+  position: sticky;
+  top: 0;
+}
+
+.side-box {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #aca899;
+  border-top: 4px solid #ff9933;
+}
+
+.side-box h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #0a246a;
+}
+
+.side-box ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #444;
+}
+
+.side-box li {
+  margin-bottom: 4px;
+}
+
+#feed-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
