@@ -781,6 +781,10 @@ h2 {
 }
 
 #settings-status {
+  position: sticky;
+  bottom: -12px;
+  padding: 4px 0;
+  background: #fff;
   min-height: 16px;
   margin: 0;
   font-size: 11px;
