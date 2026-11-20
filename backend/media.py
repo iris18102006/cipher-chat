@@ -83,3 +83,34 @@ def classify(raw: bytes) -> tuple[str, str] | None:
     return None
 
 
+def media_json(row) -> dict:
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "url": f"/api/post-media/{row['id']}",
+        "mime": row["mime"],
+        "width": row["width"],
+        "height": row["height"],
+        "animated": bool(row["animated"]),
+    }
+
+
+# ---------- used by feed.py ----------
+
+
+def media_for(conn, post_ids: list[int]) -> dict[int, list[dict]]:
+    """post id -> the files on it, in order."""
+    if not post_ids:
+        return {}
+    marks = ",".join("?" * len(post_ids))
+    rows = conn.execute(
+        f"SELECT id, post_id, kind, mime, width, height, animated FROM post_media "
+        f"WHERE post_id IN ({marks}) ORDER BY post_id, position, id",
+        post_ids,
+    ).fetchall()
+    out: dict[int, list[dict]] = {}
+    for r in rows:
+        out.setdefault(r["post_id"], []).append(media_json(r))
+    return out
+
+
