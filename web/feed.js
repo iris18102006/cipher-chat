@@ -296,3 +296,44 @@ function repostDialog(target) {
   const dlg = openDialog("Repost", form);
 }
 
+function reportDialog(target, card) {
+  const form = el("form", "feed-report-form");
+  form.append(el("p", "pf-hint", "Why are you reporting this? When enough people report a post it is hidden until somebody looks at it. The author isn't told who reported."));
+  let chosen = "";
+  const go = el("button", "fc-submit", "Report");
+  go.type = "submit";
+  go.disabled = true;
+  for (const [value, name] of REPORT_REASONS) {
+    const row = el("label", "opt");
+    const input = el("input");
+    input.type = "radio";
+    input.name = "report-reason";
+    input.value = value;
+    input.onchange = () => {
+      chosen = value;
+      go.disabled = false;
+    };
+    row.append(input, el("span", "", name));
+    form.append(row);
+  }
+  const err = el("p", "fc-error");
+  err.hidden = true;
+  form.append(err, go);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    go.disabled = true;
+    try {
+      await sendJson("/api/posts/" + target.id + "/report", "POST", { reason: chosen });
+      target.reported = true;
+      dlg.close();
+      renderFeed();
+      toast("Thanks, it's been reported");
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+      go.disabled = false;
+    }
+  };
+  const dlg = openDialog("Report this post", form);
+}
+
