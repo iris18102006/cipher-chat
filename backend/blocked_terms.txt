@@ -1,0 +1,7 @@
+# Extra words and phrases that can't be used in a post (one per line, lines starting with # are ignored).
+# They are matched as whole words and it doesn't matter if they are written in capitals.
+# The server reads this file when it starts, so restart it after changing the list.
+#
+# Keep it short and careful: a list that is too eager blocks normal people.
+# Example (remove the # to use it):
+# some bad phrase
