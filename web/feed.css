@@ -1,53 +1,53 @@
-/* The feed window. A proper little desktop-program window, not a modal in a hurry:
-   blue title bar, a bulletin-board header, cards that look like 2000s forum posts. */
+/* The feed page. It takes the place of the chat while it is open: a bulletin board with a blue
+   title bar, a wide column of posts and a narrow side column. */
 
-#feed-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 28px 10px;
-  overflow-y: auto;
-  background: rgba(10, 25, 55, 0.65);
-}
-
-#feed-overlay[hidden] {
+body.on-feed #app {
   display: none;
 }
 
-#feed-window {
+#feed-page {
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  max-width: 640px;
-  background: #ece9d8;
-  border: 3px solid #0a246a;
-  border-radius: 8px 8px 3px 3px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
-  padding: 0 0 12px;
+  max-width: 980px;
+  margin: 10px auto;
+  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+#feed-page[hidden] {
+  display: none;
+}
+
+#feed-btn.on {
+  background: linear-gradient(#fff4c4, #ffc94a);
 }
 
 #feed-bar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 6px 5px 12px;
-  border-radius: 4px 4px 0 0;
+  padding: 5px 8px 5px 12px;
+  border: 2px solid #0a246a;
+  border-radius: 6px 6px 0 0;
   background: linear-gradient(#3a7bd5, #0a4bbf 55%, #0a3a9a);
   color: #fff;
-  font-weight: bold;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
 }
 
-#feed-title {
+#feed-bar #feed-title {
   flex: 1;
+  margin: 0;
+  padding: 0;
+  background: none;
+  font-size: 14px;
   letter-spacing: 0.5px;
 }
 
 #feed-bar button {
-  min-width: 26px;
   height: 24px;
-  padding: 0 6px;
+  padding: 0 8px;
   border: 1px solid #fff;
   border-radius: 4px;
   background: linear-gradient(#e8f0ff, #9db8ea);
@@ -56,280 +56,3 @@
   cursor: pointer;
 }
 
-#feed-close {
-  background: linear-gradient(#f6a590, #d3472b) !important;
-  color: #fff !important;
-}
-
-#feed-compose {
-  margin: 12px 12px 0;
-  padding: 10px;
-  background: #fff;
-  border: 2px inset #aca899;
-}
-
-.feed-label {
-  display: block;
-  margin-bottom: 4px;
-  font-weight: bold;
-  color: #0a246a;
-}
-
-#feed-text {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  min-height: 60px;
-  max-height: 220px;
-  padding: 6px;
-  font: inherit;
-  border: 1px solid #7f9db9;
-}
-
-#feed-compose-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 6px;
-}
-
-#feed-hint {
-  flex: 1;
-  font-size: 11px;
-  color: #888;
-}
-
-#feed-chars {
-  margin-right: 10px;
-  font-size: 11px;
-  color: #666;
-}
-
-#feed-chars.low {
-  color: #a33;
-  font-weight: bold;
-}
-
-#feed-post {
-  padding: 4px 18px;
-  border: 2px outset #fff;
-  border-radius: 4px;
-  background: linear-gradient(#fff4c4, #ffc94a);
-  color: #4a2f00;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-#feed-post:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-#feed-error {
-  margin: 8px 12px 0;
-  color: #a33;
-  font-weight: bold;
-}
-
-#feed-new {
-  display: block;
-  margin: 10px auto 0;
-  padding: 4px 16px;
-  border: 1px solid #0a246a;
-  border-radius: 12px;
-  background: #fff7c2;
-  color: #0a246a;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-#feed-list {
-  margin: 10px 12px 0;
-}
-
-#feed-more {
-  display: block;
-  margin: 10px auto 0;
-  padding: 5px 18px;
-  cursor: pointer;
-}
-
-.feed-empty {
-  padding: 22px 10px;
-  text-align: center;
-  color: #555;
-  font-style: italic;
-}
-
-/* ---------- one post ---------- */
-
-.feed-post {
-  margin-bottom: 10px;
-  padding: 10px;
-  background: #fff;
-  border: 1px solid #aca899;
-  border-left: 5px solid #3a7bd5;
-  border-radius: 3px;
-  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.12);
-}
-
-.feed-post.mine {
-  border-left-color: #ff9933;
-}
-
-.feed-post.is-new {
-  animation: feed-flash 1.6s ease-out;
-}
-
-@keyframes feed-flash {
-  from { background: #fff7c2; }
-  to { background: #fff; }
-}
-
-.feed-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.feed-head .pf-avatar {
-  flex: none;
-  cursor: pointer;
-}
-
-.feed-who {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.2;
-}
-
-.feed-who b {
-  cursor: pointer;
-  color: #0a246a;
-}
-
-.feed-who b:hover {
-  text-decoration: underline;
-}
-
-.feed-who small {
-  display: block;
-  color: #666;
-  font-size: 11px;
-}
-
-.feed-body {
-  margin: 8px 0 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.feed-shared-tag {
-  font-size: 11px;
-  color: #666;
-  margin-left: 4px;
-}
-
-/* the post that was shared, inside the share */
-.feed-original {
-  margin-top: 8px;
-  padding: 8px;
-  background: #f3f6fc;
-  border: 1px dashed #7f9db9;
-}
-
-.feed-original.is-note {
-  color: #666;
-  font-style: italic;
-}
-
-.feed-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.feed-actions button {
-  padding: 2px 10px;
-  border: 1px solid #aca899;
-  border-radius: 10px;
-  background: #f6f4ea;
-  color: #333;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.feed-actions button:hover {
-  background: #fff7c2;
-}
-
-.feed-actions button.on {
-  border-color: #d3472b;
-  color: #d3472b;
-  font-weight: bold;
-}
-
-.feed-actions .danger {
-  margin-left: auto;
-  color: #a33;
-}
-
-.feed-actions button:focus-visible,
-#feed-bar button:focus-visible,
-#feed-post:focus-visible,
-#feed-more:focus-visible,
-#feed-new:focus-visible {
-  outline: 2px solid #0a246a;
-  outline-offset: 2px;
-}
-
-/* the little form that opens when you press Share */
-.feed-share-form {
-  margin-top: 8px;
-  padding: 8px;
-  background: #fffbe6;
-  border: 1px solid #e0c060;
-}
-
-.feed-share-form textarea {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 44px;
-  font: inherit;
-  border: 1px solid #7f9db9;
-}
-
-.feed-share-form .row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin-top: 6px;
-}
-
-.feed-share-form .err {
-  color: #a33;
-  font-size: 12px;
-}
-
-@media (max-width: 520px) {
-  #feed-overlay {
-    padding: 0;
-  }
-
-  #feed-window {
-    border-radius: 0;
-    min-height: 100%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .feed-post.is-new {
-    animation: none;
-  }
-}
-
-/* a profile opened from a post has to open on top of the feed window */
-#profile-overlay {
-  z-index: 65;
-}
