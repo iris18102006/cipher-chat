@@ -252,3 +252,40 @@ def edit_post(post_id: int, body: EditBody, user=Depends(current_user), conn=Dep
     return one_post(viewer, viewer.row(post_id))
 
 
+@router.delete("/api/posts/{post_id}")
+def delete_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute("SELECT author_id FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if not row or row["author_id"] != user["id"]:
+        raise HTTPException(404, "no such post")
+    conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    conn.commit()
+    return {"ok": True}
+
+
+# ---------- reading ----------
+
+
+@router.get("/api/feed")
+def get_feed(
+    before: int | None = None,
+    limit: int = Query(FEED_PAGE, ge=1, le=50),
+    tab: str = Query("all", pattern="^(all|close|mine)$"),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    """Newest first. `before` is the id of the oldest post you already have.
+    tab: all = everything you can see, close = posts for close friends, mine = your own."""
+    viewer = Viewer(conn, user)
+    extra = ""
+    if tab == "close":
+        extra = " AND p.audience = 'close'"
+    elif tab == "mine":
+        extra = " AND p.author_id = :me"
+    rows = conn.execute(
+        POST_SELECT + f" WHERE {viewer.clause}{extra} AND (:before IS NULL OR p.id < :before) "
+        "ORDER BY p.id DESC LIMIT :limit",
+        viewer.args(before=before, limit=limit + 1),
+    ).fetchall()
+    return {"posts": post_dicts(viewer, rows[:limit]), "more": len(rows) > limit}
+
+
