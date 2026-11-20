@@ -1,5 +1,5 @@
 # cipher-chat 
-
+ 
 End-to-end encrypted web chat with a 2000s social-site look. Work in progress.
 
 The server only ever sees ciphertext. Keys are generated in your browser and the private key never leaves it.
