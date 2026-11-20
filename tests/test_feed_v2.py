@@ -224,3 +224,37 @@ def test_blocked_people_are_left_out_of_liked_by(client):
     assert {p["username"] for p in a.get(f"/api/posts/{pid}/likes").json()["likers"]} == {"bob", "carol"}
 
 
+# ---------- repost and chat share rules ----------
+
+def test_only_open_posts_can_be_reposted_or_sent(client):
+    a, b, c = trio(client)
+    close = post(a, "x", audience="close").json()
+    assert close["can_repost"] is False and close["can_send"] is False
+    open_ = post(a, "y").json()
+    assert open_["can_repost"] and open_["can_send"]
+    a.put("/api/close-friends", json={"usernames": ["bob"]})
+    assert b.post(f"/api/posts/{close['id']}/repost", json={}).status_code == 403
+    assert b.post(f"/api/posts/{open_['id']}/repost", json={}).status_code == 200
+
+
+def test_author_can_switch_reposts_and_sending_off(client):
+    a, b, c = trio(client)
+    a.put("/api/settings", json={"allow_reposts": False, "allow_chat_shares": False})
+    p = post(a, "x").json()
+    seen = b.get(f"/api/posts/{p['id']}").json()
+    assert seen["can_repost"] is False and seen["can_send"] is False
+    assert b.post(f"/api/posts/{p['id']}/repost", json={}).status_code == 403
+
+
+def test_repost_note_is_checked_and_original_audience_change_hides_it(client):
+    a, b, c = trio(client)
+    pid = post(a, "orig").json()["id"]
+    assert b.post(f"/api/posts/{pid}/repost", json={"body": "kys"}).status_code == 400
+    rp = b.post(f"/api/posts/{pid}/repost", json={"body": "nice"}).json()
+    a.patch(f"/api/posts/{pid}", json={"audience": "me"})
+    again = b.get(f"/api/posts/{rp['id']}").json()
+    assert again["original"] == {"hidden": True}
+
+
+# ---------- reports ----------
+
