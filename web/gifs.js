@@ -77,3 +77,88 @@ function gifTile(src, label, onPick, onRemove) {
   return wrap;
 }
 
+function paintGifs() {
+  const panel = gifPanel();
+  const tabs = el("div", "gif-tabs");
+  if (gifs.search) {
+    const s = plainButton("Search", () => {
+      gifs.tab = "search";
+      paintGifs();
+      runSearch(false);
+    }, gifs.tab === "search" ? "on" : "");
+    tabs.append(s);
+  }
+  tabs.append(plainButton("My GIFs (" + gifs.mine.length + ")", () => {
+    gifs.tab = "mine";
+    paintGifs();
+  }, gifs.tab === "mine" ? "on" : ""));
+  tabs.append(plainButton("\u00d7", closeGifs, "gif-close"));
+  tabs.lastChild.setAttribute("aria-label", "close the GIF picker");
+  const body = el("div", "gif-body");
+  if (gifs.tab === "search") {
+    const input = el("input", "gif-search");
+    input.type = "search";
+    input.placeholder = "search GIFs...";
+    input.value = gifs.query;
+    input.setAttribute("aria-label", "search GIFs");
+    input.oninput = () => {
+      gifs.query = input.value;
+      clearTimeout(gifs.timer);
+      gifs.timer = setTimeout(() => runSearch(false), 350);
+    };
+    const grid = el("div", "gif-grid");
+    grid.id = "gif-grid";
+    const more = plainButton("More", () => runSearch(true), "gif-more");
+    more.id = "gif-more";
+    more.hidden = true;
+    body.append(input, grid, more, el("p", "gif-credit", "Powered by GIPHY"));
+  } else {
+    const bar = el("div", "gif-bar");
+    const file = el("input");
+    file.type = "file";
+    file.accept = "image/gif,image/webp,image/png,image/jpeg";
+    file.multiple = true;
+    file.hidden = true;
+    const add = plainButton("+ Add a GIF", () => file.click());
+    add.disabled = gifs.mine.length >= gifs.max;
+    const note = el("span", "gif-note", gifs.mine.length + " of " + gifs.max + " kept. GIFs you add stay in your library.");
+    file.onchange = async () => {
+      const picked = [...file.files];
+      file.value = "";
+      add.disabled = true;
+      for (const f of picked) {
+        const why = checkPicture(f, 4);
+        if (why) {
+          toast(why);
+          continue;
+        }
+        try {
+          const data = await sendFile("/api/me/gifs", "POST", f);
+          gifs.mine = data.gifs;
+        } catch (ex) {
+          toast(ex.message);
+          break;
+        }
+      }
+      paintGifs();
+    };
+    bar.append(add, file, note);
+    const grid = el("div", "gif-grid");
+    if (!gifs.mine.length) grid.append(el("p", "list-empty", "No GIFs yet. Add some, then send them to anyone in a chat."));
+    for (const g of gifs.mine) {
+      grid.append(
+        gifTile(g.url, "", () => sendGif(g.url), async () => {
+          try {
+            gifs.mine = (await sendJson("/api/me/gifs/" + g.id, "DELETE")).gifs;
+            paintGifs();
+          } catch (ex) {
+            toast(ex.message);
+          }
+        })
+      );
+    }
+    body.append(bar, grid);
+  }
+  panel.replaceChildren(tabs, body);
+}
+
