@@ -27,3 +27,31 @@ function mediaKindOf(file) {
   return null;
 }
 
+// one upload, with progress (fetch can't tell how far an upload got)
+function uploadPostMedia(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/post-media");
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      let data = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {}
+      if (xhr.status === 401) {
+        location.href = "/login.html";
+        reject(new Error("not logged in"));
+      } else if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        reject(new Error(typeof data.detail === "string" ? data.detail : "that file didn't upload, try again"));
+      }
+    };
+    xhr.onerror = () => reject(new Error("couldn't upload that, check your connection"));
+    xhr.send(file);
+  });
+}
+
