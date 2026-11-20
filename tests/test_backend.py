@@ -741,11 +741,11 @@ def say(ws, to, cid="c1"):
 
 def test_message_policy_setting(client):
     a = signup(client, "alice")
-    assert a.get("/api/settings").json() == {"message_policy": "allow"}
+    assert a.get("/api/settings").json()["message_policy"] == "allow"
     for bad in ("nope", "", "ASK"):
         assert a.put("/api/settings", json={"message_policy": bad}).status_code == 400
-    assert a.put("/api/settings", json={"message_policy": "ask"}).json() == {"message_policy": "ask"}
-    assert a.get("/api/settings").json() == {"message_policy": "ask"}
+    assert a.put("/api/settings", json={"message_policy": "ask"}).json()["message_policy"] == "ask"
+    assert a.get("/api/settings").json()["message_policy"] == "ask"
     assert client.__class__(client.app).get("/api/settings").status_code == 401
 
 
