@@ -59,3 +59,16 @@ function openDialog(title, content, opts) {
   return dlg;
 }
 
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !dialogStack.length) return;
+  e.stopImmediatePropagation();
+  dialogStack[dialogStack.length - 1].close();
+}, true);
+
+// a button that is a button (type="button" so it never submits a form by accident)
+function plainButton(label, onClick, cls) {
+  const b = el("button", cls || "", label);
+  b.type = "button";
+  if (onClick) b.onclick = onClick;
+  return b;
+}
