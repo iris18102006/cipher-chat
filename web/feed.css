@@ -387,3 +387,60 @@ body.on-feed #app {
   border-color: #999;
 }
 
+.feed-body {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feed-shared-tag {
+  font-size: 11px;
+  color: #666;
+  margin-left: 4px;
+}
+
+/* the post that was reposted, inside the repost */
+.feed-original {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f3f6fc;
+  border: 1px dashed #7f9db9;
+}
+
+.feed-original.is-note {
+  color: #666;
+  font-style: italic;
+}
+
+/* ---------- pictures, video, music ---------- */
+
+.feed-media {
+  margin-top: 8px;
+}
+
+.feed-pics {
+  display: grid;
+  gap: 3px;
+  grid-template-columns: 1fr;
+}
+
+.feed-pics.n2,
+.feed-pics.n3,
+.feed-pics.n4 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.feed-pics img {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: cover;
+  background: #dde;
+  cursor: zoom-in;
+}
+
+.feed-pics.n1 img {
+  max-height: 460px;
+  object-fit: contain;
+}
+
