@@ -134,3 +134,47 @@ def test_not_a_picture_is_refused(client):
     assert a.post("/api/post-media", content=b"GIF89a" + b"junk" * 100).status_code == 400
 
 
+def test_video_and_song_sniffing_and_ranges(client):
+    a, b, c = trio(client)
+    video = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 2000
+    v = a.post("/api/post-media", content=video).json()
+    assert v["kind"] == "video" and v["mime"] == "video/mp4"
+    song = b"ID3" + b"\x03\x00" + b"\x00" * 300
+    s = a.post("/api/post-media", content=song).json()
+    assert s["kind"] == "audio"
+    p = post(a, "", media=[v["id"], s["id"]])
+    assert p.status_code == 200
+    part = b.get(v["url"], headers={"Range": "bytes=4-7"})
+    assert part.status_code == 206 and part.content == b"ftyp"
+    # an m4a song says M4A, so it isn't taken for a video
+    m4a = a.post("/api/post-media", content=b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 300).json()
+    assert m4a["kind"] == "audio"
+
+
+def test_media_mix_rules(client):
+    a, b, c = trio(client)
+    video = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 2000
+    v = a.post("/api/post-media", content=video).json()
+    i = png(a)
+    assert post(a, "", media=[v["id"], i["id"]]).status_code == 400
+    five = [png(a)["id"] for _ in range(5)]
+    assert post(a, "", media=five).status_code == 400
+    assert post(a, "", media=[99999]).status_code == 400
+
+
+def test_edit_swaps_media_and_removes_the_old(client):
+    a, b, c = trio(client)
+    one, two = png(a), png(a)
+    pid = post(a, "x", media=[one["id"]]).json()["id"]
+    e = a.patch(f"/api/posts/{pid}", json={"media": [two["id"]]}).json()
+    assert [m["id"] for m in e["media"]] == [two["id"]] and e["edited"]
+    assert a.get(one["url"]).status_code == 404
+
+
+def test_draft_limit_and_delete(client):
+    a, b, c = trio(client)
+    m = png(a)
+    assert a.delete(f"/api/post-media/{m['id']}").status_code == 200
+    assert a.delete(f"/api/post-media/{m['id']}").status_code == 404
+
+
