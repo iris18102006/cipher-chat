@@ -198,3 +198,35 @@ def library(conn, user_id: int) -> dict:
     }
 
 
+@router.get("/api/me/gifs")
+def my_gifs(user=Depends(current_user), conn=Depends(get_conn)):
+    return library(conn, user["id"])
+
+
+@router.post("/api/me/gifs")
+async def add_gif(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    have = conn.execute("SELECT COUNT(*) FROM images WHERE owner_id = ? AND kind = 'gif'", (user["id"],)).fetchone()[0]
+    if have >= MAX_GIFS:
+        raise HTTPException(400, f"you can keep up to {MAX_GIFS} GIFs, remove one first")
+    raw = await read_body(request, MAX_GIF_UPLOAD)
+    img = await run_in_threadpool(process_image, raw, "gif")
+    reason = await run_in_threadpool(moderation.check_image, img["data"])
+    if reason:
+        raise HTTPException(400, reason)
+    conn.execute(
+        "INSERT INTO images (owner_id, kind, mime, data, width, height, animated) VALUES (?, 'gif', ?, ?, ?, ?, ?)",
+        (user["id"], img["mime"], img["data"], img["width"], img["height"], img["animated"]),
+    )
+    conn.commit()
+    return library(conn, user["id"])
+
+
+@router.delete("/api/me/gifs/{image_id}")
+def remove_gif(image_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    cur = conn.execute(
+        "DELETE FROM images WHERE id = ? AND owner_id = ? AND kind = 'gif'", (image_id, user["id"])
+    )
+    conn.commit()
+    if not cur.rowcount:
+        raise HTTPException(404, "no such GIF")
+    return library(conn, user["id"])
