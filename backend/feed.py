@@ -331,3 +331,48 @@ def like_state(conn, post_id: int, user) -> dict:
     return engagement(viewer, need_post(viewer, post_id))
 
 
+@router.get("/api/posts/{post_id}/likes")
+def post_likes(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    """Everybody who liked it, if the author lets this person see the names."""
+    viewer = Viewer(conn, user)
+    row = need_post(viewer, post_id)
+    if row["author_id"] != viewer.id and row["likes_visibility"] != "everyone":
+        raise HTTPException(403, "the author keeps the names of who liked this private")
+    people = likers(viewer, post_id)
+    return {"count": len(people), "likers": people}
+
+
+# ---------- reposting ----------
+
+
+@router.post("/api/posts/{post_id}/repost")
+async def repost_post(post_id: int, body: RepostBody, user=Depends(current_user), conn=Depends(get_conn)):
+    viewer = Viewer(conn, user)
+    target = need_post(viewer, post_id)
+    # reposting a repost reposts what it points at, so a chain of reposts is never longer than one
+    if target["is_share"]:
+        if target["shared_id"] is None:
+            raise HTTPException(404, "that post is gone")
+        target = need_post(viewer, target["shared_id"])
+    if target["audience"] != "friends":
+        raise HTTPException(403, "that post is only for a few people, so it can't be reposted")
+    if not target["allow_reposts"]:
+        raise HTTPException(403, "the author doesn't let people repost their posts")
+    note = clean_words(body.body, NOTE_LIMIT, "note")
+    audience = pick_audience(conn, user, body.audience)
+    already = conn.execute(
+        "SELECT 1 FROM posts WHERE author_id = ? AND shared_id = ?", (user["id"], target["id"])
+    ).fetchone()
+    if already:
+        raise HTTPException(409, "you already reposted that")
+    check_rate(user["id"])
+    cur = conn.execute(
+        "INSERT INTO posts (author_id, body, shared_id, is_share, audience) VALUES (?, ?, ?, 1, ?)",
+        (user["id"], note, target["id"], audience),
+    )
+    conn.commit()
+    await tell_friends(conn, user, cur.lastrowid, audience)
+    viewer = Viewer(conn, user)
+    return one_post(viewer, viewer.row(cur.lastrowid))
+
+
