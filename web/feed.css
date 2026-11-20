@@ -332,3 +332,58 @@ body.on-feed #app {
   animation: feed-flash 1.6s ease-out;
 }
 
+@keyframes feed-flash {
+  from { background: #fff7c2; }
+  to { background: #fff; }
+}
+
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-head .pf-avatar {
+  flex: none;
+  cursor: pointer;
+}
+
+.feed-who {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.feed-who b {
+  cursor: pointer;
+  color: #0a246a;
+}
+
+.feed-who b:hover {
+  text-decoration: underline;
+}
+
+.feed-who small {
+  display: block;
+  color: #666;
+  font-size: 11px;
+}
+
+.feed-audience {
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #eef3fb;
+  border: 1px solid #7f9db9;
+}
+
+.feed-audience.a-close {
+  background: #e7f7e7;
+  border-color: #2eb82e;
+  color: #1a661a;
+}
+
+.feed-audience.a-me {
+  background: #f1f1f1;
+  border-color: #999;
+}
+
