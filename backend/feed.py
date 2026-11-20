@@ -206,3 +206,49 @@ async def tell_friends(conn, user, post_id: int, audience: str):
 # ---------- writing, editing, deleting ----------
 
 
+@router.post("/api/posts")
+async def create_post(body: PostBody, user=Depends(current_user), conn=Depends(get_conn)):
+    text = clean_words(body.body, POST_LIMIT, "post")
+    ids = media.plan(conn, user["id"], body.media)
+    if not text and not ids:
+        raise HTTPException(400, "write something first")
+    audience = pick_audience(conn, user, body.audience)
+    check_rate(user["id"])
+    cur = conn.execute("INSERT INTO posts (author_id, body, audience) VALUES (?, ?, ?)", (user["id"], text, audience))
+    media.attach(conn, cur.lastrowid, ids)
+    conn.commit()
+    await tell_friends(conn, user, cur.lastrowid, audience)
+    viewer = Viewer(conn, user)
+    return one_post(viewer, viewer.row(cur.lastrowid))
+
+
+@router.patch("/api/posts/{post_id}")
+def edit_post(post_id: int, body: EditBody, user=Depends(current_user), conn=Depends(get_conn)):
+    # somebody else's post is "not found", the same answer as one that doesn't exist
+    row = conn.execute(
+        "SELECT author_id, body, is_share, audience FROM posts WHERE id = ?", (post_id,)
+    ).fetchone()
+    if not row or row["author_id"] != user["id"]:
+        raise HTTPException(404, "no such post")
+    is_repost = bool(row["is_share"])
+    old_ids = media.current_ids(conn, post_id)
+    text = row["body"] if body.body is None else clean_words(body.body, NOTE_LIMIT if is_repost else POST_LIMIT, "post")
+    if body.media is not None and is_repost and body.media:
+        raise HTTPException(400, "a repost can't have its own files")
+    ids = old_ids if body.media is None else media.plan(conn, user["id"], body.media, post_id)
+    if not is_repost and not text and not ids:
+        raise HTTPException(400, "a post needs some words or a file")
+    audience = row["audience"] if body.audience is None else pick_audience(conn, user, body.audience)
+    changed = text != row["body"] or ids != old_ids
+    conn.execute(
+        "UPDATE posts SET body = ?, audience = ?, edited_at = CASE WHEN ? THEN datetime('now') ELSE edited_at END "
+        "WHERE id = ?",
+        (text, audience, int(changed), post_id),
+    )
+    if body.media is not None:
+        media.attach(conn, post_id, ids)
+    conn.commit()
+    viewer = Viewer(conn, user)
+    return one_post(viewer, viewer.row(post_id))
+
+
