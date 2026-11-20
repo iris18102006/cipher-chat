@@ -174,3 +174,35 @@ def post_dicts(viewer: Viewer, rows) -> list[dict]:
     return out
 
 
+def one_post(viewer: Viewer, row) -> dict:
+    return post_dicts(viewer, [row])[0]
+
+
+def need_post(viewer: Viewer, post_id: int):
+    """A post the person is allowed to see, or the same 404 whether it's missing or private."""
+    row = viewer.row(post_id)
+    if not row:
+        raise HTTPException(404, "no such post")
+    return row
+
+
+async def tell_friends(conn, user, post_id: int, audience: str):
+    """A little nudge to everybody who can see it and is online, so their feed can say 'new posts'."""
+    if audience == "me":
+        return
+    ids = friend_ids(conn, user["id"]) - blocked_with(conn, user["id"])
+    if audience == "close":
+        close = conn.execute("SELECT friend_id FROM close_friends WHERE owner_id = ?", (user["id"],)).fetchall()
+        ids &= {r[0] for r in close}
+    if not ids:
+        return
+    names = conn.execute(
+        f"SELECT username FROM users WHERE notify_posts = 1 AND id IN ({','.join('?' * len(ids))})", list(ids)
+    ).fetchall()
+    for r in names:
+        await manager.send_user(r["username"], {"type": "feed", "event": "new", "id": post_id, "from": user["username"]})
+
+
+# ---------- writing, editing, deleting ----------
+
+
