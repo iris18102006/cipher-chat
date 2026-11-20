@@ -376,3 +376,31 @@ async def repost_post(post_id: int, body: RepostBody, user=Depends(current_user)
     return one_post(viewer, viewer.row(cur.lastrowid))
 
 
+# ---------- reports and moderators ----------
+
+
+@router.post("/api/posts/{post_id}/report")
+def report_post(post_id: int, body: ReportBody, user=Depends(current_user), conn=Depends(get_conn)):
+    viewer = Viewer(conn, user)
+    row = need_post(viewer, post_id)
+    if row["author_id"] == viewer.id:
+        raise HTTPException(400, "that's your own post")
+    if body.reason not in REPORT_REASONS:
+        raise HTTPException(400, "pick nudity, violence, harassment or other")
+    conn.execute(
+        "INSERT OR REPLACE INTO post_reports (post_id, reporter_id, reason) VALUES (?, ?, ?)",
+        (post_id, user["id"], body.reason),
+    )
+    count = conn.execute("SELECT COUNT(*) FROM post_reports WHERE post_id = ?", (post_id,)).fetchone()[0]
+    if count >= HIDE_AFTER_REPORTS and not row["reviewed"]:
+        conn.execute("UPDATE posts SET hidden = 1 WHERE id = ?", (post_id,))
+    conn.commit()
+    return {"reported": True}
+
+
+def need_admin(user):
+    # the same answer a page that doesn't exist would give
+    if not is_admin(user):
+        raise HTTPException(404, "not found")
+
+
