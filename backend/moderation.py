@@ -126,3 +126,47 @@ def _frames(data: bytes, limit: int = 3) -> list[bytes]:
     return out
 
 
+def _nudenet_detector():
+    global _detector
+    if _detector is None:
+        from nudenet import NudeDetector  # an optional install, see the README
+
+        _detector = NudeDetector()
+    return _detector
+
+
+def _nudenet_flags(png: bytes) -> bool:
+    detector = _nudenet_detector()
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp.write(png)
+        path = tmp.name
+    try:
+        found = detector.detect(path)
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    limit = threshold()
+    return any(d.get("class") in EXPLICIT_LABELS and float(d.get("score", 0)) >= limit for d in found)
+
+
+def check_image(data: bytes) -> str | None:
+    """None if the picture is fine, otherwise a reason to show the person.
+
+    With the check switched off this does nothing. With it switched on and not working
+    (not installed, crashing) pictures are refused: a safety check that quietly stops
+    checking is worse than one that says so."""
+    if mode() == "off":
+        return None
+    try:
+        for png in _frames(data):
+            if _nudenet_flags(png):
+                return IMAGE_REFUSED
+    except ImportError:
+        log.error("CIPHER_IMAGE_CHECK=nudenet is set but the nudenet package is not installed")
+        return IMAGE_UNAVAILABLE
+    except Exception:  # noqa: BLE001 - whatever went wrong, don't let the picture through unchecked
+        log.exception("the picture check failed")
+        return IMAGE_UNAVAILABLE
+    return None
