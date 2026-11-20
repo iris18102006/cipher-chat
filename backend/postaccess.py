@@ -68,3 +68,32 @@ POST_SELECT = """
 """
 
 
+class Viewer:
+    """Somebody looking at posts. Works out who they can see once, then answers for any post."""
+
+    def __init__(self, conn, user):
+        self.conn = conn
+        self.user = user
+        self.id = user["id"]
+        self.admin = is_admin(user)
+        self.blocked = blocked_with(conn, self.id)
+        self.clause, self.params = visible_sql(conn, self.id)
+
+    def args(self, **extra) -> dict:
+        return {**self.params, "me": self.id, **extra}
+
+    def row(self, post_id: int):
+        """The post, if this person may see it. None whether it is missing or private."""
+        return self.conn.execute(
+            POST_SELECT + f" WHERE p.id = :id AND {self.clause}", self.args(id=post_id)
+        ).fetchone()
+
+    def raw_row(self, post_id: int):
+        """The post whether or not they may see it (for deciding what to say about it)."""
+        return self.conn.execute(POST_SELECT + " WHERE p.id = :id", {"me": self.id, "id": post_id}).fetchone()
+
+    def has_reports(self, post_id: int) -> bool:
+        return (
+            self.conn.execute("SELECT 1 FROM post_reports WHERE post_id = ? LIMIT 1", (post_id,)).fetchone()
+            is not None
+        )
