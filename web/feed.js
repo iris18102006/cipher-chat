@@ -482,3 +482,39 @@ function closeFeed() {
   hideFeed();
 }
 
+function closeSingle() {
+  location.hash = "#feed";
+}
+
+function routeFromHash() {
+  const h = location.hash;
+  const post = /^#post-(\d{1,12})$/.exec(h);
+  if (h === "#feed") showFeed();
+  else if (post) showPost(Number(post[1]));
+  else hideFeed();
+}
+
+// the writing box is made again each time the page opens, so it starts with your usual audience
+function mountCompose() {
+  $("feed-compose-slot").replaceChildren(
+    makeComposer({
+      onDone: (post) => {
+        if (feed.tab === "all" || feed.tab === "mine" || (feed.tab === "close" && post.audience === "close")) feed.posts.unshift(post);
+        renderFeed();
+        const first = $("feed-list").firstChild;
+        if (first && first.classList) first.classList.add("is-new");
+      },
+    })
+  );
+}
+
+for (const b of document.querySelectorAll("#feed-tabs button")) {
+  b.onclick = () => {
+    feed.tab = b.dataset.tab;
+    paintTabs();
+    feed.posts = [];
+    renderFeed();
+    loadFeed(false);
+  };
+}
+
