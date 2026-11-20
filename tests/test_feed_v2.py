@@ -88,3 +88,49 @@ def test_changing_audience_is_not_an_edit(client):
     assert e["edited"] is False and pid not in ids(b)
 
 
+def test_words_are_checked(client):
+    a, b, c = trio(client)
+    assert post(a, "i will kill you").status_code == 400
+    assert post(a, "go kill yourself").status_code == 400
+    assert post(a, "I'm gonna kill you").status_code == 400
+    assert post(a, "this song kills me, killer beat").status_code == 200
+    pid = post(a, "ok").json()["id"]
+    assert a.patch(f"/api/posts/{pid}", json={"body": "kys"}).status_code == 400
+
+
+# ---------- media ----------
+
+def test_picture_upload_attach_and_serve(client):
+    a, b, c = trio(client)
+    m = png(a)
+    assert m["kind"] == "image"
+    # a draft is only for its owner
+    assert b.get(m["url"]).status_code == 404 and a.get(m["url"]).status_code == 200
+    p = post(a, "", media=[m["id"]]).json()
+    assert p["media"][0]["id"] == m["id"]
+    r = b.get(m["url"])
+    assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
+    assert "sandbox" in r.headers["content-security-policy"]
+    stranger = signup(client, "dave")
+    assert stranger.get(m["url"]).status_code == 404  # not a friend of alice
+    # used files can't go on a second post
+    assert post(a, "again", media=[m["id"]]).status_code == 400
+
+
+def test_media_follows_post_audience_and_deletion(client):
+    a, b, c = trio(client)
+    m = png(a)
+    pid = post(a, "", media=[m["id"]], audience="me").json()["id"]
+    assert b.get(m["url"]).status_code == 404
+    a.patch(f"/api/posts/{pid}", json={"audience": "friends"})
+    assert b.get(m["url"]).status_code == 200
+    a.delete(f"/api/posts/{pid}")
+    assert a.get(m["url"]).status_code == 404
+
+
+def test_not_a_picture_is_refused(client):
+    a, b, c = trio(client)
+    assert a.post("/api/post-media", content=b"MZ" + b"\x00" * 3000).status_code == 400
+    assert a.post("/api/post-media", content=b"GIF89a" + b"junk" * 100).status_code == 400
+
+
