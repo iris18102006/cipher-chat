@@ -114,3 +114,54 @@ def media_for(conn, post_ids: list[int]) -> dict[int, list[dict]]:
     return out
 
 
+def plan(conn, user_id: int, ids: list[int], post_id: int | None = None) -> list[int]:
+    """Checks that these files can go on a post (yours, not used by another post, a sensible mix)
+    and gives them back in order. Raises a 400 with the reason otherwise."""
+    if len(ids) != len(set(ids)):
+        raise HTTPException(400, "the same file is on this post twice")
+    if len(ids) > MAX_PER_POST:
+        raise HTTPException(400, "that's too many files for one post")
+    kinds: Counter = Counter()
+    for media_id in ids:
+        row = conn.execute(
+            "SELECT kind, post_id FROM post_media WHERE id = ? AND owner_id = ?", (media_id, user_id)
+        ).fetchone()
+        if not row or (row["post_id"] is not None and row["post_id"] != post_id):
+            raise HTTPException(400, "one of those files isn't yours or is already on another post")
+        kinds[row["kind"]] += 1
+    if kinds["image"] > MAX_IMAGES:
+        raise HTTPException(400, f"a post can have up to {MAX_IMAGES} pictures")
+    if kinds["video"] > 1:
+        raise HTTPException(400, "a post can have one video")
+    if kinds["audio"] > 1:
+        raise HTTPException(400, "a post can have one song")
+    if kinds["video"] and kinds["image"]:
+        raise HTTPException(400, "a post can have pictures or a video, not both")
+    return ids
+
+
+def attach(conn, post_id: int, ids: list[int]):
+    """Puts the files on the post in this order, and removes any other file it had."""
+    marks = ",".join("?" * len(ids)) or "NULL"
+    conn.execute(f"DELETE FROM post_media WHERE post_id = ? AND id NOT IN ({marks})", (post_id, *ids))
+    for position, media_id in enumerate(ids):
+        conn.execute(
+            "UPDATE post_media SET post_id = ?, position = ? WHERE id = ?", (post_id, position, media_id)
+        )
+
+
+def current_ids(conn, post_id: int) -> list[int]:
+    rows = conn.execute("SELECT id FROM post_media WHERE post_id = ? ORDER BY position, id", (post_id,)).fetchall()
+    return [r["id"] for r in rows]
+
+
+# ---------- routes ----------
+
+
+def clear_old_drafts(conn, user_id: int):
+    conn.execute(
+        "DELETE FROM post_media WHERE owner_id = ? AND post_id IS NULL AND created_at < datetime('now', ?)",
+        (user_id, f"-{DRAFT_HOURS} hours"),
+    )
+
+
