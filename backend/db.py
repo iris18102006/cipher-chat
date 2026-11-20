@@ -144,6 +144,41 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (post_id, user_id)
             );
+            -- photos, videos and songs on feed posts. Unlike chat files these are NOT encrypted: the
+            -- server has to be able to check them. post_id is null while a file is only uploaded
+            -- and not part of a post yet (a draft), and drafts are cleaned up after a day.
+            CREATE TABLE IF NOT EXISTS post_media (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL CHECK (kind IN ('image', 'video', 'audio')),
+                mime TEXT NOT NULL,
+                data BLOB NOT NULL,
+                width INTEGER NOT NULL DEFAULT 0,
+                height INTEGER NOT NULL DEFAULT 0,
+                animated INTEGER NOT NULL DEFAULT 0,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_post_media_post ON post_media (post_id, position);
+            CREATE INDEX IF NOT EXISTS idx_post_media_owner ON post_media (owner_id, post_id);
+            -- the friends someone picked as their close friends (the posts "for close friends"
+            -- are only shown to these people)
+            CREATE TABLE IF NOT EXISTS close_friends (
+                owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (owner_id, friend_id),
+                CHECK (owner_id != friend_id)
+            );
+            -- "report this post": one row per person per post
+            CREATE TABLE IF NOT EXISTS post_reports (
+                post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+                reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                reason TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (post_id, reporter_id)
+            );
             -- group chats. The server only ever stores ciphertext: every message is
             -- encrypted with a group key, and that key is stored once per member,
             -- wrapped (encrypted) for them in the browser of whoever made it.
@@ -270,6 +305,22 @@ def init_db():
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_group_messages_chain "
             "ON chat_group_messages (group_id, sender_id, key_version, n) WHERE n IS NOT NULL"
         )
+        # the feed: who may see a post (friends | close | me), when it was last edited, and 1 in
+        # hidden while reports are waiting for somebody to look at them. reviewed = 1 once a
+        # person looked and decided it can stay, after which reports no longer hide it
+        _add_column(conn, "posts", "audience", "TEXT NOT NULL DEFAULT 'friends'")
+        _add_column(conn, "posts", "edited_at", "TEXT")
+        _add_column(conn, "posts", "hidden", "INTEGER NOT NULL DEFAULT 0")
+        _add_column(conn, "posts", "reviewed", "INTEGER NOT NULL DEFAULT 0")
+        # post settings: the audience a new post starts with, who gets to see the names behind
+        # the likes (everyone | count | private), and whether friends may repost / send my posts in
+        # chats, and whether I get the little "new post" nudge
+        _add_column(conn, "users", "post_audience", "TEXT NOT NULL DEFAULT 'friends'")
+        _add_column(conn, "users", "likes_visibility", "TEXT NOT NULL DEFAULT 'everyone'")
+        _add_column(conn, "users", "allow_reposts", "INTEGER NOT NULL DEFAULT 1")
+        _add_column(conn, "users", "allow_chat_shares", "INTEGER NOT NULL DEFAULT 1")
+        _add_column(conn, "users", "notify_posts", "INTEGER NOT NULL DEFAULT 1")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_post_reports_post ON post_reports (post_id)")
         conn.commit()
     finally:
         conn.close()
