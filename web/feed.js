@@ -250,3 +250,49 @@ function editDialog(p, card) {
   const dlg = openDialog(p.is_repost ? "Edit your note" : "Edit post", form, { wide: true });
 }
 
+function repostDialog(target) {
+  const form = el("form", "feed-repost-form");
+  const note = el("textarea");
+  note.maxLength = NOTE_MAX;
+  note.rows = 3;
+  note.placeholder = "add a note (optional)";
+  note.setAttribute("aria-label", "note to go with the repost");
+  const who = el("select");
+  who.setAttribute("aria-label", "who can see your repost");
+  for (const [value, name] of AUDIENCE_OPTIONS) {
+    const o = el("option", "", name);
+    o.value = value;
+    who.append(o);
+  }
+  who.value = (feed.settings && feed.settings.post_audience) || "friends";
+  const err = el("p", "fc-error");
+  err.hidden = true;
+  const go = el("button", "fc-submit", "Repost");
+  go.type = "submit";
+  const row = el("div", "fc-row");
+  row.append(who, go);
+  form.append(el("p", "pf-hint", "Reposting puts this post on your page too. Only friends of " + shownName(target.author) + " can see what it says."), note, err, row);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    go.disabled = true;
+    err.hidden = true;
+    try {
+      const made = await sendJson("/api/posts/" + target.id + "/repost", "POST", { body: note.value.trim(), audience: who.value });
+      // every copy of the original on screen has one more repost
+      for (const q of feed.posts) {
+        if (q.id === target.id) q.reposts = made.original.reposts;
+        if (q.is_repost && q.original && q.original.id === target.id) q.original.reposts = made.original.reposts;
+      }
+      dlg.close();
+      if (feed.single == null && (feed.tab === "all" || feed.tab === "mine")) feed.posts.unshift(made);
+      renderFeed();
+      toast("Reposted");
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+      go.disabled = false;
+    }
+  };
+  const dlg = openDialog("Repost", form);
+}
+
