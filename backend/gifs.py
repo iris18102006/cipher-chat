@@ -155,3 +155,46 @@ async def search(
     return {"gifs": found, "next": offset + PAGE if len(found) >= PAGE - 4 else None}
 
 
+@router.get("/api/gifs/media/{gid}/{size}")
+async def search_media(gid: str, size: str, user=Depends(current_user)):
+    """One picture from a search, passed on from GIPHY. size is preview or full."""
+    if size not in ("preview", "full") or not GIF_ID.match(gid) or gid not in _seen:
+        raise HTTPException(404, "no such GIF, search again")
+    if media_limiter.blocked(str(user["id"])):
+        raise HTTPException(429, "slow down")
+    media_limiter.hit(str(user["id"]))
+    try:
+        body, kind = await run_in_threadpool(_media, _seen[gid][size])
+    except OSError:
+        raise HTTPException(502, "couldn't load that GIF")
+    # only animated pictures go through, whatever the other end says it is
+    if kind not in ("image/gif", "image/webp") or not (body[:4] == b"GIF8" or body[8:12] == b"WEBP"):
+        raise HTTPException(502, "couldn't load that GIF")
+    return Response(
+        content=body,
+        media_type=kind,
+        headers={
+            "Cache-Control": "private, max-age=86400",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
+
+
+# ---------- your own GIFs ----------
+
+
+def library(conn, user_id: int) -> dict:
+    rows = conn.execute(
+        "SELECT id, width, height, animated FROM images WHERE owner_id = ? AND kind = 'gif' ORDER BY id DESC",
+        (user_id,),
+    ).fetchall()
+    return {
+        "gifs": [
+            {"id": r["id"], "url": f"/api/img/{r['id']}", "width": r["width"], "height": r["height"], "animated": bool(r["animated"])}
+            for r in rows
+        ],
+        "max": MAX_GIFS,
+    }
+
+
