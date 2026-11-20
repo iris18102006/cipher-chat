@@ -115,3 +115,37 @@ function mediaNode(list) {
   return box.childNodes.length ? box : null;
 }
 
+function postBody(p) {
+  const frag = [];
+  if (p.body) frag.push(el("p", "feed-body", p.body));
+  const m = mediaNode(p.media || []);
+  if (m) frag.push(m);
+  return frag;
+}
+
+// what a repost says about the original
+function originalBox(o) {
+  if (o.gone) return el("div", "feed-original is-note", "The original post was deleted.");
+  if (o.hidden) return el("div", "feed-original is-note", "A post from someone you're not friends with, or that isn't shared with you.");
+  const box = el("div", "feed-original");
+  box.append(postHead(o, { quiet: true }), ...postBody(o));
+  return box;
+}
+
+function renderPost(p) {
+  const card = el("article", "feed-post" + (p.mine ? " mine" : "") + (p.hidden ? " is-hidden" : ""));
+  card.dataset.id = String(p.id);
+  const head = postHead(p);
+  if (p.is_repost) head.querySelector(".feed-who b").after(el("span", "feed-shared-tag", "reposted"));
+  card.append(head);
+  if (p.hidden) {
+    card.append(el("p", "feed-hidden-note", "Hidden: people reported this post, so only you can see it until it has been looked at."));
+  }
+  card.append(...postBody(p));
+  if (p.is_repost && p.original) card.append(originalBox(p.original));
+  const engage = el("div", "feed-engage");
+  card.append(engage);
+  paintEngage(card, p);
+  return card;
+}
+
