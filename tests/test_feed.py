@@ -29,7 +29,7 @@ def test_write_and_read_own_post(client):
     r = post(a, "my first post")
     assert r.status_code == 200
     p = r.json()
-    assert p["body"] == "my first post" and p["mine"] and p["likes"] == 0 and not p["is_share"]
+    assert p["body"] == "my first post" and p["mine"] and p["likes"] == 0 and not p["is_repost"]
     assert ids(a) == [p["id"]]
 
 
@@ -83,12 +83,14 @@ def test_delete_only_your_own(client):
 def test_like_and_unlike(client):
     a, b, c = trio(client)
     pid = post(b).json()["id"]
-    assert a.post(f"/api/posts/{pid}/like").json() == {"likes": 1, "liked": True}
-    assert a.post(f"/api/posts/{pid}/like").json() == {"likes": 1, "liked": True}  # twice is still one
+    first = a.post(f"/api/posts/{pid}/like").json()
+    assert first["likes"] == 1 and first["liked"] is True
+    assert a.post(f"/api/posts/{pid}/like").json()["likes"] == 1  # twice is still one
     assert b.post(f"/api/posts/{pid}/like").json()["likes"] == 2
     seen = [p for p in a.get("/api/feed").json()["posts"] if p["id"] == pid][0]
     assert seen["likes"] == 2 and seen["liked"] is True
-    assert a.delete(f"/api/posts/{pid}/like").json() == {"likes": 1, "liked": False}
+    gone = a.delete(f"/api/posts/{pid}/like").json()
+    assert gone["likes"] == 1 and gone["liked"] is False
 
 
 def test_cannot_like_what_you_cannot_see(client):
@@ -101,57 +103,57 @@ def test_cannot_like_what_you_cannot_see(client):
 def test_share_with_a_note(client):
     a, b, c = trio(client)
     pid = post(b, "original").json()["id"]
-    r = a.post(f"/api/posts/{pid}/share", json={"body": "look at this"})
+    r = a.post(f"/api/posts/{pid}/repost", json={"body": "look at this"})
     assert r.status_code == 200
     s = r.json()
-    assert s["is_share"] and s["body"] == "look at this" and s["original"]["body"] == "original"
-    assert s["original"]["shares"] == 1
-    assert a.post(f"/api/posts/{pid}/share", json={"body": ""}).status_code == 409
+    assert s["is_repost"] and s["body"] == "look at this" and s["original"]["body"] == "original"
+    assert s["original"]["reposts"] == 1
+    assert a.post(f"/api/posts/{pid}/repost", json={"body": ""}).status_code == 409
 
 
 def test_share_without_a_note_is_fine(client):
     a, b, c = trio(client)
     pid = post(b, "original").json()["id"]
-    r = a.post(f"/api/posts/{pid}/share", json={})
+    r = a.post(f"/api/posts/{pid}/repost", json={})
     assert r.status_code == 200 and r.json()["body"] == ""
 
 
 def test_sharing_does_not_leak_the_original(client):
     a, b, c = trio(client)
     pid = post(b, "for bob's friends only").json()["id"]
-    sid = a.post(f"/api/posts/{pid}/share", json={"body": "wow"}).json()["id"]
+    sid = a.post(f"/api/posts/{pid}/repost", json={"body": "wow"}).json()["id"]
     # carol is alice's friend, not bob's: she sees alice's share, but not what it says
     seen = [p for p in c.get("/api/feed").json()["posts"] if p["id"] == sid][0]
     assert seen["original"] == {"hidden": True}
     assert "for bob's friends only" not in str(c.get("/api/feed").json())
     # and she can't share the original herself, or find it any other way
-    assert c.post(f"/api/posts/{pid}/share", json={}).status_code == 404
+    assert c.post(f"/api/posts/{pid}/repost", json={}).status_code == 404
 
 
 def test_sharing_a_share_shares_the_original(client):
     a, b, c = trio(client)
     pid = post(a, "root").json()["id"]
-    sid = b.post(f"/api/posts/{pid}/share", json={"body": "b"}).json()["id"]
+    sid = b.post(f"/api/posts/{pid}/repost", json={"body": "b"}).json()["id"]
     # alice can see bob's share; sharing it points at the root post, not at the share
-    again = c.post(f"/api/posts/{sid}/share", json={"body": "c"})
+    again = c.post(f"/api/posts/{sid}/repost", json={"body": "c"})
     assert again.status_code == 404  # carol isn't bob's friend, so it isn't hers to share
     # alice can: it points at the root post, never at bob's share
-    ok = a.post(f"/api/posts/{sid}/share", json={"body": "a"})
+    ok = a.post(f"/api/posts/{sid}/repost", json={"body": "a"})
     assert ok.status_code == 200 and ok.json()["original"]["id"] == pid
-    assert a.post(f"/api/posts/{sid}/share", json={}).status_code == 409  # already shared that root
-    d = c.post(f"/api/posts/{pid}/share", json={"body": "c"})
+    assert a.post(f"/api/posts/{sid}/repost", json={}).status_code == 409  # already shared that root
+    d = c.post(f"/api/posts/{pid}/repost", json={"body": "c"})
     assert d.status_code == 200 and d.json()["original"]["id"] == pid
 
 
 def test_deleting_the_original_leaves_the_share_saying_so(client):
     a, b, c = trio(client)
     pid = post(b, "gone soon").json()["id"]
-    sid = a.post(f"/api/posts/{pid}/share", json={"body": "so true"}).json()["id"]
+    sid = a.post(f"/api/posts/{pid}/repost", json={"body": "so true"}).json()["id"]
     assert b.delete(f"/api/posts/{pid}").status_code == 200
     s = [p for p in a.get("/api/feed").json()["posts"] if p["id"] == sid][0]
-    assert s["is_share"] and s["body"] == "so true" and s["original"] == {"gone": True}
+    assert s["is_repost"] and s["body"] == "so true" and s["original"] == {"gone": True}
     # sharing that dead share isn't possible
-    assert b.post(f"/api/posts/{sid}/share", json={}).status_code == 404
+    assert b.post(f"/api/posts/{sid}/repost", json={}).status_code == 404
 
 
 def test_rate_limit(client, monkeypatch):
