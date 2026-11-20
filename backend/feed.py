@@ -81,3 +81,50 @@ def pick_audience(conn, user, wanted: str | None) -> str:
     return wanted
 
 
+def clean_words(value: str, limit: int, field: str) -> str:
+    text = clean_text(value, limit, field, multiline=True)
+    reason = moderation.check_text(text)
+    if reason:
+        raise HTTPException(400, reason)
+    return text
+
+
+# ---------- turning rows into what the browser gets ----------
+
+
+def person(row) -> dict:
+    return {
+        "username": row["username"],
+        "display_name": row["display_name"],
+        "avatar": avatar_url(row["avatar_id"]),
+    }
+
+
+def likers(viewer: Viewer, post_id: int, limit: int | None = None) -> list[dict]:
+    """The people who liked a post, newest like first, without anybody the viewer has a block with."""
+    rows = viewer.conn.execute(
+        "SELECT u.id, u.username, u.display_name, u.avatar_id FROM post_likes l "
+        "JOIN users u ON u.id = l.user_id WHERE l.post_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 500",
+        (post_id,),
+    ).fetchall()
+    out = [person(r) for r in rows if r["id"] not in viewer.blocked]
+    return out[:limit] if limit else out
+
+
+def engagement(viewer: Viewer, row) -> dict:
+    """Likes as this viewer is allowed to see them, following the author's likes setting:
+    everyone = count and names, count = the author sees the names and everybody else only the
+    number, private = only the author sees anything."""
+    mine = row["author_id"] == viewer.id
+    setting = row["likes_visibility"]
+    names = mine or setting == "everyone"
+    count = mine or setting in ("everyone", "count")
+    return {
+        "liked": bool(row["liked"]),
+        "likes": row["likes"] if count else None,
+        "likes_hidden": not count,
+        "likes_names": names,
+        "likers": likers(viewer, row["id"], LIKERS_SHOWN) if names else [],
+    }
+
+
