@@ -35,3 +35,38 @@ function postAgo(ts) {
   return d.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
 }
 
+function feedError(text) {
+  const p = $("feed-error");
+  p.textContent = text || "";
+  p.hidden = !text;
+}
+
+// pictures, videos and songs only ever come from our own server
+function safeMedia(url) {
+  return typeof url === "string" && /^\/api\/post-media\/\d+$/.test(url) ? url : "";
+}
+
+// ---------- drawing a post ----------
+
+function postSub(p) {
+  const bits = ["@" + p.author.username, postAgo(p.created_at)];
+  if (p.edited) bits.push("edited");
+  return bits.join(" \u00b7 ");
+}
+
+function postHead(p, opts) {
+  const head = el("div", "feed-head");
+  const avatar = avatarNode(p.author, "small");
+  avatar.onclick = () => openProfile(p.author.username);
+  const who = el("div", "feed-who");
+  const name = el("b", "", shownName(p.author));
+  name.onclick = () => openProfile(p.author.username);
+  const sub = el("small", "feed-sub", postSub(p));
+  if (p.audience && p.audience !== "friends" && !(opts && opts.quiet)) {
+    sub.append(" \u00b7 ", el("span", "feed-audience a-" + p.audience, AUDIENCE_LABELS[p.audience]));
+  }
+  who.append(name, sub);
+  head.append(avatar, who);
+  return head;
+}
+
