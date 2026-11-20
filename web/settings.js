@@ -96,3 +96,47 @@ function toggleRow(label, hint, current, status, field) {
   return row;
 }
 
+// the friends you share "close friends" posts with
+async function closeFriendsBox(status) {
+  const box = el("fieldset");
+  box.id = "settings-close-friends";
+  box.append(el("legend", "", "Close friends"));
+  box.append(el("p", "pf-hint", "Posts you make for close friends only are shown to these people and nobody else. They aren't told they're on the list."));
+  const list = el("div", "settings-friends");
+  box.append(list);
+  let friends = [];
+  try {
+    friends = (await api("/api/close-friends")).friends;
+  } catch {
+    list.append(el("p", "list-empty", "couldn't load your friends"));
+    return box;
+  }
+  if (!friends.length) list.append(el("p", "list-empty", "You don't have any friends to pick from yet."));
+  const saved = () => friends.filter((f) => f.close).map((f) => f.username);
+  for (const f of friends) {
+    const row = el("label", "share-row");
+    const input = el("input");
+    input.type = "checkbox";
+    input.checked = f.close;
+    input.onchange = async () => {
+      f.close = input.checked;
+      status.className = "";
+      status.textContent = "saving...";
+      try {
+        await sendJson("/api/close-friends", "PUT", { usernames: saved() });
+        status.textContent = "saved";
+      } catch (ex) {
+        f.close = !input.checked;
+        input.checked = f.close;
+        status.className = "bad";
+        status.textContent = ex.message;
+      }
+    };
+    const who = el("span", "who");
+    who.append(el("b", "", shownName(f)), el("small", "", "@" + f.username));
+    row.append(input, avatarNode(f, "small"), who);
+    list.append(row);
+  }
+  return box;
+}
+
