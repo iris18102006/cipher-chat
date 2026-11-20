@@ -670,3 +670,58 @@ body.on-feed #app {
   cursor: pointer;
 }
 
+.share-group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
+
+/* ---------- a shared post inside a chat bubble ---------- */
+
+.chat-post {
+  min-width: 200px;
+  max-width: 300px;
+  color: #111;
+  background: #fff;
+  border: 1px solid #7f9db9;
+  border-left: 4px solid #3a7bd5;
+  text-align: left;
+}
+
+.chat-post-label,
+.chat-post-note {
+  padding: 3px 8px;
+  font-size: 10px;
+  color: #556;
+  background: #eef3fb;
+}
+
+.chat-post-note {
+  background: none;
+  font-style: italic;
+}
+
+.chat-post-open {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  background: none;
+  color: #111;
+  text-align: left;
+  font-weight: normal;
+}
+
+.chat-post-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
