@@ -77,3 +77,50 @@ def _api(path: str, params: dict) -> dict:
     return json.loads(body)
 
 
+def _media(url: str) -> tuple[bytes, str]:
+    """One picture from GIPHY's picture hosts. Swapped out by the tests."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" or not MEDIA_HOST.match(parts.hostname or ""):
+        raise OSError("not a GIPHY picture address")
+    return _get(url, MAX_MEDIA_BYTES)
+
+
+def _remember(gid: str, preview: str, full: str):
+    _seen[gid] = {"preview": preview, "full": full}
+    _seen.move_to_end(gid)
+    while len(_seen) > CACHE_SIZE:
+        _seen.popitem(last=False)
+
+
+def _url_of(images: dict, *names: str) -> str:
+    for name in names:
+        url = (images.get(name) or {}).get("url", "")
+        parts = urllib.parse.urlsplit(url)
+        if parts.scheme == "https" and MEDIA_HOST.match(parts.hostname or ""):
+            return url
+    return ""
+
+
+def _results(payload: dict) -> list[dict]:
+    out = []
+    for item in payload.get("data", []):
+        gid = str(item.get("id", ""))
+        images = item.get("images") or {}
+        preview = _url_of(images, "fixed_width_small", "fixed_width", "downsized")
+        full = _url_of(images, "downsized_medium", "downsized", "fixed_width", "original")
+        if not GIF_ID.match(gid) or not preview or not full:
+            continue
+        _remember(gid, preview, full)
+        shape = images.get("fixed_width_small") or images.get("fixed_width") or {}
+        out.append(
+            {
+                "id": gid,
+                "title": clean_text(str(item.get("title", "")), 80, "title")[:80] if item.get("title") else "",
+                "preview": f"/api/gifs/media/{gid}/preview",
+                "width": int(shape.get("width") or 0) or 0,
+                "height": int(shape.get("height") or 0) or 0,
+            }
+        )
+    return out
+
+
