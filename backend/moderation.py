@@ -41,3 +41,47 @@ BUILT_IN = [
     r"\b(?:send|sell|selling|buy|trade|trading)\s+(?:me\s+)?(?:nudes|nude\s+pics?|nude\s+photos?)\b",
 ]
 
+TERMS_FILE = Path(__file__).parent / "blocked_terms.txt"
+
+
+def _compile_extra() -> list[re.Pattern]:
+    """The phrases from blocked_terms.txt, each matched as whole words."""
+    try:
+        lines = TERMS_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        out.append(re.compile(r"\b" + re.escape(line.lower()).replace(r"\ ", r"\s+") + r"\b", re.I))
+    return out
+
+
+_RULES = [re.compile(p, re.I) for p in BUILT_IN]
+_EXTRA = _compile_extra()
+
+TEXT_REFUSED = "that breaks the rules: no threats, no telling people to hurt themselves and no explicit stuff"
+
+
+def _squash(text: str) -> str:
+    """Make 'k i l l  y o u' and 'kill   you' and curly apostrophes look the same as plain text."""
+    text = text.replace("\u2019", "'").replace("\u2018", "'")
+    return re.sub(r"\s+", " ", text)
+
+
+def check_text(text: str) -> str | None:
+    """None if the words are fine, otherwise a reason to show the person."""
+    flat = _squash(text)
+    for rule in (*_RULES, *_EXTRA):
+        if rule.search(flat):
+            return TEXT_REFUSED
+    return None
+
+
+# ---------- pictures ----------
+
+IMAGE_REFUSED = "that picture can't be posted here (no nudity, violence or anything harmful)"
+IMAGE_UNAVAILABLE = "pictures can't be checked right now, try again a little later"
+
