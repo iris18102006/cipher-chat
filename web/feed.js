@@ -70,3 +70,48 @@ function postHead(p, opts) {
   return head;
 }
 
+// the pictures, video and song on a post
+function mediaNode(list) {
+  const box = el("div", "feed-media");
+  const pics = list.filter((m) => m.kind === "image" && safeMedia(m.url));
+  if (pics.length) {
+    const grid = el("div", "feed-pics n" + pics.length);
+    for (const m of pics) {
+      const img = el("img");
+      img.src = m.url;
+      img.alt = "picture in a post";
+      img.loading = "lazy";
+      img.draggable = false;
+      img.onclick = () => {
+        const big = el("img", "feed-big");
+        big.src = m.url;
+        big.alt = "picture in a post";
+        openDialog("Picture", big, { wide: true });
+      };
+      grid.append(img);
+    }
+    box.append(grid);
+  }
+  for (const m of list) {
+    if (!safeMedia(m.url)) continue;
+    if (m.kind === "video") {
+      const v = el("video", "feed-video");
+      v.controls = true;
+      v.preload = "metadata";
+      v.playsInline = true;
+      v.src = m.url;
+      box.append(v);
+    } else if (m.kind === "audio") {
+      const wrap = el("div", "feed-song");
+      wrap.append(el("span", "feed-song-icon", "\u{1f3b5}"));
+      const a = el("audio");
+      a.controls = true;
+      a.preload = "none";
+      a.src = m.url;
+      wrap.append(a);
+      box.append(wrap);
+    }
+  }
+  return box.childNodes.length ? box : null;
+}
+
