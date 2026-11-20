@@ -614,3 +614,59 @@ body.on-feed #app {
   cursor: pointer;
 }
 
+.feed-repost-form textarea,
+.share-note {
+  width: 100%;
+  margin: 6px 0;
+  font: inherit;
+  border: 1px solid #7f9db9;
+}
+
+.likes-list,
+.share-list,
+.settings-friends {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.likes-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 4px;
+  border: 0;
+  border-bottom: 1px solid #e5e5e5;
+  background: none;
+  text-align: left;
+  font-weight: normal;
+  color: #111;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.who small {
+  color: #667;
+}
+
+.share-search {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 5px;
+  font: inherit;
+  border: 1px solid #7f9db9;
+}
+
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
