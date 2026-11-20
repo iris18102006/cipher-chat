@@ -33,3 +33,47 @@ from .security import SlidingLimiter
 
 router = APIRouter()
 
+API = "https://api.giphy.com/v1/gifs/"
+MEDIA_HOST = re.compile(r"^(?:media\d*|i)\.giphy\.com$")
+GIF_ID = re.compile(r"^[A-Za-z0-9]{3,40}$")
+PAGE = 24
+MAX_MEDIA_BYTES = 8 * 1024 * 1024
+TIMEOUT = 8
+CACHE_SIZE = 1500
+
+search_limiter = SlidingLimiter(60, 60)  # searches per person per minute
+media_limiter = SlidingLimiter(400, 60)  # pictures per person per minute
+
+# what GIPHY told us about each result, so the picture can be fetched by id. Never from the browser.
+_seen: "OrderedDict[str, dict]" = OrderedDict()
+
+
+def api_key() -> str:
+    return os.environ.get("CIPHER_GIPHY_KEY", "").strip()
+
+
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):  # a redirect is an error, so we can't be led elsewhere
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirects)
+
+
+def _get(url: str, limit: int) -> tuple[bytes, str]:
+    """(body, content type) of one https address. Raises OSError for anything that goes wrong."""
+    req = urllib.request.Request(url, headers={"User-Agent": "cipher-chat", "Accept": "*/*"})
+    with _opener.open(req, timeout=TIMEOUT) as res:
+        body = res.read(limit + 1)
+        if len(body) > limit:
+            raise OSError("too big")
+        return body, res.headers.get_content_type()
+
+
+def _api(path: str, params: dict) -> dict:
+    """One call to the GIPHY api. Swapped out by the tests."""
+    query = urllib.parse.urlencode({"api_key": api_key(), "rating": "pg", "lang": "en", **params})
+    body, _ = _get(API + path + "?" + query, 1024 * 1024)
+    return json.loads(body)
+
+
