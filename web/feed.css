@@ -501,3 +501,60 @@ body.on-feed #app {
   cursor: pointer;
 }
 
+.feed-likes.link:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.feed-actions button {
+  padding: 2px 10px;
+  border: 1px solid #aca899;
+  border-radius: 10px;
+  background: #f6f4ea;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.feed-actions button:hover:not(:disabled) {
+  background: #fff7c2;
+}
+
+.feed-actions button.on {
+  border-color: #d3472b;
+  color: #d3472b;
+  font-weight: bold;
+}
+
+.feed-actions .danger {
+  color: #a33;
+}
+
+.feed-actions .quiet {
+  margin-left: auto;
+  color: #777;
+}
+
+.feed-actions .danger:last-child {
+  margin-left: auto;
+}
+
+#feed-page button:focus-visible,
+.dlg-card button:focus-visible {
+  outline: 2px solid #0a246a;
+  outline-offset: 2px;
+}
+
+.admin-report {
+  margin-bottom: 8px;
+  padding: 6px;
+  background: #fff8f0;
+  border: 1px solid #e0a060;
+}
+
