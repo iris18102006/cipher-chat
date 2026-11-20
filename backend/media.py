@@ -42,3 +42,44 @@ MEDIA_HEADERS = {
     "Accept-Ranges": "bytes",
 }
 
+# the "brand" an mp4 file says it is. Music files say M4A, videos say one of these
+VIDEO_BRANDS = {b"isom", b"iso2", b"mp41", b"mp42", b"avc1", b"M4V ", b"msnv", b"dash"}
+
+
+# ---------- what is this file? ----------
+
+
+def sniff_image(raw: bytes) -> bool:
+    head = raw[:16]
+    return (
+        head[:8] == b"\x89PNG\r\n\x1a\n"
+        or head[:3] == b"\xff\xd8\xff"
+        or head[:4] == b"GIF8"
+        or (head[:4] == b"RIFF" and head[8:12] == b"WEBP")
+    )
+
+
+def sniff_video(raw: bytes) -> str | None:
+    """video/mp4 or video/webm, or None. Only what every browser can play."""
+    if len(raw) < 1024:
+        return None
+    if raw[4:8] == b"ftyp" and raw[8:12] in VIDEO_BRANDS:
+        return "video/mp4"
+    if raw[:4] == b"\x1aE\xdf\xa3" and b"webm" in raw[:64]:
+        return "video/webm"
+    return None
+
+
+def classify(raw: bytes) -> tuple[str, str] | None:
+    """('image' | 'video' | 'audio', mime) for what the bytes really are, or None."""
+    if sniff_image(raw):
+        return "image", ""
+    video = sniff_video(raw)
+    if video:
+        return "video", video
+    audio = sniff_audio(raw)
+    if audio:
+        return "audio", audio
+    return None
+
+
