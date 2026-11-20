@@ -518,3 +518,41 @@ for (const b of document.querySelectorAll("#feed-tabs button")) {
   };
 }
 
+$("feed-btn").onclick = openFeed;
+$("feed-close").onclick = closeFeed;
+$("feed-back-feed").onclick = closeSingle;
+$("feed-refresh").onclick = () => {
+  setNewCount(0);
+  feed.single != null ? loadSingle(feed.single) : loadFeed(false);
+};
+$("feed-new").onclick = () => {
+  setNewCount(0);
+  loadFeed(false);
+  window.scrollTo({ top: 0 });
+};
+$("feed-more").onclick = () => loadFeed(true);
+$("feed-post-settings").onclick = () => openSettings("posts");
+window.addEventListener("hashchange", routeFromHash);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !feed.open || dialogStack.length) return;
+  // a profile page or the settings opened from the feed sit on top and close first
+  for (const id of ["profile-overlay", "settings-overlay", "lists-overlay"]) {
+    const o = document.getElementById(id);
+    if (o && !o.hidden) return;
+  }
+  closeFeed();
+});
+
+// "5 min ago" goes stale while the page stays open, so the times are redrawn each minute
+setInterval(() => {
+  if (!feed.open) return;
+  for (const card of document.querySelectorAll("#feed-list .feed-post")) {
+    const post = feed.posts.find((p) => String(p.id) === card.dataset.id);
+    const sub = card.querySelector(".feed-head .feed-sub");
+    if (post && sub && sub.firstChild) sub.firstChild.textContent = postSub(post);
+  }
+}, 60000);
+
+// ---------- for moderators: reported posts ----------
+
