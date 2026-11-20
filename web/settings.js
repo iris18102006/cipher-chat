@@ -78,3 +78,21 @@ function radioGroup(legend, name, options, current, status, field, after) {
   return box;
 }
 
+// an on/off switch that saves when you click it
+function toggleRow(label, hint, current, status, field) {
+  const row = el("label", "opt");
+  const input = el("input");
+  input.type = "checkbox";
+  input.checked = current;
+  input.onchange = async () => {
+    const fresh = await saveSetting(status, { [field]: input.checked });
+    if (fresh) current = input.checked;
+    else input.checked = current;
+  };
+  const text = el("span");
+  text.append(label);
+  text.append(el("small", "", hint));
+  row.append(input, text);
+  return row;
+}
+
