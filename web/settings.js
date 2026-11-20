@@ -140,3 +140,54 @@ async function closeFriendsBox(status) {
   return box;
 }
 
+async function openSettings(section) {
+  settingsReturnFocus = document.activeElement;
+  $("settings-overlay").hidden = false;
+  $("settings-close").focus();
+  const body = $("settings-body");
+  body.replaceChildren(el("p", "", "loading..."));
+  let s;
+  try {
+    s = await api("/api/settings");
+  } catch {
+    body.replaceChildren(el("p", "", "couldn't load your settings."));
+    return;
+  }
+  if (typeof feed !== "undefined") feed.settings = s;
+
+  const status = el("p");
+  status.id = "settings-status";
+  status.setAttribute("role", "status");
+
+  const messages = radioGroup("Messages before I accept a friend request", "message_policy", POLICY_OPTIONS, s.message_policy, status, "message_policy", (value) => {
+    // "let them message me" lets waiting messages through, so refresh the buddy list
+    if (value === "allow") loadContacts();
+  });
+
+  const posts = el("div", "settings-section");
+  posts.id = "settings-posts";
+  posts.append(el("h3", "", "Posts"));
+  posts.append(radioGroup("Who sees my new posts", "post_audience", POST_AUDIENCE_OPTIONS, s.post_audience, status, "post_audience"));
+  posts.append(radioGroup("Who sees the likes on my posts", "likes_visibility", LIKES_OPTIONS, s.likes_visibility, status, "likes_visibility"));
+  const sharing = el("fieldset");
+  sharing.append(el("legend", "", "Reposts, sharing and nudges"));
+  sharing.append(
+    toggleRow("Friends can repost my posts", "A repost shows your post on their page. Only posts for all your friends can be reposted.", s.allow_reposts, status, "allow_reposts"),
+    toggleRow("Friends can send my posts in chats", "The Share button. They can only send posts that are for all your friends.", s.allow_chat_shares, status, "allow_chat_shares"),
+    toggleRow("Tell me when friends post", "A small popup and a counter on the Feed button.", s.notify_posts, status, "notify_posts")
+  );
+  posts.append(sharing);
+  posts.append(await closeFriendsBox(status));
+
+  body.replaceChildren(messages, posts, status);
+  if (section === "posts") posts.scrollIntoView({ block: "start" });
+}
+
+$("settings-btn").onclick = () => openSettings();
+$("settings-close").onclick = closeSettings;
+$("settings-overlay").addEventListener("click", (e) => {
+  if (e.target === $("settings-overlay")) closeSettings();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("settings-overlay").hidden) closeSettings();
+});
