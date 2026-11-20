@@ -1,10 +1,24 @@
-// Settings: what happens to messages from people whose friend request you haven't accepted.
-// Loaded last. Uses $, el, api, toast and loadContacts from app.js.
+// Settings: messages from people you haven't accepted yet, and everything about your posts
+// (who sees them, who sees the likes, reposts and sharing, close friends).
+// Loaded after friends.js. Uses $, el, api, toast and loadContacts from app.js, avatarNode and
+// shownName from profile.js and plainButton from dialogs.js.
 
 const POLICY_OPTIONS = [
   ["allow", "Let them message me", "Messages arrive right away, even before I accept."],
   ["ask", "Ask me first", "Their messages wait (up to 3) and I only see them when I accept the request."],
   ["wait", "Make them wait", "They can't message me until I accept the request."],
+];
+
+const POST_AUDIENCE_OPTIONS = [
+  ["friends", "All my friends", "Every friend can see it. This is how posts work unless you pick something else."],
+  ["close", "Close friends only", "Only the friends on your close friends list below."],
+  ["me", "Only me", "Nobody else. Handy as a private diary."],
+];
+
+const LIKES_OPTIONS = [
+  ["everyone", "Everyone who can see the post", "They see how many likes it has and who liked it."],
+  ["count", "Only the number", "Others see how many likes there are, and only you see the names."],
+  ["private", "Only me", "Nobody else sees the likes at all, not even the number."],
 ];
 
 let settingsReturnFocus = null;
@@ -15,65 +29,3 @@ function closeSettings() {
   settingsReturnFocus = null;
 }
 
-async function openSettings() {
-  settingsReturnFocus = document.activeElement;
-  $("settings-overlay").hidden = false;
-  $("settings-close").focus();
-  const body = $("settings-body");
-  body.replaceChildren(el("p", "", "loading..."));
-  let current;
-  try {
-    current = (await api("/api/settings")).message_policy;
-  } catch {
-    body.replaceChildren(el("p", "", "couldn't load your settings."));
-    return;
-  }
-
-  const box = el("fieldset");
-  box.append(el("legend", "", "Messages before I accept a friend request"));
-  const status = el("p");
-  status.id = "settings-status";
-  status.setAttribute("role", "status");
-  for (const [value, label, hint] of POLICY_OPTIONS) {
-    const row = el("label", "opt");
-    const input = el("input");
-    input.type = "radio";
-    input.name = "message_policy";
-    input.value = value;
-    input.checked = value === current;
-    input.onchange = async () => {
-      status.className = "";
-      status.textContent = "saving...";
-      try {
-        await api("/api/settings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message_policy: value }),
-        });
-        current = value;
-        status.textContent = "saved";
-        // "let them message me" lets waiting messages through, so refresh the buddy list
-        if (value === "allow") loadContacts();
-      } catch {
-        status.className = "bad";
-        status.textContent = "couldn't save that, try again";
-        for (const other of box.querySelectorAll("input")) other.checked = other.value === current;
-      }
-    };
-    const text = el("span");
-    text.append(label);
-    text.append(el("small", "", hint));
-    row.append(input, text);
-    box.append(row);
-  }
-  body.replaceChildren(box, status);
-}
-
-$("settings-btn").onclick = openSettings;
-$("settings-close").onclick = closeSettings;
-$("settings-overlay").addEventListener("click", (e) => {
-  if (e.target === $("settings-overlay")) closeSettings();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("settings-overlay").hidden) closeSettings();
-});
