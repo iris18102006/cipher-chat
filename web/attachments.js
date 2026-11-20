@@ -300,6 +300,8 @@ function attachmentNode(desc) {
 
 // what goes in a message bubble: a file if the message is one, otherwise the text
 function messageBody(m) {
+  const post = m.failed ? null : postParse(m.text);
+  if (post) return postCardNode(post);
   const desc = m.failed ? null : fcParse(m.text);
   return desc ? attachmentNode(desc) : el("div", "text", m.text);
 }
@@ -322,7 +324,9 @@ function attCanSend() {
 
 // the buttons follow the text box: locked whenever you can't write in this chat
 function attSync() {
-  for (const id of ["attach", "mic"]) $(id).disabled = $("msg").disabled;
+  // a GIF picked in one chat must not be sent to another, so the picker closes when the chat changes
+  if (typeof closeGifs === "function") closeGifs();
+  for (const id of ["attach", "gif-btn", "mic"]) $(id).disabled = $("msg").disabled;
 }
 
 let attBusy = false;
