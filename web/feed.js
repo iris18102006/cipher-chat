@@ -149,3 +149,23 @@ function renderPost(p) {
   return card;
 }
 
+// ---------- likes, reposts, sharing, edit, delete, report ----------
+
+// "Liked by anna, ben and 3 others", the names open the whole list
+function likeSummary(p) {
+  if (p.likes_hidden && !p.mine) return null;
+  if (!p.likes) return null;
+  if (!p.likes_names || !p.likers.length) return el("div", "feed-likes", p.likes === 1 ? "1 like" : p.likes + " likes");
+  const names = p.likers.map(shownName);
+  const others = p.likes - names.length;
+  let text = "Liked by " + names.join(", ");
+  if (others > 0) text += " and " + others + (others === 1 ? " other" : " others");
+  const btn = plainButton(text, () => showLikes(p), "feed-likes link");
+  btn.title = "see everyone who liked this";
+  return btn;
+}
+
+function likeLabel(p) {
+  return (p.liked ? "\u2665 Liked" : "\u2661 Like") + (p.likes && !p.likes_hidden ? " " + p.likes : "");
+}
+
