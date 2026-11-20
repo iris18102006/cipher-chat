@@ -99,3 +99,7 @@ function shareDialog(post) {
   const dlg = openDialog("Share post", box);
 }
 
+// ---------- a post inside a chat ----------
+
+const postCardCache = new Map(); // post id -> a promise for what the server said, kept briefly
+
