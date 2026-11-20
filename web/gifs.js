@@ -39,3 +39,41 @@ async function openGifs() {
   if (gifs.tab === "search") runSearch(false);
 }
 
+// sends one GIF: fetches the bytes from our own server and sends them as a picture
+async function sendGif(url) {
+  if (gifs.busy) return;
+  gifs.busy = true;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("couldn't load that GIF");
+    const blob = await res.blob();
+    const type = blob.type === "image/webp" ? "image/webp" : "image/gif";
+    const file = new File([blob], "gif-" + Date.now() + (type === "image/webp" ? ".webp" : ".gif"), { type });
+    closeGifs();
+    await sendFiles([file], "file");
+  } catch (ex) {
+    toast(whyFailed(ex, "Couldn't send that GIF, try again."));
+  } finally {
+    gifs.busy = false;
+  }
+}
+
+function gifTile(src, label, onPick, onRemove) {
+  const wrap = el("div", "gif-tile");
+  const b = plainButton("", () => onPick(), "gif-pick");
+  b.setAttribute("aria-label", "send " + (label || "this GIF"));
+  const img = el("img");
+  img.src = src;
+  img.alt = label || "";
+  img.loading = "lazy";
+  img.draggable = false;
+  b.append(img);
+  wrap.append(b);
+  if (onRemove) {
+    const x = plainButton("\u00d7", onRemove, "gif-remove");
+    x.setAttribute("aria-label", "remove this GIF from my library");
+    wrap.append(x);
+  }
+  return wrap;
+}
+
