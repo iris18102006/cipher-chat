@@ -37,3 +37,47 @@ LIKERS_SHOWN = 3  # names shown under a post, the rest are behind "liked by"
 _recent: dict[int, deque] = defaultdict(deque)  # user id -> when they last posted (in memory)
 
 
+class PostBody(BaseModel):
+    body: str = ""
+    audience: str | None = None
+    media: list[int] = []
+
+
+class EditBody(BaseModel):
+    body: str | None = None
+    audience: str | None = None
+    media: list[int] | None = None
+
+
+class RepostBody(BaseModel):
+    body: str = ""
+    audience: str | None = None
+
+
+class ReportBody(BaseModel):
+    reason: str = "other"
+
+
+class CloseFriendsBody(BaseModel):
+    usernames: list[str] = []
+
+
+def check_rate(user_id: int):
+    now = time.monotonic()
+    seen = _recent[user_id]
+    while seen and now - seen[0] > POST_WINDOW:
+        seen.popleft()
+    if len(seen) >= POSTS_PER_WINDOW:
+        raise HTTPException(429, "slow down, you've posted a lot in the last few minutes")
+    seen.append(now)
+
+
+def pick_audience(conn, user, wanted: str | None) -> str:
+    """The audience the person asked for, or the one from their settings."""
+    if wanted is None:
+        wanted = conn.execute("SELECT post_audience FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
+    if wanted not in POST_AUDIENCES:
+        raise HTTPException(400, "pick friends, close friends or only me")
+    return wanted
+
+
