@@ -289,3 +289,45 @@ def get_feed(
     return {"posts": post_dicts(viewer, rows[:limit]), "more": len(rows) > limit}
 
 
+@router.get("/api/feed/meta")
+def feed_meta(user=Depends(current_user), conn=Depends(get_conn)):
+    admin = is_admin(user)
+    open_reports = 0
+    if admin:
+        open_reports = conn.execute(
+            "SELECT COUNT(*) FROM posts p WHERE p.reviewed = 0 AND EXISTS "
+            "(SELECT 1 FROM post_reports r WHERE r.post_id = p.id)"
+        ).fetchone()[0]
+    return {"admin": admin, "open_reports": open_reports}
+
+
+@router.get("/api/posts/{post_id}")
+def get_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    viewer = Viewer(conn, user)
+    return one_post(viewer, need_post(viewer, post_id))
+
+
+# ---------- likes ----------
+
+
+@router.post("/api/posts/{post_id}/like")
+def like_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    need_post(Viewer(conn, user), post_id)
+    conn.execute("INSERT OR IGNORE INTO post_likes (post_id, user_id) VALUES (?, ?)", (post_id, user["id"]))
+    conn.commit()
+    return like_state(conn, post_id, user)
+
+
+@router.delete("/api/posts/{post_id}/like")
+def unlike_post(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    need_post(Viewer(conn, user), post_id)
+    conn.execute("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?", (post_id, user["id"]))
+    conn.commit()
+    return like_state(conn, post_id, user)
+
+
+def like_state(conn, post_id: int, user) -> dict:
+    viewer = Viewer(conn, user)
+    return engagement(viewer, need_post(viewer, post_id))
+
+
