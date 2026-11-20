@@ -221,3 +221,57 @@ body.on-feed #app {
   border: 1px solid #7f9db9;
 }
 
+.fc-chip.fc-image {
+  padding: 0;
+}
+
+.fc-chip img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+}
+
+.fc-chip progress {
+  width: 120px;
+}
+
+.fc-name {
+  font-size: 11px;
+}
+
+.fc-icon {
+  font-size: 22px;
+}
+
+.fc-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 18px;
+  padding: 0 5px;
+  line-height: 16px;
+  border-radius: 9px;
+}
+
+.fc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fc-row select {
+  max-width: 100%;
+  padding: 3px;
+  font: inherit;
+}
+
+.fc-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: #888;
+}
+
