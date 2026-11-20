@@ -265,3 +265,5 @@ function makeComposer(opts) {
   return form;
 }
 
+// the page may have been opened with #feed or #post-12 in the address
+routeFromHash();
