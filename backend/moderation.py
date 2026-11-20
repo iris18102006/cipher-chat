@@ -85,3 +85,44 @@ def check_text(text: str) -> str | None:
 IMAGE_REFUSED = "that picture can't be posted here (no nudity, violence or anything harmful)"
 IMAGE_UNAVAILABLE = "pictures can't be checked right now, try again a little later"
 
+# what the optional check counts as "exposed" (NudeNet's own label names)
+EXPLICIT_LABELS = {
+    "FEMALE_GENITALIA_EXPOSED",
+    "MALE_GENITALIA_EXPOSED",
+    "FEMALE_BREAST_EXPOSED",
+    "ANUS_EXPOSED",
+    "BUTTOCKS_EXPOSED",
+}
+
+_detector = None
+
+
+def mode() -> str:
+    """off, or the name of the picture check that is switched on with CIPHER_IMAGE_CHECK."""
+    value = os.environ.get("CIPHER_IMAGE_CHECK", "").strip().lower()
+    return value if value in ("nudenet",) else "off"
+
+
+def threshold() -> float:
+    try:
+        return min(0.99, max(0.05, float(os.environ.get("CIPHER_IMAGE_THRESHOLD", "0.5"))))
+    except ValueError:
+        return 0.5
+
+
+def _frames(data: bytes, limit: int = 3) -> list[bytes]:
+    """The first, a middle and the last picture of the file (a still has one), as PNG bytes."""
+    img = Image.open(io.BytesIO(data))
+    count = max(1, getattr(img, "n_frames", 1))
+    picks = sorted({0, count // 2, count - 1})[:limit]
+    out = []
+    for n in picks:
+        img.seek(n)
+        frame = img.convert("RGB")
+        frame.thumbnail((640, 640))
+        buf = io.BytesIO()
+        frame.save(buf, "PNG")
+        out.append(buf.getvalue())
+    return out
+
+
