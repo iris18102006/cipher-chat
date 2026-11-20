@@ -162,3 +162,34 @@ function paintGifs() {
   panel.replaceChildren(tabs, body);
 }
 
+// searching, or what's popular when the box is empty. `more` adds the next page.
+async function runSearch(more) {
+  const grid = $("gif-grid");
+  if (!grid) return;
+  const q = gifs.query.trim();
+  const stamp = (gifs.stamp = (gifs.stamp || 0) + 1);
+  const offset = more ? gifs.next || 0 : 0;
+  if (!more) grid.replaceChildren(el("p", "list-empty", "searching..."));
+  try {
+    const data = await api("/api/gifs/search?" + new URLSearchParams({ q, offset: String(offset) }));
+    if (stamp !== gifs.stamp || !$("gif-grid")) return; // a newer search took over
+    if (!more) grid.replaceChildren();
+    if (!more && !data.gifs.length) grid.append(el("p", "list-empty", "nothing found"));
+    for (const g of data.gifs) {
+      grid.append(gifTile(g.preview, g.title, () => sendGif("/api/gifs/media/" + g.id + "/full")));
+    }
+    gifs.next = data.next;
+    $("gif-more").hidden = data.next == null;
+  } catch (ex) {
+    if (stamp === gifs.stamp && $("gif-grid")) $("gif-grid").replaceChildren(el("p", "list-empty", whyFailed(ex, "couldn't search, try again")));
+  }
+}
+
+$("gif-btn").onclick = () => (gifs.open ? closeGifs() : openGifs());
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && gifs.open) closeGifs();
+});
+// clicking anywhere else closes the picker
+document.addEventListener("mousedown", (e) => {
+  if (gifs.open && !gifPanel().contains(e.target) && e.target !== $("gif-btn")) closeGifs();
+});
