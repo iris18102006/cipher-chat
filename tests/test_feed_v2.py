@@ -258,3 +258,54 @@ def test_repost_note_is_checked_and_original_audience_change_hides_it(client):
 
 # ---------- reports ----------
 
+def test_reports_hide_a_post_until_a_moderator_looks(client, monkeypatch):
+    a, b, c = trio(client)
+    pid = post(a, "bad stuff").json()["id"]
+    assert a.post(f"/api/posts/{pid}/report", json={"reason": "other"}).status_code == 400  # own post
+    assert b.post(f"/api/posts/{pid}/report", json={"reason": "weird"}).status_code == 400
+    assert b.post(f"/api/posts/{pid}/report", json={"reason": "nudity"}).status_code == 200
+    assert pid in ids(c)  # one report isn't enough
+    assert c.post(f"/api/posts/{pid}/report", json={"reason": "violence"}).status_code == 200
+    assert pid not in ids(b) and pid not in ids(c)
+    mine = a.get(f"/api/posts/{pid}").json()
+    assert mine["hidden"] is True  # the author is told
+    # not a moderator: looks like a page that doesn't exist
+    assert b.get("/api/admin/reports").status_code == 404
+    monkeypatch.setenv("CIPHER_ADMINS", "bob")
+    rep = b.get("/api/admin/reports").json()["reports"]
+    assert rep[0]["post"]["id"] == pid and rep[0]["reports"] == 2 and rep[0]["hidden"]
+    assert b.get("/api/feed/meta").json() == {"admin": True, "open_reports": 1}
+    assert b.post(f"/api/admin/posts/{pid}/keep").status_code == 200
+    assert pid in ids(c)
+    # looked at and kept: more reports don't hide it again
+    for who in (b, c):
+        who.post(f"/api/posts/{pid}/report", json={"reason": "other"})
+    assert pid in ids(c)
+
+
+def test_moderator_can_see_reported_media_and_remove(client, monkeypatch):
+    a, b, c = trio(client)
+    m = png(a)
+    pid = post(a, "", media=[m["id"]]).json()["id"]
+    b.post(f"/api/posts/{pid}/report", json={"reason": "nudity"})
+    c.post(f"/api/posts/{pid}/report", json={"reason": "nudity"})
+    monkeypatch.setenv("CIPHER_ADMINS", "carol")
+    assert b.get(m["url"]).status_code == 404
+    assert c.get(m["url"]).status_code == 200
+    assert c.delete(f"/api/admin/posts/{pid}").status_code == 200
+    assert a.get(f"/api/posts/{pid}").status_code == 404
+
+
+# ---------- settings ----------
+
+def test_settings_round_trip(client):
+    a, b, c = trio(client)
+    s = a.get("/api/settings").json()
+    assert s == {"message_policy": "allow", "post_audience": "friends", "likes_visibility": "everyone",
+                 "allow_reposts": True, "allow_chat_shares": True, "notify_posts": True}
+    assert a.put("/api/settings", json={"notify_posts": False}).json()["notify_posts"] is False
+    assert a.put("/api/settings", json={"likes_visibility": "x"}).status_code == 400
+
+
+# ---------- GIFs ----------
+
