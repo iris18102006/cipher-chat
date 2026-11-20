@@ -103,3 +103,44 @@ function shareDialog(post) {
 
 const postCardCache = new Map(); // post id -> a promise for what the server said, kept briefly
 
+function fetchPostForChat(id) {
+  const hit = postCardCache.get(id);
+  if (hit && Date.now() - hit.at < 30000) return hit.job;
+  const job = api("/api/posts/" + id);
+  postCardCache.set(id, { at: Date.now(), job });
+  job.catch(() => postCardCache.delete(id));
+  return job;
+}
+
+// the little card that stands for a post in a chat bubble
+function postCardNode(ref) {
+  const card = el("div", "chat-post");
+  card.append(el("div", "chat-post-note", "loading post..."));
+  fetchPostForChat(ref.id)
+    .then((p) => {
+      const open = plainButton("", () => openPostPage(ref.id), "chat-post-open");
+      open.append(avatarNode(p.author, "small"));
+      const text = el("span", "chat-post-text");
+      text.append(el("b", "", shownName(p.author)));
+      let body = p.body;
+      if (p.is_repost && p.original && p.original.body && !body) body = p.original.body;
+      if (body) text.append(el("span", "chat-post-body", body.length > 140 ? body.slice(0, 140) + "\u2026" : body));
+      const media = (p.media && p.media.length ? p.media : p.original && p.original.media) || [];
+      const pic = media.find((m) => m.kind === "image" && safeMedia(m.url));
+      if (pic) {
+        const img = el("img", "chat-post-pic");
+        img.src = pic.url;
+        img.alt = "";
+        img.loading = "lazy";
+        open.append(img);
+      } else if (media.length) {
+        text.append(el("span", "chat-post-body", media[0].kind === "video" ? "\u{1f3ac} video" : "\u{1f3b5} song"));
+      }
+      open.append(text);
+      card.replaceChildren(el("div", "chat-post-label", "\u2708 shared a post"), open);
+    })
+    .catch(() => {
+      card.replaceChildren(el("div", "chat-post-note", "This post isn't available to you. It may have been deleted, or it isn't shared with you."));
+    });
+  return card;
+}
