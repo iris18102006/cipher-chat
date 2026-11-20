@@ -404,3 +404,54 @@ def need_admin(user):
         raise HTTPException(404, "not found")
 
 
+@router.get("/api/admin/reports")
+def admin_reports(user=Depends(current_user), conn=Depends(get_conn)):
+    """Reported posts nobody has looked at yet, the most reported first."""
+    need_admin(user)
+    viewer = Viewer(conn, user)
+    ids = conn.execute(
+        "SELECT p.id FROM posts p WHERE p.reviewed = 0 AND EXISTS (SELECT 1 FROM post_reports r WHERE r.post_id = p.id) "
+        "ORDER BY (SELECT COUNT(*) FROM post_reports r WHERE r.post_id = p.id) DESC, p.id DESC LIMIT 50"
+    ).fetchall()
+    out = []
+    for (post_id,) in ids:
+        row = viewer.raw_row(post_id)
+        reasons = conn.execute(
+            "SELECT reason, COUNT(*) AS n FROM post_reports WHERE post_id = ? GROUP BY reason", (post_id,)
+        ).fetchall()
+        post = plain_post(viewer, row, media.media_for(conn, [post_id]))
+        post["is_repost"] = bool(row["is_share"])
+        out.append(
+            {
+                "post": post,
+                "hidden": bool(row["hidden"]),
+                "reports": sum(r["n"] for r in reasons),
+                "reasons": {r["reason"]: r["n"] for r in reasons},
+            }
+        )
+    return {"reports": out}
+
+
+@router.post("/api/admin/posts/{post_id}/keep")
+def admin_keep(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    """It's fine: show it again, and don't let more reports hide it."""
+    need_admin(user)
+    if not conn.execute("SELECT 1 FROM posts WHERE id = ?", (post_id,)).fetchone():
+        raise HTTPException(404, "no such post")
+    conn.execute("UPDATE posts SET hidden = 0, reviewed = 1 WHERE id = ?", (post_id,))
+    conn.execute("DELETE FROM post_reports WHERE post_id = ?", (post_id,))
+    conn.commit()
+    return {"ok": True}
+
+
+@router.delete("/api/admin/posts/{post_id}")
+def admin_remove(post_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    """It breaks the rules: delete it (reposts of it say the original was deleted)."""
+    need_admin(user)
+    cur = conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    conn.commit()
+    if not cur.rowcount:
+        raise HTTPException(404, "no such post")
+    return {"ok": True}
+
+
