@@ -77,3 +77,41 @@
   text-align: right;
 }
 
+.gif-grid {
+  columns: 3 90px;
+  column-gap: 4px;
+}
+
+.gif-tile {
+  position: relative;
+  break-inside: avoid;
+  margin-bottom: 4px;
+}
+
+.gif-pick {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid #ccd;
+  background: #eef;
+}
+
+.gif-pick img {
+  display: block;
+  width: 100%;
+}
+
+.gif-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  padding: 0 5px;
+  line-height: 16px;
+  border-radius: 9px;
+}
+
+.gif-more {
+  display: block;
+  margin: 6px auto 0;
+}
