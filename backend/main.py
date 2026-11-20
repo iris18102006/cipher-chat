@@ -74,6 +74,12 @@ MAX_TOP_FRIENDS = 8
 # messages from someone whose friend request you haven't accepted yet
 MESSAGE_POLICIES = ("allow", "ask", "wait")
 MAX_HELD = 3  # how many messages someone can leave waiting while you decide
+
+# the feed: who a post is for, and who gets to see the names behind the likes
+POST_AUDIENCES = ("friends", "close", "me")
+LIKES_VISIBILITY = ("everyone", "count", "private")
+MAX_GIFS = 40  # GIFs (or pictures) someone can keep to send in chats
+MAX_GIF_UPLOAD = 4 * 1024 * 1024
 HELD = 2  # messages.hidden = 2 means "waiting for the friend request to be accepted"
 
 # pictures: one profile picture plus a small gallery of photos / gifs
@@ -153,6 +159,11 @@ class CommentBody(BaseModel):
 
 class SettingsBody(BaseModel):
     message_policy: str | None = None
+    post_audience: str | None = None
+    likes_visibility: str | None = None
+    allow_reposts: bool | None = None
+    allow_chat_shares: bool | None = None
+    notify_posts: bool | None = None
 
 
 class CaptionBody(BaseModel):
@@ -283,7 +294,7 @@ def process_image(raw: bytes, kind: str) -> dict:
         if w < 1 or h < 1 or w > MAX_SIDE or h > MAX_SIDE or w * h > MAX_PIXELS:
             raise HTTPException(400, f"that picture is too big (max {MAX_SIDE}px on a side)")
         frames = getattr(img, "n_frames", 1)
-        if frames > 1 and fmt in ("GIF", "WEBP") and kind == "photo":
+        if frames > 1 and fmt in ("GIF", "WEBP") and kind in ("photo", "gif", "post"):
             if frames > MAX_FRAMES:
                 raise HTTPException(400, f"that gif has too many frames (max {MAX_FRAMES})")
             img.seek(frames - 1)  # a broken file fails here instead of in somebody's browser
@@ -916,6 +927,15 @@ def drop_held(conn, a: int, b: int):
     )
 
 
+def drop_close_friends(conn, a: int, b: int):
+    """Not friends any more: neither is on the other's close friends list."""
+    conn.execute(
+        "DELETE FROM close_friends WHERE (owner_id = :a AND friend_id = :b) "
+        "OR (owner_id = :b AND friend_id = :a)",
+        {"a": a, "b": b},
+    )
+
+
 def friend_ids(conn, user_id: int) -> set[int]:
     rows = conn.execute(
         "SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END "
@@ -1014,6 +1034,7 @@ async def remove_friend(username: str, user=Depends(current_user), conn=Depends(
         {"a": user["id"], "b": peer["id"]},
     )
     drop_held(conn, user["id"], peer["id"])
+    drop_close_friends(conn, user["id"], peer["id"])
     conn.commit()
     if cur.rowcount:  # nothing to tell them if there was nothing between you
         await manager.send_user(
@@ -1089,6 +1110,7 @@ async def block_user(username: str, user=Depends(current_user), conn=Depends(get
         {"a": user["id"], "b": peer["id"]},
     )
     drop_held(conn, user["id"], peer["id"])
+    drop_close_friends(conn, user["id"], peer["id"])
     conn.commit()
     await notify_block_change(user["username"], peer["username"])
     return {"blocked": True}
@@ -1109,24 +1131,52 @@ async def unblock_user(username: str, user=Depends(current_user), conn=Depends(g
 # ---------- settings ----------
 
 
+SETTINGS_COLUMNS = (
+    "msg_policy, post_audience, likes_visibility, allow_reposts, allow_chat_shares, notify_posts"
+)
+
+
 @app.get("/api/settings")
 def get_settings(user=Depends(current_user), conn=Depends(get_conn)):
-    row = conn.execute("SELECT msg_policy FROM users WHERE id = ?", (user["id"],)).fetchone()
-    return {"message_policy": row["msg_policy"]}
+    row = conn.execute(f"SELECT {SETTINGS_COLUMNS} FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return {
+        "message_policy": row["msg_policy"],
+        "post_audience": row["post_audience"],
+        "likes_visibility": row["likes_visibility"],
+        "allow_reposts": bool(row["allow_reposts"]),
+        "allow_chat_shares": bool(row["allow_chat_shares"]),
+        "notify_posts": bool(row["notify_posts"]),
+    }
 
 
 @app.put("/api/settings")
 async def put_settings(body: SettingsBody, user=Depends(current_user), conn=Depends(get_conn)):
+    # every field is optional: only the ones that were sent change. Column names come from this
+    # fixed list, never from the request
+    updates: dict = {}
     if body.message_policy is not None:
         if body.message_policy not in MESSAGE_POLICIES:
             raise HTTPException(400, "pick allow, ask or wait")
-        conn.execute(
-            "UPDATE users SET msg_policy = ? WHERE id = ?", (body.message_policy, user["id"])
-        )
+        updates["msg_policy"] = body.message_policy
+    if body.post_audience is not None:
+        if body.post_audience not in POST_AUDIENCES:
+            raise HTTPException(400, "pick friends, close friends or only me")
+        updates["post_audience"] = body.post_audience
+    if body.likes_visibility is not None:
+        if body.likes_visibility not in LIKES_VISIBILITY:
+            raise HTTPException(400, "pick everyone, count or private")
+        updates["likes_visibility"] = body.likes_visibility
+    for field in ("allow_reposts", "allow_chat_shares", "notify_posts"):
+        value = getattr(body, field)
+        if value is not None:
+            updates[field] = int(value)
+    if updates:
+        sets = ", ".join(f"{col} = ?" for col in updates)
+        conn.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), user["id"]))
         conn.commit()
-        if body.message_policy == "allow":
-            # you're fine with them now, so whatever was waiting comes through
-            await release_held(conn, user["id"])
+    if updates.get("msg_policy") == "allow":
+        # you're fine with them now, so whatever was waiting comes through
+        await release_held(conn, user["id"])
     return get_settings(user, conn)
 
 
@@ -1651,12 +1701,14 @@ async def websocket_endpoint(ws: WebSocket):
 # ---------- group chats ----------
 # imported down here because groups.py uses helpers from this file
 
-from . import blobs, chat_themes, feed, groups, songs  # noqa: E402
+from . import blobs, chat_themes, feed, gifs, groups, media, moderation, songs  # noqa: E402
 
 app.include_router(groups.router)
 app.include_router(songs.router)
 app.include_router(blobs.router)
 app.include_router(feed.router)
+app.include_router(media.router)
+app.include_router(gifs.router)
 app.include_router(chat_themes.router)
 
 
