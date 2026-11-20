@@ -43,3 +43,48 @@ def test_close_friends_only_see_close_posts(client):
     assert c.get(f"/api/posts/{pid}").status_code == 404
 
 
+def test_only_me_is_only_me(client):
+    a, b, c = trio(client)
+    pid = post(a, "diary", audience="me").json()["id"]
+    assert pid in ids(a) and pid not in ids(b)
+    assert b.get(f"/api/posts/{pid}").status_code == 404
+
+
+def test_close_friends_must_be_friends_and_go_with_the_friendship(client):
+    a, b, c = trio(client)
+    assert b.put("/api/close-friends", json={"usernames": ["carol"]}).status_code == 400
+    a.put("/api/close-friends", json={"usernames": ["bob", "carol"]})
+    assert [f["close"] for f in a.get("/api/close-friends").json()["friends"]] == [True, True]
+    a.delete("/api/friends/bob")
+    assert [f["username"] for f in a.get("/api/close-friends").json()["friends"]] == ["carol"]
+    a.post("/api/friends/bob"); b.post("/api/friends/alice/accept")
+    assert [f["close"] for f in a.get("/api/close-friends").json()["friends"]] == [False, True]
+
+
+def test_default_audience_comes_from_settings(client):
+    a, b, c = trio(client)
+    assert a.put("/api/settings", json={"post_audience": "me"}).json()["post_audience"] == "me"
+    assert post(a).json()["audience"] == "me"
+    assert post(a, audience="friends").json()["audience"] == "friends"
+    assert a.put("/api/settings", json={"post_audience": "nope"}).status_code == 400
+    assert post(a, audience="everyone").status_code == 400
+
+
+# ---------- editing ----------
+
+def test_edit_own_post(client):
+    a, b, c = trio(client)
+    pid = post(a, "first").json()["id"]
+    e = a.patch(f"/api/posts/{pid}", json={"body": "second"}).json()
+    assert e["body"] == "second" and e["edited"] is True
+    assert b.patch(f"/api/posts/{pid}", json={"body": "hax"}).status_code == 404
+    assert a.patch(f"/api/posts/{pid}", json={"body": "  "}).status_code == 400
+
+
+def test_changing_audience_is_not_an_edit(client):
+    a, b, c = trio(client)
+    pid = post(a, "x").json()["id"]
+    e = a.patch(f"/api/posts/{pid}", json={"audience": "me"}).json()
+    assert e["edited"] is False and pid not in ids(b)
+
+
