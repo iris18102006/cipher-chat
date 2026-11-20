@@ -124,3 +124,34 @@ def _results(payload: dict) -> list[dict]:
     return out
 
 
+def _need_search(user):
+    if not api_key():
+        raise HTTPException(404, "GIF search isn't switched on on this server")
+    if search_limiter.blocked(str(user["id"])):
+        raise HTTPException(429, "slow down, you've searched a lot just now")
+    search_limiter.hit(str(user["id"]))
+
+
+@router.get("/api/gifs/status")
+def status(user=Depends(current_user)):
+    return {"search": bool(api_key()), "max": MAX_GIFS, "page": PAGE}
+
+
+@router.get("/api/gifs/search")
+async def search(
+    q: str = Query("", max_length=100),
+    offset: int = Query(0, ge=0, le=500),
+    user=Depends(current_user),
+):
+    """GIFs for some words, or what's popular right now when there are none."""
+    _need_search(user)
+    words = clean_text(q, 50, "search")
+    path, params = ("search", {"q": words}) if words else ("trending", {})
+    try:
+        payload = await run_in_threadpool(_api, path, {**params, "limit": PAGE, "offset": offset})
+    except (OSError, ValueError):
+        raise HTTPException(502, "couldn't reach the GIF service, try again in a moment")
+    found = _results(payload)
+    return {"gifs": found, "next": offset + PAGE if len(found) >= PAGE - 4 else None}
+
+
