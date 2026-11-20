@@ -442,3 +442,43 @@ function showPage() {
   }
 }
 
+function showFeed() {
+  showPage();
+  feed.single = null;
+  setNewCount(0);
+  paintTabs();
+  mountCompose();
+  loadFeed(false);
+}
+
+function showPost(id) {
+  showPage();
+  feed.single = id;
+  setNewCount(0);
+  paintTabs();
+  loadSingle(id);
+}
+
+function hideFeed() {
+  if (!feed.open) return;
+  feed.open = false;
+  feed.single = null;
+  document.body.classList.remove("on-feed");
+  $("feed-page").hidden = true;
+  $("feed-btn").classList.remove("on");
+}
+
+function openFeed() {
+  if (location.hash === "#feed") showFeed();
+  else location.hash = "#feed";
+}
+
+function openPostPage(id) {
+  location.hash = "#post-" + id;
+}
+
+function closeFeed() {
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  hideFeed();
+}
+
