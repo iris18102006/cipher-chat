@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="chat-themes.css">
   <link rel="stylesheet" href="feed.css">
   <link rel="stylesheet" href="attachments.css">
+  <link rel="stylesheet" href="gifs.css">
 </head>
 <body>
   <noscript><p>cipher-chat needs JavaScript to encrypt your messages in your browser. Turn it on and reload the page.</p></noscript>
@@ -101,8 +102,11 @@
           <button id="rec-send" type="button">Send</button>
         </div>
 
+        <div id="gif-panel" role="dialog" aria-label="GIFs" hidden></div>
+
         <form id="composer" autocomplete="off">
           <button id="attach" type="button" aria-label="send a file, photo or video" title="send a file, photo or video" disabled>&#128206;</button>
+          <button id="gif-btn" type="button" aria-label="send a GIF" aria-expanded="false" title="send a GIF" disabled>GIF</button>
           <input id="attach-input" type="file" multiple hidden aria-label="choose files to send">
           <textarea id="msg" rows="1" maxlength="4000" aria-label="message" placeholder="type a message (Enter to send, Shift+Enter for a new line)"></textarea>
           <button id="mic" type="button" aria-label="record a voice message" title="record a voice message (up to 5 minutes)" disabled>&#127908;</button>
@@ -114,29 +118,45 @@
 
   <div id="toast" role="status" aria-live="polite" hidden></div>
 
-  <!-- the feed, filled in by feed.js -->
-  <div id="feed-overlay" hidden>
-    <div id="feed-window" role="dialog" aria-modal="true" aria-labelledby="feed-title">
-      <div id="feed-bar">
-        <span id="feed-title">Feed</span>
-        <button id="feed-refresh" type="button" aria-label="refresh the feed" title="refresh">&#8635;</button>
-        <button id="feed-close" type="button" aria-label="close the feed">&times;</button>
-      </div>
-      <form id="feed-compose" autocomplete="off">
-        <label for="feed-text" class="feed-label">What's on your mind?</label>
-        <textarea id="feed-text" rows="3" maxlength="500" placeholder="say something to your friends..."></textarea>
-        <div id="feed-compose-row">
-          <span id="feed-hint">Ctrl+Enter posts</span>
-          <span id="feed-chars" aria-live="off">500</span>
-          <button id="feed-post" type="submit">Post</button>
-        </div>
-      </form>
-      <p id="feed-error" role="alert" hidden></p>
-      <button id="feed-new" type="button" hidden></button>
-      <div id="feed-list" aria-live="polite"></div>
-      <button id="feed-more" type="button" hidden>Load older posts</button>
+  <!-- the feed page, filled in by feed.js. It takes the place of the chat while it is open -->
+  <main id="feed-page" aria-labelledby="feed-title" hidden>
+    <div id="feed-bar">
+      <button id="feed-close" type="button">&laquo; Chats</button>
+      <button id="feed-back-feed" type="button" hidden>&laquo; Feed</button>
+      <h2 id="feed-title">Feed</h2>
+      <button id="feed-refresh" type="button" aria-label="refresh the feed" title="refresh">&#8635;</button>
+      <button id="feed-post-settings" type="button" title="who sees your posts, likes and more">Post settings</button>
     </div>
-  </div>
+    <div id="feed-layout">
+      <section id="feed-main">
+        <div id="feed-tabs" role="group" aria-label="which posts to show">
+          <button type="button" data-tab="all" class="on" aria-pressed="true">Everyone</button>
+          <button type="button" data-tab="close" aria-pressed="false">&#9733; Close friends</button>
+          <button type="button" data-tab="mine" aria-pressed="false">My posts</button>
+        </div>
+        <div id="feed-compose-box"><div id="feed-compose-slot"></div></div>
+        <p id="feed-error" role="alert" hidden></p>
+        <button id="feed-new" type="button" hidden></button>
+        <div id="feed-list" aria-live="polite"></div>
+        <button id="feed-more" type="button" hidden>Load older posts</button>
+      </section>
+      <aside id="feed-side" aria-label="about the feed">
+        <div class="side-box">
+          <h3>House rules</h3>
+          <ul>
+            <li>Be kind. No threats, bullying or hate.</li>
+            <li>No nudity, violence or gore.</li>
+            <li>Only post pictures, videos and music you may share.</li>
+            <li>See something wrong? Press Report.</li>
+          </ul>
+        </div>
+        <div class="side-box" id="feed-admin" hidden>
+          <h3>To review <span class="count" id="feed-admin-count">0</span></h3>
+          <div id="feed-admin-list"></div>
+        </div>
+      </aside>
+    </div>
+  </main>
 
   <!-- friend requests and blocked people, filled in by lists.js -->
   <div id="lists-overlay" hidden>
@@ -203,9 +223,14 @@
   <script src="friends.js"></script>
   <script src="settings.js"></script>
   <script src="lists.js"></script>
+  <script src="postwire.js"></script>
+  <script src="dialogs.js"></script>
   <script src="feed.js"></script>
+  <script src="feed-compose.js"></script>
   <script src="groups.js"></script>
   <script src="attachments.js"></script>
+  <script src="feed-share.js"></script>
+  <script src="gifs.js"></script>
   <script src="chat-themes.js"></script>
 </body>
 </html>
