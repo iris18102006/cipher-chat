@@ -725,3 +725,58 @@ body.on-feed #app {
   flex-direction: column;
 }
 
+.chat-post-text b {
+  color: #0a246a;
+}
+
+.chat-post-body {
+  overflow-wrap: anywhere;
+}
+
+.chat-post-pic {
+  grid-column: 1 / -1;
+  order: 3;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+}
+
+.settings-section h3 {
+  margin: 14px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 2px solid #ff9933;
+  color: #17407f;
+}
+
+@media (max-width: 760px) {
+  #feed-page {
+    padding: 0;
+    margin: 0;
+  }
+
+  #feed-layout {
+    flex-direction: column;
+    padding: 6px;
+  }
+
+  #feed-side {
+    position: static;
+    width: 100%;
+  }
+
+  #feed-bar {
+    border-radius: 0;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-post.is-new {
+    animation: none;
+  }
+}
+
+/* a profile opened from a post has to open on top of the little windows too */
+#profile-overlay {
+  z-index: 65;
+}
