@@ -455,3 +455,43 @@ def admin_remove(post_id: int, user=Depends(current_user), conn=Depends(get_conn
     return {"ok": True}
 
 
+# ---------- close friends ----------
+
+
+def close_friends_list(conn, user) -> dict:
+    friends = friend_ids(conn, user["id"]) - blocked_with(conn, user["id"])
+    if not friends:
+        return {"friends": []}
+    rows = conn.execute(
+        "SELECT u.username, u.display_name, u.avatar_id, "
+        "EXISTS (SELECT 1 FROM close_friends c WHERE c.owner_id = ? AND c.friend_id = u.id) AS close "
+        f"FROM users u WHERE u.id IN ({','.join('?' * len(friends))}) ORDER BY LOWER(u.username)",
+        [user["id"], *sorted(friends)],
+    ).fetchall()
+    return {"friends": [{**person(r), "close": bool(r["close"])} for r in rows]}
+
+
+@router.get("/api/close-friends")
+def get_close_friends(user=Depends(current_user), conn=Depends(get_conn)):
+    return close_friends_list(conn, user)
+
+
+@router.put("/api/close-friends")
+def put_close_friends(body: CloseFriendsBody, user=Depends(current_user), conn=Depends(get_conn)):
+    """Replaces the whole list. Everyone on it has to be a friend."""
+    if len(body.usernames) > 500:
+        raise HTTPException(400, "that's too many people")
+    wanted = {n.strip().lower() for n in body.usernames if n.strip()}
+    friends = friend_ids(conn, user["id"]) - blocked_with(conn, user["id"])
+    chosen: set[int] = set()
+    for name in wanted:
+        row = conn.execute("SELECT id FROM users WHERE username = ?", (name,)).fetchone()
+        if not row or row["id"] not in friends:
+            raise HTTPException(400, "you can only add your friends")
+        chosen.add(row["id"])
+    conn.execute("DELETE FROM close_friends WHERE owner_id = ?", (user["id"],))
+    conn.executemany(
+        "INSERT INTO close_friends (owner_id, friend_id) VALUES (?, ?)", [(user["id"], fid) for fid in sorted(chosen)]
+    )
+    conn.commit()
+    return close_friends_list(conn, user)
