@@ -275,3 +275,60 @@ body.on-feed #app {
   color: #888;
 }
 
+.fc-chars {
+  font-size: 11px;
+  color: #666;
+}
+
+.fc-chars.low {
+  color: #a33;
+  font-weight: bold;
+}
+
+.fc-submit {
+  padding: 4px 18px;
+  border: 2px outset #fff;
+  border-radius: 4px;
+  background: linear-gradient(#fff4c4, #ffc94a);
+  color: #4a2f00;
+}
+
+.fc-rules {
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: #777;
+}
+
+/* ---------- one post ---------- */
+
+.feed-post {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #aca899;
+  border-left: 5px solid #3a7bd5;
+  border-radius: 3px;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.12);
+}
+
+.feed-post.mine {
+  border-left-color: #ff9933;
+}
+
+.feed-post.is-hidden {
+  opacity: 0.8;
+  border-left-color: #b00020;
+}
+
+.feed-hidden-note {
+  margin: 8px 0 0;
+  padding: 4px 8px;
+  background: #fde8e8;
+  border: 1px solid #e0a0a0;
+  color: #7a1010;
+}
+
+.feed-post.is-new {
+  animation: feed-flash 1.6s ease-out;
+}
+
