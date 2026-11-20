@@ -227,3 +227,26 @@ async function showLikes(p) {
   }
 }
 
+function afterChange(p, fresh) {
+  // keep every copy of this post on screen in step (the post itself and reposts that show it)
+  for (const q of feed.posts) {
+    if (q.id === p.id) Object.assign(q, fresh);
+    if (q.is_repost && q.original && q.original.id === p.id) Object.assign(q.original, fresh);
+  }
+  renderFeed();
+}
+
+function editDialog(p, card) {
+  const form = makeComposer({
+    post: p,
+    onDone: (fresh) => {
+      dlg.close();
+      // an edit keeps a repost's original, so only the parts that can change are copied over
+      Object.assign(p, fresh, p.is_repost ? { original: p.original } : {});
+      renderFeed();
+    },
+    onCancel: () => dlg.close(),
+  });
+  const dlg = openDialog(p.is_repost ? "Edit your note" : "Edit post", form, { wide: true });
+}
+
