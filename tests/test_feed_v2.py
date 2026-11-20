@@ -178,3 +178,49 @@ def test_draft_limit_and_delete(client):
     assert a.delete(f"/api/post-media/{m['id']}").status_code == 404
 
 
+# ---------- the picture check ----------
+
+def test_picture_check_off_by_default_and_fails_closed(client, monkeypatch):
+    a, b, c = trio(client)
+    assert moderation.check_image(make_image("PNG").getvalue() if hasattr(make_image("PNG"), "getvalue") else make_image("PNG")) is None
+    monkeypatch.setenv("CIPHER_IMAGE_CHECK", "nudenet")
+    monkeypatch.setattr(moderation, "_nudenet_flags", lambda png: (_ for _ in ()).throw(ImportError()))
+    assert a.post("/api/post-media", content=make_image("PNG").getvalue() if hasattr(make_image("PNG"), "getvalue") else make_image("PNG")).status_code == 400
+    monkeypatch.setattr(moderation, "_nudenet_flags", lambda png: True)
+    r = a.post("/api/post-media", content=make_image("PNG").getvalue() if hasattr(make_image("PNG"), "getvalue") else make_image("PNG"))
+    assert r.status_code == 400 and "picture" in r.json()["detail"]
+    monkeypatch.setattr(moderation, "_nudenet_flags", lambda png: False)
+    assert a.post("/api/post-media", content=make_image("PNG").getvalue() if hasattr(make_image("PNG"), "getvalue") else make_image("PNG")).status_code == 200
+
+
+# ---------- likes ----------
+
+def test_liked_by_names_and_privacy_levels(client):
+    a, b, c = trio(client)
+    pid = post(a, "x").json()["id"]
+    b.post(f"/api/posts/{pid}/like"); a.post(f"/api/posts/{pid}/like")
+    seen = b.get(f"/api/posts/{pid}").json()
+    assert seen["likes"] == 2 and {p["username"] for p in seen["likers"]} == {"alice", "bob"}
+    names = b.get(f"/api/posts/{pid}/likes").json()
+    assert names["count"] == 2
+    a.put("/api/settings", json={"likes_visibility": "count"})
+    seen = b.get(f"/api/posts/{pid}").json()
+    assert seen["likes"] == 2 and seen["likers"] == [] and not seen["likes_names"]
+    assert b.get(f"/api/posts/{pid}/likes").status_code == 403
+    assert a.get(f"/api/posts/{pid}/likes").json()["count"] == 2  # the author still sees them
+    a.put("/api/settings", json={"likes_visibility": "private"})
+    seen = b.get(f"/api/posts/{pid}").json()
+    assert seen["likes"] is None and seen["likes_hidden"] and seen["liked"] is True
+    assert a.get(f"/api/posts/{pid}").json()["likes"] == 2
+
+
+def test_blocked_people_are_left_out_of_liked_by(client):
+    a, b, c = trio(client)
+    pid = post(a, "x").json()["id"]
+    b.post(f"/api/posts/{pid}/like")
+    c.post(f"/api/posts/{pid}/like")
+    c.post("/api/blocks/bob")  # carol blocks bob, so carol doesn't see him, alice still does
+    assert {p["username"] for p in c.get(f"/api/posts/{pid}/likes").json()["likers"]} == {"carol"}
+    assert {p["username"] for p in a.get(f"/api/posts/{pid}/likes").json()["likers"]} == {"bob", "carol"}
+
+
