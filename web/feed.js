@@ -337,3 +337,29 @@ function reportDialog(target, card) {
   const dlg = openDialog("Report this post", form);
 }
 
+async function deletePost(p) {
+  if (!confirm("Delete this post? Reposts of it will say the original was deleted.")) return;
+  try {
+    await sendJson("/api/posts/" + p.id, "DELETE");
+    feed.posts = feed.posts.filter((x) => x.id !== p.id);
+    if (feed.single === p.id) return closeSingle();
+    renderFeed();
+  } catch (ex) {
+    feedError(ex.message);
+  }
+}
+
+function renderFeed() {
+  const list = $("feed-list");
+  list.replaceChildren();
+  if (!feed.posts.length) {
+    const text = feed.tab === "close" ? "No close friends posts yet. Pick your close friends in Settings." : feed.tab === "mine" ? "You haven't posted anything yet." : "Nothing here yet. Post something, or add some friends.";
+    list.append(el("p", "feed-empty", text));
+  } else {
+    for (const p of feed.posts) list.append(renderPost(p));
+  }
+  $("feed-more").hidden = !feed.more || feed.single != null;
+}
+
+// ---------- loading ----------
+
