@@ -35,3 +35,45 @@
   border-radius: 8px 8px 0 0;
 }
 
+.gif-tabs button.on {
+  background: #fff;
+  box-shadow: inset 0 3px 0 #ff9933;
+}
+
+.gif-tabs .gif-close {
+  margin-left: auto;
+}
+
+.gif-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.gif-search {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 5px;
+  font: inherit;
+  border: 1px solid #7f9db9;
+}
+
+.gif-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.gif-note,
+.gif-credit {
+  font-size: 10px;
+  color: #667;
+}
+
+.gif-credit {
+  margin: 6px 0 0;
+  text-align: right;
+}
+
