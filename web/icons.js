@@ -128,3 +128,27 @@ function icon(name, filled) {
   }
   return svg;
 }
+
+// something that sits in a line of text: an icon, then the words
+function withIcon(name, text, filled) {
+  const span = el("span", "ic-label");
+  span.append(icon(name, filled));
+  if (text) span.append(el("span", "ic-text", text));
+  return span;
+}
+
+// a button with an icon and (optionally) words. Same shape as plainButton in dialogs.js.
+function iconButton(name, text, onClick, cls, filled) {
+  const b = el("button", cls || "");
+  b.type = "button";
+  b.append(icon(name, filled));
+  if (text) b.append(el("span", "ic-text", text));
+  if (onClick) b.onclick = onClick;
+  return b;
+}
+
+// puts new icon / words into a button that iconButton made (a like button that flips)
+function setIconButton(b, name, text, filled) {
+  b.replaceChildren(icon(name, filled));
+  if (text) b.append(el("span", "ic-text", text));
+}
