@@ -6,7 +6,7 @@
 // The browser never talks to GIPHY. Search words go to our server, which asks GIPHY and passes
 // the pictures on, so the page's strict content policy stays as it is.
 
-const gifs = { open: false, tab: "mine", search: false, loaded: false, mine: [], max: 40, timer: null, next: null, query: "", busy: false };
+const gifs = { open: false, tab: "search", search: false, loaded: false, mine: [], max: 40, timer: null, next: null, query: "", busy: false };
 
 function gifPanel() {
   return $("gif-panel");
