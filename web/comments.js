@@ -157,3 +157,52 @@ async function deleteComment(p, c) {
     toast(whyFailed(ex, "couldn't delete that comment, try again"));
   }
 }
+
+// ---------- the thread ----------
+
+function commentForm(p) {
+  const st = commentsFor(p.id);
+  const form = el("form", "fcm-form");
+  const input = el("textarea", "fcm-input");
+  input.rows = 1;
+  input.maxLength = COMMENT_MAX;
+  input.placeholder = "write a comment...";
+  input.setAttribute("aria-label", "write a comment");
+  input.value = st.draft;
+  const err = el("p", "fc-error");
+  err.hidden = true;
+  const send = iconButton("send", "Send", null, "fcm-send");
+  send.type = "submit";
+  input.oninput = () => {
+    st.draft = input.value;
+  };
+  // Enter sends, Shift+Enter makes a new line
+  input.onkeydown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const words = input.value.trim();
+    if (!words) return;
+    send.disabled = true;
+    err.hidden = true;
+    try {
+      const made = await sendJson("/api/posts/" + p.id + "/comments", "POST", { body: words });
+      st.list.push(made);
+      st.draft = "";
+      p.comments = (p.comments || 0) + 1;
+      repaintComments(p.id);
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+      send.disabled = false;
+    }
+  };
+  const row = el("div", "fcm-formrow");
+  row.append(input, send);
+  form.append(row, err);
+  return form;
+}
