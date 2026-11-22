@@ -1,0 +1,55 @@
+/* The picture viewer (lightbox.js): dark screen, the picture in the middle. */
+
+.lb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 12, 28, 0.92);
+  color: #fff;
+}
+
+.lb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(#3a7bd5, #0a3a9a);
+  border-bottom: 2px solid #0a246a;
+}
+
+.lb-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+.lb-save,
+.lb-close,
+.lb-prev,
+.lb-next {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  background: linear-gradient(#e8f0ff, #9db8ea);
+  color: #0a246a;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.lb-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 56px;
+}
