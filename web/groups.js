@@ -219,7 +219,7 @@ async function loadGroupDetail(gid) {
 
 const NO_KEY_TEXT = "can't decrypt this message (missing key, or the sender's key changed)";
 const USED_KEY_TEXT = "can't open this message again: its one-use key was deleted and this device didn't keep a copy of the text";
-const FAKE_TEXT = "\u26a0 this message failed its signature check, so it was not opened";
+const FAKE_TEXT = "this message failed its signature check, so it was not opened";
 
 // Open one message that has a chain number (forward secret). Returns { text, failed }.
 async function openChainRow(gid, r, signed) {
