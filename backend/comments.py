@@ -75,3 +75,27 @@ def need_comment(conn, user, comment_id: int):
     if not post or row["author_id"] in viewer.blocked:
         raise HTTPException(404, "no such comment")
     return viewer, row, post
+
+
+@router.get("/api/posts/{post_id}/comments")
+def list_comments(
+    post_id: int,
+    before: int | None = None,
+    limit: int = Query(COMMENTS_PAGE, ge=1, le=50),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    """Oldest first, like a chat. `before` is the id of the oldest comment you already have, to get
+    the ones above it. The newest `limit` come first, and `more` says there are older ones."""
+    viewer = Viewer(conn, user)
+    post = need_post(viewer, post_id)
+    rows = conn.execute(
+        COMMENT_SELECT + " WHERE c.post_id = :post AND (:before IS NULL OR c.id < :before) ORDER BY c.id DESC",
+        {"post": post_id, "before": before},
+    ).fetchall()
+    rows = [r for r in rows if r["author_id"] not in viewer.blocked]
+    page = rows[:limit]
+    return {
+        "comments": [comment_dict(viewer, r, post["author_id"]) for r in reversed(page)],
+        "more": len(rows) > limit,
+    }
