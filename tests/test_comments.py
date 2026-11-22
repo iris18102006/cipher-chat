@@ -37,3 +37,38 @@ def test_a_friend_can_comment_and_everyone_who_sees_the_post_reads_it(client):
     assert texts(c, pid) == ["love it"]
     seen_by_carol = c.get(f"/api/posts/{pid}/comments").json()["comments"][0]
     assert seen_by_carol["mine"] is False and seen_by_carol["can_delete"] is False
+
+
+def test_comments_are_counted_on_the_post_and_the_feed(client):
+    a, b, c = trio(client)
+    pid = post(a)
+    assert a.get(f"/api/posts/{pid}").json()["comments"] == 0
+    say(b, pid, "one")
+    say(c, pid, "two")
+    assert a.get(f"/api/posts/{pid}").json()["comments"] == 2
+    feed = a.get("/api/feed").json()["posts"]
+    assert [p["comments"] for p in feed if p["id"] == pid] == [2]
+
+
+def test_oldest_comment_first_and_paging_goes_back_in_time(client):
+    a, b, _ = trio(client)
+    pid = post(a)
+    for n in range(5):
+        say(b, pid, f"c{n}")
+    page = b.get(f"/api/posts/{pid}/comments", params={"limit": 2}).json()
+    assert [x["body"] for x in page["comments"]] == ["c3", "c4"] and page["more"] is True
+    older = b.get(f"/api/posts/{pid}/comments", params={"limit": 2, "before": page["comments"][0]["id"]}).json()
+    assert [x["body"] for x in older["comments"]] == ["c1", "c2"] and older["more"] is True
+    last = b.get(f"/api/posts/{pid}/comments", params={"limit": 2, "before": older["comments"][0]["id"]}).json()
+    assert [x["body"] for x in last["comments"]] == ["c0"] and last["more"] is False
+
+
+def test_you_cant_comment_on_posts_you_cant_see(client):
+    a, b, c = trio(client)
+    private = post(a, "diary", audience="me")
+    close = post(a, "close", audience="close")
+    assert say(b, private).status_code == 404
+    assert say(b, close).status_code == 404
+    assert b.get(f"/api/posts/{private}/comments").status_code == 404
+    # the author can always comment on their own
+    assert say(a, private, "note to self").status_code == 200
