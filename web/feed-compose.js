@@ -92,15 +92,15 @@ function makeComposer(opts) {
   files.multiple = true;
   const addMenu = el("div", "fc-add");
   const kinds = [
-    ["image", "\u{1f4f7} Photo or GIF", "image/png,image/jpeg,image/gif,image/webp"],
-    ["video", "\u{1f3ac} Video", "video/mp4,video/webm"],
-    ["audio", "\u{1f3b5} Music", "audio/mpeg,audio/ogg,audio/wav,audio/flac,audio/mp4,audio/x-m4a,.mp3,.m4a,.ogg,.wav,.flac"],
+    ["image", "Photo or GIF", "image/png,image/jpeg,image/gif,image/webp"],
+    ["video", "Video", "video/mp4,video/webm"],
+    ["audio", "Music", "audio/mpeg,audio/ogg,audio/wav,audio/flac,audio/mp4,audio/x-m4a,.mp3,.m4a,.ogg,.wav,.flac"],
   ];
   let picking = "image";
   if (!isRepost) {
     for (const [kind, name, accept] of kinds) {
       addMenu.append(
-        plainButton(name, () => {
+        iconButton(kind === "image" ? "image" : kind === "video" ? "video" : "music", name, () => {
           picking = kind;
           files.accept = accept;
           files.multiple = kind === "image";
