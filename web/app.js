@@ -439,24 +439,27 @@ function scrollBottom() {
 }
 
 function tickFor(m) {
-  if (m.held) return { text: "\u2713 sent, waiting for them to accept", cls: "tick" };
-  if (m.read) return { text: "\u2713\u2713 read", cls: "tick read" };
-  if (m.delivered) return { text: "\u2713\u2713 delivered", cls: "tick" };
-  return { text: "\u2713 sent", cls: "tick" };
+  if (m.held) return { ticks: 1, text: "sent, waiting for them to accept", cls: "tick" };
+  if (m.read) return { ticks: 2, text: "read", cls: "tick read" };
+  if (m.delivered) return { ticks: 2, text: "delivered", cls: "tick" };
+  return { ticks: 1, text: "sent", cls: "tick" };
 }
 
 // the little label under a group message that says whether it really came from the sender
 const SIGNATURE_BADGES = {
-  ok: ["\u2713 signed", "signed", "This message was signed with the sender's key, so it really came from them"],
+  ok: ["signed", "signed", "This message was signed with the sender's key, so it really came from them"],
   unsigned: ["not signed", "unsigned", "Sent before signing existed (or by an old browser), so there's nothing to check it against"],
   unknown: ["can't check", "unsigned", "The sender isn't in the group any more, so their key isn't available to check this"],
-  changed: ["\u26a0 key changed", "badsig", "The sender's signing key is not the one we first saw from them. Don't trust this message until you've checked with them"],
-  bad: ["\u26a0 fake?", "badsig", "The signature does not match. This message was not written by who it says, or it was changed on the way"],
+  changed: ["key changed", "badsig", "The sender's signing key is not the one we first saw from them. Don't trust this message until you've checked with them"],
+  bad: ["fake?", "badsig", "The signature does not match. This message was not written by who it says, or it was changed on the way"],
 };
 
 function signatureBadge(kind) {
   const [text, cls, title] = SIGNATURE_BADGES[kind] || SIGNATURE_BADGES.unknown;
-  const span = el("span", "sig " + cls, text);
+  const span = el("span", "sig " + cls);
+  if (kind === "ok") span.append(icon("check"), " ");
+  else if (cls === "badsig") span.append(icon("warn"), " ");
+  span.append(text);
   span.title = title;
   return span;
 }
