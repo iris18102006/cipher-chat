@@ -480,10 +480,11 @@ function groupTick(m) {
   const gid = state.openGroup;
   const d = state.gDetail.get(gid);
   const others = d ? d.members.length - 1 : 0;
-  if (!m.seen || m.seen.size === 0) return { text: "\u2713 sent", cls: "tick" };
+  if (!m.seen || m.seen.size === 0) return { ticks: 1, text: "sent", cls: "tick" };
   const all = others > 0 && m.seen.size >= others;
   return {
-    text: "\u2713\u2713 seen by " + (all ? "everyone" : m.seen.size),
+    ticks: 2,
+    text: "seen by " + (all ? "everyone" : m.seen.size),
     cls: "tick read",
     title: [...m.seen].map((u) => memberName(gid, u)).join(", "),
   };
