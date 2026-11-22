@@ -77,3 +77,70 @@ async function loadComments(p, older) {
   }
   repaintComments(p.id);
 }
+
+// ---------- one comment ----------
+
+function commentNode(p, c) {
+  const row = el("div", "fcm-row" + (c.mine ? " mine" : ""));
+  row.dataset.id = String(c.id);
+  const avatar = avatarNode(c.author, "small");
+  avatar.onclick = () => openProfile(c.author.username);
+  const main = el("div", "fcm-main");
+  const head = el("div", "fcm-head");
+  const name = el("b", "", shownName(c.author));
+  name.onclick = () => openProfile(c.author.username);
+  head.append(name, el("small", "fcm-time", postAgo(c.created_at) + (c.edited ? " \u00b7 edited" : "")));
+  const text = el("p", "fcm-text", c.body);
+  main.append(head, text);
+  if (c.mine || c.can_delete) {
+    const acts = el("div", "fcm-actions");
+    if (c.mine) acts.append(iconButton("edit", "Edit", () => editComment(p, c, row), "fcm-act"));
+    acts.append(iconButton("trash", "Delete", () => deleteComment(p, c), "fcm-act danger"));
+    main.append(acts);
+  }
+  row.append(avatar, main);
+  return row;
+}
+
+// the words turn into a little box, with Save and Cancel
+function editComment(p, c, row) {
+  const text = row.querySelector(".fcm-text");
+  const acts = row.querySelector(".fcm-actions");
+  const form = el("form", "fcm-edit");
+  const input = el("textarea", "fcm-input");
+  input.maxLength = COMMENT_MAX;
+  input.rows = 2;
+  input.value = c.body;
+  input.setAttribute("aria-label", "edit your comment");
+  const err = el("p", "fc-error");
+  err.hidden = true;
+  const save = iconButton("check", "Save", null, "fcm-save");
+  save.type = "submit";
+  const cancel = iconButton("x", "Cancel", () => repaintComments(p.id), "fcm-act");
+  const bar = el("div", "fcm-actions");
+  bar.append(save, cancel);
+  form.append(input, err, bar);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const words = input.value.trim();
+    if (!words) {
+      err.textContent = "a comment needs some words, or delete it";
+      err.hidden = false;
+      return;
+    }
+    save.disabled = true;
+    try {
+      const fresh = await sendJson("/api/comments/" + c.id, "PATCH", { body: words });
+      const st = commentsFor(p.id);
+      st.list = st.list.map((x) => (x.id === c.id ? fresh : x));
+      repaintComments(p.id);
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+      save.disabled = false;
+    }
+  };
+  text.replaceWith(form);
+  if (acts) acts.remove();
+  input.focus();
+}
