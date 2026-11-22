@@ -17,6 +17,7 @@ def fresh(monkeypatch):
     gifs.media_limiter.clear()
     monkeypatch.delenv("CIPHER_ADMINS", raising=False)
     monkeypatch.delenv("CIPHER_GIPHY_KEY", raising=False)
+    monkeypatch.setattr(gifs, "KEY_FILE", Path("/nonexistent/giphy.key"))  # a real key file mustn't change the tests
     monkeypatch.delenv("CIPHER_IMAGE_CHECK", raising=False)
 
 
