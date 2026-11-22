@@ -140,6 +140,13 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_posts_shared ON posts (shared_id);
             -- comments under a post. They go when the post goes or when the person who wrote them
             -- is deleted. Plain text like posts, and the server checks every one (moderation.py)
+            -- "delete chat for me": everything up to this message id is hidden from this person only
+            CREATE TABLE IF NOT EXISTS chat_clears (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                peer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                up_to_id INTEGER NOT NULL,
+                PRIMARY KEY (user_id, peer_id)
+            );
             CREATE TABLE IF NOT EXISTS post_comments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
