@@ -235,8 +235,11 @@ function attImage(box, desc) {
     img.src = url;
     img.alt = desc.name;
     img.draggable = false;
-    img.title = "click to open";
-    img.onclick = () => window.open(url, "_blank", "noopener");
+    img.title = "click to view it big";
+    img.onclick = () => {
+      const { items, at } = chatPictures(img);
+      openLightbox(items, at);
+    };
     box.replaceChildren(img, attNameLine(desc));
   };
   const manual = () => attLoadButton("Show picture", async (progress) => show(await attLoadUrl(desc, progress)));
