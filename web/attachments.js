@@ -266,26 +266,28 @@ function attPlayer(box, desc, kind) {
     if (autoplay) media.play().catch(() => {});
   };
   if (attCache.has(desc.id)) return mount(attCache.get(desc.id), false);
-  const label = kind === "voice" ? "\u{1f3a4} voice message " + fcClock(desc.dur) : "\u25b6 play " + kind + " (" + fcHumanSize(desc.size) + ")";
+  const label = kind === "voice" ? withIcon("mic", "voice message " + fcClock(desc.dur)) : withIcon("play", "play " + kind + " (" + fcHumanSize(desc.size) + ")");
   box.append(attLoadButton(label, async (progress) => mount(await attLoadUrl(desc, progress), true)));
 }
 
 
 function attIcon(desc) {
   const name = desc.name.toLowerCase();
-  if (desc.type.startsWith("image/")) return "\u{1f5bc}\u{fe0f}";
-  if (desc.type.startsWith("video/")) return "\u{1f3ac}";
-  if (desc.type.startsWith("audio/")) return "\u{1f3b5}";
-  if (desc.type === "application/pdf") return "\u{1f4d5}";
-  if (/\.(zip|rar|7z|tar|gz)$/.test(name)) return "\u{1f5dc}\u{fe0f}";
-  return "\u{1f4c4}";
+  if (desc.type.startsWith("image/")) return icon("image");
+  if (desc.type.startsWith("video/")) return icon("video");
+  if (desc.type.startsWith("audio/")) return icon("music");
+  if (desc.type === "application/pdf") return icon("book");
+  if (/\.(zip|rar|7z|tar|gz)$/.test(name)) return icon("archive");
+  return icon("file");
 }
 
 // everything that isn't shown in the chat: a card with a download button
 function attFile(box, desc, tooBigToPlay) {
   const info = el("div", "att-info");
   info.append(el("div", "att-title", desc.name), el("div", "att-note", fcHumanSize(desc.size) + (tooBigToPlay ? " \u00b7 too big to play here, download it" : "")));
-  box.append(el("div", "att-icon", attIcon(desc)), info, attLoadButton("Download", (progress) => attSave(desc, progress)));
+  const kindIcon = el("div", "att-icon");
+  kindIcon.append(attIcon(desc));
+  box.append(kindIcon, info, attLoadButton("Download", (progress) => attSave(desc, progress)));
 }
 
 function attachmentNode(desc) {
