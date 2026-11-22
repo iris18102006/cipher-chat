@@ -84,12 +84,12 @@ function songPlayer(url, label) {
     if (Number.isFinite(audio.duration)) audio.currentTime = (Number(seek.value) / 1000) * audio.duration;
   };
   audio.onplay = () => {
-    play.textContent = "\u275a\u275a";
+    play.replaceChildren(icon("pause"));
     play.setAttribute("aria-label", "pause");
     box.classList.add("playing");
   };
   const stopped = () => {
-    play.textContent = "\u25b6";
+    play.replaceChildren(icon("play"));
     play.setAttribute("aria-label", "play " + (label || "song"));
     box.classList.remove("playing");
   };
