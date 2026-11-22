@@ -958,6 +958,40 @@ async function setBlocked(username, on) {
   }
 }
 
+// Delete chat: for me only (nobody is told) or for both of us (their chat empties too)
+function chatGone(peer) {
+  state.msgs.set(peer, []);
+  state.hasOlder.set(peer, false);
+  const c = state.contacts.get(peer);
+  if (c) c.unread = 0;
+  if (state.open === peer) renderMessages();
+  renderBuddies();
+}
+
+$("delete-chat").onclick = () => {
+  const peer = state.open;
+  if (!peer) return;
+  const box = el("div", "del-chat");
+  box.append(el("p", "pf-hint", "Delete the whole conversation with " + peer + ". Pick who it disappears for. This can't be undone."));
+  const row = el("div", "fc-row");
+  const err = el("p", "fc-error");
+  err.hidden = true;
+  const run = async (everyone) => {
+    try {
+      await sendJson("/api/messages/" + encodeURIComponent(peer) + (everyone ? "?everyone=true" : ""), "DELETE");
+      dlg.close();
+      chatGone(peer);
+      toast(everyone ? "Deleted for both of you" : "Deleted for you");
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+    }
+  };
+  row.append(iconButton("trash", "Delete for me", () => run(false)), iconButton("trash", "Delete for everyone", () => run(true), "danger"));
+  box.append(row, err);
+  const dlg = openDialog("Delete chat", box);
+};
+
 $("block").onclick = () => {
   const c = state.contacts.get(state.open);
   if (c) setBlocked(c.username, !c.blocked);
