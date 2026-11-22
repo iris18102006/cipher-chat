@@ -149,7 +149,12 @@ function renderPost(p) {
   if (p.is_repost && p.original) card.append(originalBox(p.original));
   const engage = el("div", "feed-engage");
   card.append(engage);
+  const thread = el("div", "feed-comments");
+  thread.hidden = true;
+  card.append(thread);
+  if (feed.single === p.id) commentState.open.add(p.id);
   paintEngage(card, p);
+  paintComments(card, p);
   return card;
 }
 
