@@ -179,7 +179,7 @@ function paintEngage(card, p) {
   const target = p.is_repost && p.original && !p.original.gone && !p.original.hidden ? p.original : p.is_repost ? null : p;
   const bar = el("div", "feed-actions");
 
-  const like = plainButton(likeLabel(p), null, p.liked ? "on" : "");
+  const like = iconButton("heart", likeLabel(p), null, p.liked ? "on" : "", p.liked);
   like.setAttribute("aria-pressed", String(p.liked));
   like.onclick = async () => {
     like.disabled = true;
