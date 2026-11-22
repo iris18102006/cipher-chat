@@ -108,3 +108,23 @@ const ICON_PATHS = {
     ["line", { x1: "4", y1: "22", x2: "4", y2: "15" }],
   ],
 };
+
+// icons that are solid shapes (the rest are outlines)
+const ICON_SOLID = new Set(["play", "pause"]);
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+// icon("heart") -> an <svg> that is as big as the text around it. `filled` colours it in
+// (a liked heart, a starred friend).
+function icon(name, filled) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", "ic ic-" + name + (filled || ICON_SOLID.has(name) ? " filled" : ""));
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  for (const [tag, attrs] of ICON_PATHS[name] || []) {
+    const part = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) part.setAttribute(k, attrs[k]);
+    svg.append(part);
+  }
+  return svg;
+}
