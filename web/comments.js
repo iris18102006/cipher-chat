@@ -35,3 +35,45 @@ function postOnScreen(id) {
   }
   return null;
 }
+
+function repaintComments(id) {
+  const p = postOnScreen(id);
+  if (!p) return;
+  for (const card of document.querySelectorAll('#feed-list .feed-post[data-id="' + id + '"]')) {
+    paintComments(card, p);
+    paintEngage(card, p);
+  }
+}
+
+function toggleComments(card, p) {
+  if (commentState.open.has(p.id)) commentState.open.delete(p.id);
+  else commentState.open.add(p.id);
+  paintComments(card, p);
+  paintEngage(card, p);
+  if (commentState.open.has(p.id)) {
+    const box = card.querySelector(".fcm-input");
+    if (box) box.focus();
+  }
+}
+
+async function loadComments(p, older) {
+  const st = commentsFor(p.id);
+  if (st.loading) return;
+  st.loading = true;
+  st.error = "";
+  repaintComments(p.id);
+  try {
+    const q = new URLSearchParams();
+    if (older && st.list.length) q.set("before", String(st.list[0].id));
+    const data = await api("/api/posts/" + p.id + "/comments?" + q);
+    st.list = older ? data.comments.concat(st.list) : data.comments;
+    st.more = data.more;
+    st.loaded = true;
+    p.comments = Math.max(p.comments || 0, st.list.length);
+  } catch (ex) {
+    st.error = whyFailed(ex, "couldn't load the comments, try again");
+  } finally {
+    st.loading = false;
+  }
+  repaintComments(p.id);
+}
