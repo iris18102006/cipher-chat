@@ -208,8 +208,9 @@ function attNameLine(desc) {
 // `run(progress)` does the work and puts the result on the page itself.
 function attLoadButton(label, run) {
   const wrap = el("div", "att-action");
-  const btn = el("button", "att-btn", label);
+  const btn = el("button", "att-btn");
   btn.type = "button";
+  btn.append(...[].concat(label));
   const note = el("span", "att-note");
   btn.onclick = async () => {
     btn.disabled = true;
