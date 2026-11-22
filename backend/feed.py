@@ -159,9 +159,10 @@ def post_dicts(viewer: Viewer, rows) -> list[dict]:
             originals[r["shared_id"]] = viewer.row(r["shared_id"])
     ids = [r["id"] for r in rows] + [o["id"] for o in originals.values() if o]
     media_map = media.media_for(viewer.conn, ids)
+    counts = comment_counts(viewer, ids)
     out = []
     for r in rows:
-        d = plain_post(viewer, r, media_map)
+        d = plain_post(viewer, r, media_map, counts)
         d["is_repost"] = bool(r["is_share"])
         if d["is_repost"]:
             if r["shared_id"] is None:
