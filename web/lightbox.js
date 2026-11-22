@@ -62,3 +62,25 @@ function paintLightbox() {
   r.querySelector(".lb-prev").hidden = lightbox.at === 0;
   r.querySelector(".lb-next").hidden = lightbox.at === lightbox.items.length - 1;
 }
+
+function stepLightbox(by) {
+  const to = lightbox.at + by;
+  if (to < 0 || to >= lightbox.items.length) return;
+  lightbox.at = to;
+  paintLightbox();
+}
+
+function lightboxKeys(e) {
+  if (!lightbox.root) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    closeLightbox();
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    stepLightbox(-1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    stepLightbox(1);
+  }
+}
