@@ -59,7 +59,7 @@ function shareDialog(post) {
       };
       const who = el("span", "who");
       who.append(el("b", "", t.name), el("small", "", t.sub));
-      row.append(input, t.person ? avatarNode(t.person, "small") : el("span", "share-group-icon", "\u{1f465}"), who);
+      row.append(input, t.person ? avatarNode(t.person, "small") : shareGroupIcon(), who);
       list.append(row);
     }
   };
