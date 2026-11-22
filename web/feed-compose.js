@@ -177,9 +177,13 @@ function makeComposer(opts) {
       img.alt = "";
       box.append(img);
     } else if (item.kind === "video") {
-      box.append(el("span", "fc-icon", "\u{1f3ac}"), el("span", "fc-name", "video"));
+      const ic = el("span", "fc-icon");
+      ic.append(icon("video"));
+      box.append(ic, el("span", "fc-name", "video"));
     } else {
-      box.append(el("span", "fc-icon", "\u{1f3b5}"), el("span", "fc-name", "song"));
+      const ic = el("span", "fc-icon");
+      ic.append(icon("music"));
+      box.append(ic, el("span", "fc-name", "song"));
     }
     const remove = plainButton("\u00d7", () => {
       items.splice(items.indexOf(item), 1);
