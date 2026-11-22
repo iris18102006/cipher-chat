@@ -1,0 +1,36 @@
+/* The thread under a post (comments.js). Same look as the rest of the bulletin board. */
+
+.feed-comments {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #c9c4b0;
+  border-radius: 6px;
+  background: #fbfaf3;
+}
+
+.feed-comments[hidden] {
+  display: none;
+}
+
+.fcm-row {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dotted #c9c4b0;
+}
+
+.fcm-row:last-of-type {
+  border-bottom: 0;
+}
+
+.fcm-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.fcm-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
