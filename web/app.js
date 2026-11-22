@@ -504,7 +504,8 @@ function renderMessages(keepScroll) {
     meta.append(el("span", "time", clock(d)));
     if (mine) {
       const t = inGroup ? groupTick(m) : tickFor(m);
-      const tick = el("span", t.cls, t.text);
+      const tick = el("span", t.cls);
+      tick.append(icon(t.ticks === 2 ? "checks" : "check"), " " + t.text);
       if (t.title) tick.title = t.title;
       meta.append(tick);
     }
