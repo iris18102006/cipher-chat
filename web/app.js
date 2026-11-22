@@ -364,7 +364,7 @@ function renderChatHeader() {
   if (state.openGroup != null) return renderGroupHeader();
   // back from a group chat: the 1:1 buttons come back, the group one goes
   $("group-info").hidden = true;
-  for (const id of ["view-profile", "verify", "block"]) $(id).hidden = false;
+  for (const id of ["view-profile", "verify", "block", "delete-chat"]) $(id).hidden = false;
   $("msg").placeholder = "type a message (Enter to send, Shift+Enter for a new line)";
   const c = state.contacts.get(state.open);
   if (!c) return;
