@@ -119,3 +119,25 @@
   color: #0a246a;
   font-weight: bold;
 }
+
+.fcm-edit .fcm-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.feed-actions button.on .ic-heart,
+.feed-actions button[aria-expanded="true"] {
+  color: #0a3a9a;
+}
+
+/* comment pictures are smaller than the one in a post's header */
+.fcm-row .pf-avatar {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  cursor: pointer;
+}
+
+.fcm-row .pf-avatar .pf-avatar-letter {
+  font-size: 15px;
+}
