@@ -730,6 +730,8 @@ async function handleWS(data) {
     if (typeof pfCurrent !== "undefined" && pfCurrent && pfCurrent.username === data.from) {
       openProfile(data.from);
     }
+  } else if (data.type === "feed" && data.event === "comment") {
+    if (typeof onCommentEvent === "function") onCommentEvent(data);
   } else if (data.type === "feed") {
     // a friend posted or shared something: count it, the feed window offers to show them
     if (typeof setNewCount === "function") {
