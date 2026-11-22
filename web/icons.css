@@ -1,0 +1,15 @@
+/* The line icons from icons.js. They are as tall as the text and use its colour. */
+.ic {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ic.filled { fill: currentColor; }
+.ic-label { display: inline-flex; align-items: center; gap: 0.35em; }
+button .ic + .ic-text { margin-left: 0.4em; }
