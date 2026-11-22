@@ -75,3 +75,47 @@
 .fcm-send:hover:not(:disabled) {
   background: #fff7c2;
 }
+
+.fcm-act.danger {
+  color: #a33;
+}
+
+.fcm-older {
+  display: block;
+  margin: 0 auto 6px;
+}
+
+.fcm-empty {
+  margin: 4px 0 8px;
+  color: #777;
+  font-size: 13px;
+}
+
+.fcm-form {
+  margin-top: 6px;
+}
+
+.fcm-formrow {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.fcm-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #7f9db9;
+  border-radius: 4px;
+  font: inherit;
+  resize: vertical;
+}
+
+.fcm-send,
+.fcm-save {
+  height: 28px;
+  background: linear-gradient(#e8f0ff, #9db8ea);
+  border-color: #0a246a;
+  color: #0a246a;
+  font-weight: bold;
+}
