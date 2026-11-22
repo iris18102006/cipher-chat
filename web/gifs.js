@@ -34,9 +34,8 @@ async function openGifs() {
       return closeGifs();
     }
   }
-  gifs.tab = gifs.search ? gifs.tab : "mine";
   paintGifs();
-  if (gifs.tab === "search") runSearch(false);
+  if (gifs.tab === "search" && gifs.search) runSearch(false);
 }
 
 // sends one GIF: fetches the bytes from our own server and sends them as a picture
