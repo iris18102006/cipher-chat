@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from . import media, moderation
 from .main import POST_AUDIENCES, avatar_url, clean_text, current_user, friend_ids, get_conn, manager
-from .postaccess import HIDE_AFTER_REPORTS, POST_SELECT, Viewer, blocked_with, is_admin
+from .postaccess import HIDE_AFTER_REPORTS, POST_SELECT, Viewer, blocked_with, comment_counts, is_admin
 
 router = APIRouter()
 
