@@ -102,3 +102,35 @@ def test_only_the_writer_can_edit(client):
     assert r.status_code == 200 and r.json()["body"] == "second" and r.json()["edited"] is True
     assert texts(a, pid) == ["second"]
     assert b.patch(f"/api/comments/{cid}", json={"body": " "}).status_code == 400
+
+
+def test_saving_the_same_words_is_not_an_edit(client):
+    a, b, _ = trio(client)
+    pid = post(a)
+    cid = say(b, pid, "same").json()["id"]
+    assert b.patch(f"/api/comments/{cid}", json={"body": "same"}).json()["edited"] is False
+
+
+def test_writer_and_post_owner_can_delete_but_nobody_else(client):
+    a, b, c = trio(client)
+    pid = post(a)
+    mine = say(b, pid, "bob's").json()["id"]
+    other = say(c, pid, "carol's").json()["id"]
+    assert c.delete(f"/api/comments/{mine}").status_code == 403  # not hers, not her post
+    assert b.delete(f"/api/comments/{mine}").status_code == 200  # her own
+    assert a.delete(f"/api/comments/{other}").status_code == 200  # under her post
+    assert texts(a, pid) == []
+    assert a.delete(f"/api/comments/{other}").status_code == 404
+
+
+def test_deleting_the_post_takes_its_comments_along(client):
+    a, b, _ = trio(client)
+    pid = post(a)
+    cid = say(b, pid).json()["id"]
+    a.delete(f"/api/posts/{pid}")
+    assert b.patch(f"/api/comments/{cid}", json={"body": "x"}).status_code == 404
+    conn = db.connect()
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM post_comments").fetchone()[0] == 0
+    finally:
+        conn.close()
