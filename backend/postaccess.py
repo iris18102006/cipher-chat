@@ -97,3 +97,18 @@ class Viewer:
             self.conn.execute("SELECT 1 FROM post_reports WHERE post_id = ? LIMIT 1", (post_id,)).fetchone()
             is not None
         )
+
+
+def comment_counts(viewer, post_ids: list[int]) -> dict[int, int]:
+    """How many comments each post has, not counting people the viewer has a block with."""
+    if not post_ids:
+        return {}
+    marks = ", ".join("?" * len(post_ids))
+    rows = viewer.conn.execute(
+        f"SELECT post_id, author_id FROM post_comments WHERE post_id IN ({marks})", list(post_ids)
+    ).fetchall()
+    out: dict[int, int] = {}
+    for r in rows:
+        if r["author_id"] not in viewer.blocked:
+            out[r["post_id"]] = out.get(r["post_id"], 0) + 1
+    return out
