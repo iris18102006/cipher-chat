@@ -84,3 +84,22 @@ function lightboxKeys(e) {
     stepLightbox(1);
   }
 }
+
+function closeLightbox() {
+  if (!lightbox.root) return;
+  lightbox.root.remove();
+  lightbox.root = null;
+  lightbox.items = [];
+  document.removeEventListener("keydown", lightboxKeys, true);
+  const back = lightbox.returnFocus;
+  lightbox.returnFocus = null;
+  if (back && document.contains(back)) back.focus();
+}
+
+// the pictures that are showing in the open chat, in order, with the one that was clicked
+function chatPictures(clicked) {
+  const imgs = [...document.querySelectorAll("#messages .att-image img")];
+  const items = imgs.map((n) => ({ url: n.src, name: n.alt }));
+  const at = Math.max(0, imgs.indexOf(clicked));
+  return { items: items.length ? items : [{ url: clicked.src, name: clicked.alt }], at: items.length ? at : 0 };
+}
