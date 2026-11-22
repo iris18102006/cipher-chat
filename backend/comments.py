@@ -99,3 +99,38 @@ def list_comments(
         "comments": [comment_dict(viewer, r, post["author_id"]) for r in reversed(page)],
         "more": len(rows) > limit,
     }
+
+
+@router.post("/api/posts/{post_id}/comments")
+async def add_comment(post_id: int, body: CommentBody, user=Depends(current_user), conn=Depends(get_conn)):
+    viewer = Viewer(conn, user)
+    post = need_post(viewer, post_id)
+    text = clean_words(body.body, COMMENT_LIMIT, "comment")
+    if not text:
+        raise HTTPException(400, "write something first")
+    check_rate(user["id"])
+    cur = conn.execute("INSERT INTO post_comments (post_id, author_id, body) VALUES (?, ?, ?)", (post_id, user["id"], text))
+    conn.commit()
+    row = conn.execute(COMMENT_SELECT + " WHERE c.id = ?", (cur.lastrowid,)).fetchone()
+    if post["author_id"] != user["id"] and post["author_id"] not in viewer.blocked:
+        owner = conn.execute("SELECT username FROM users WHERE id = ?", (post["author_id"],)).fetchone()
+        await manager.send_user(
+            owner["username"],
+            {"type": "feed", "event": "comment", "id": post_id, "from": user["username"]},
+        )
+    return comment_dict(viewer, row, post["author_id"])
+
+
+@router.patch("/api/comments/{comment_id}")
+def edit_comment(comment_id: int, body: CommentBody, user=Depends(current_user), conn=Depends(get_conn)):
+    viewer, row, post = need_comment(conn, user, comment_id)
+    if row["author_id"] != user["id"]:
+        raise HTTPException(403, "you can only edit your own comments")
+    text = clean_words(body.body, COMMENT_LIMIT, "comment")
+    if not text:
+        raise HTTPException(400, "a comment needs some words, or delete it")
+    if text != row["body"]:
+        conn.execute("UPDATE post_comments SET body = ?, edited_at = datetime('now') WHERE id = ?", (text, comment_id))
+        conn.commit()
+    fresh = conn.execute(COMMENT_SELECT + " WHERE c.id = ?", (comment_id,)).fetchone()
+    return comment_dict(viewer, fresh, post["author_id"])
