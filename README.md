@@ -263,6 +263,12 @@ This is a learning project, not Signal.
 - Big downloads: Chrome and Edge write a file over 64 MB straight to disk. Firefox and Safari stream it through the download helper (`web/sw.js`), which needs `https` or `localhost` and a browser that allows service workers (private windows sometimes don't). Without it a file up to 1 GB is kept in memory while it downloads and a bigger one is refused. A download that is streamed can't be resumed: if the browser or the tab dies halfway you start it again. This has been tested with a pretend worker in Node, not yet in every real browser, so a report from Safari is welcome
 - Voice messages need a microphone and a browser with `MediaRecorder`, over `https` or on `localhost`. The format is whatever the browser records (webm or mp4), so an old browser may not be able to play it
 
+## GIF search
+
+The GIF button searches GIPHY. It needs a free key: make one at developers.giphy.com, put it on the
+first line of a file called `giphy.key` next to `server.py` (it is in `.gitignore`, so it never goes
+to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
+
 ## Roadmap
 
 - [x] HKDF key derivation
