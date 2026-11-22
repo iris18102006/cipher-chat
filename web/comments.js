@@ -144,3 +144,16 @@ function editComment(p, c, row) {
   if (acts) acts.remove();
   input.focus();
 }
+
+async function deleteComment(p, c) {
+  if (!confirm(c.mine ? "Delete your comment?" : "Delete this comment from your post?")) return;
+  try {
+    await sendJson("/api/comments/" + c.id, "DELETE");
+    const st = commentsFor(p.id);
+    st.list = st.list.filter((x) => x.id !== c.id);
+    p.comments = Math.max(0, (p.comments || 1) - 1);
+    repaintComments(p.id);
+  } catch (ex) {
+    toast(whyFailed(ex, "couldn't delete that comment, try again"));
+  }
+}
