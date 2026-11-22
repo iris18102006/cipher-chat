@@ -170,7 +170,7 @@ function likeSummary(p) {
 }
 
 function likeLabel(p) {
-  return (p.liked ? "\u2665 Liked" : "\u2661 Like") + (p.likes && !p.likes_hidden ? " " + p.likes : "");
+  return (p.liked ? "Liked" : "Like") + (p.likes && !p.likes_hidden ? " " + p.likes : "");
 }
 
 function paintEngage(card, p) {
