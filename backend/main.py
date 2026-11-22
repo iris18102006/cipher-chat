@@ -1352,6 +1352,7 @@ def history(
         WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
             OR (m.sender_id = :peer AND m.recipient_id = :me))
           AND NOT (m.recipient_id = :me AND m.hidden != 0)
+          AND m.id > COALESCE((SELECT up_to_id FROM chat_clears WHERE user_id = :me AND peer_id = :peer), 0)
           AND (:before IS NULL OR m.id < :before)
         ORDER BY m.id DESC LIMIT :limit
         """,
