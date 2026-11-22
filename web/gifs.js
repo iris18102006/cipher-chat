@@ -79,22 +79,26 @@ function gifTile(src, label, onPick, onRemove) {
 function paintGifs() {
   const panel = gifPanel();
   const tabs = el("div", "gif-tabs");
-  if (gifs.search) {
-    const s = plainButton("Search", () => {
-      gifs.tab = "search";
-      paintGifs();
-      runSearch(false);
-    }, gifs.tab === "search" ? "on" : "");
-    tabs.append(s);
-  }
-  tabs.append(plainButton("My GIFs (" + gifs.mine.length + ")", () => {
+  const s = plainButton("Search GIFs", () => {
+    gifs.tab = "search";
+    paintGifs();
+    if (gifs.search) runSearch(false);
+  }, gifs.tab === "search" ? "on" : "");
+  tabs.append(s);
+  tabs.append(plainButton("Saved (" + gifs.mine.length + ")", () => {
     gifs.tab = "mine";
     paintGifs();
   }, gifs.tab === "mine" ? "on" : ""));
   tabs.append(plainButton("\u00d7", closeGifs, "gif-close"));
   tabs.lastChild.setAttribute("aria-label", "close the GIF picker");
   const body = el("div", "gif-body");
-  if (gifs.tab === "search") {
+  if (gifs.tab === "search" && !gifs.search) {
+    // nothing to search with yet: say what to do, in words anybody running the server can follow
+    body.append(
+      el("p", "list-empty", "GIF search isn't switched on yet."),
+      el("p", "gif-note", "Whoever runs this server needs a free key from developers.giphy.com. Put it on the first line of a file called giphy.key next to server.py (or set CIPHER_GIPHY_KEY), then restart the server.")
+    );
+  } else if (gifs.tab === "search") {
     const input = el("input", "gif-search");
     input.type = "search";
     input.placeholder = "search GIFs...";
