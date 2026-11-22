@@ -63,7 +63,9 @@ function postHead(p, opts) {
   name.onclick = () => openProfile(p.author.username);
   const sub = el("small", "feed-sub", postSub(p));
   if (p.audience && p.audience !== "friends" && !(opts && opts.quiet)) {
-    sub.append(" \u00b7 ", el("span", "feed-audience a-" + p.audience, AUDIENCE_LABELS[p.audience]));
+    const tag = el("span", "feed-audience a-" + p.audience);
+    tag.append(icon(AUDIENCE_ICONS[p.audience]), " " + AUDIENCE_LABELS[p.audience]);
+    sub.append(" \u00b7 ", tag);
   }
   who.append(name, sub);
   head.append(avatar, who);
