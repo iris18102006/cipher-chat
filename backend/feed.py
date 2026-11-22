@@ -142,6 +142,7 @@ def plain_post(viewer: Viewer, row, media_map: dict, counts: dict | None = None)
         "hidden": bool(row["hidden"]) and mine,  # only the author is told it is hidden
         "reported": bool(row["reported"]),
         "reposts": row["reposts"],
+        "comments": (counts or {}).get(row["id"], 0),
         "media": media_map.get(row["id"], []),
         # only posts for all friends can leave the circle they were made for, and only if the author allows it
         "can_repost": open_post and bool(row["allow_reposts"]),
