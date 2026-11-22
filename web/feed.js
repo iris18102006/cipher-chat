@@ -105,7 +105,9 @@ function mediaNode(list) {
       box.append(v);
     } else if (m.kind === "audio") {
       const wrap = el("div", "feed-song");
-      wrap.append(el("span", "feed-song-icon", "\u{1f3b5}"));
+      const note = el("span", "feed-song-icon");
+      note.append(icon("music"));
+      wrap.append(note);
       const a = el("audio");
       a.controls = true;
       a.preload = "none";
