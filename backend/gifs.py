@@ -49,8 +49,21 @@ media_limiter = SlidingLimiter(400, 60)  # pictures per person per minute
 _seen: "OrderedDict[str, dict]" = OrderedDict()
 
 
+# the free key can also live in a file next to server.py. *.key is in .gitignore, so it never
+# ends up on GitHub
+KEY_FILE = Path(__file__).resolve().parent.parent / "giphy.key"
+KEY_SHAPE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
+
+
 def api_key() -> str:
-    return os.environ.get("CIPHER_GIPHY_KEY", "").strip()
+    """The GIPHY key: CIPHER_GIPHY_KEY, or else the first line of giphy.key. Empty when there is none."""
+    key = os.environ.get("CIPHER_GIPHY_KEY", "").strip()
+    if not key:
+        try:
+            key = KEY_FILE.read_text(encoding="utf-8").strip().split("\n")[0].strip()
+        except OSError:
+            key = ""
+    return key if KEY_SHAPE.match(key) else ""
 
 
 class _NoRedirects(urllib.request.HTTPRedirectHandler):
