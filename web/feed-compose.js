@@ -11,13 +11,14 @@ const MEDIA_LIMITS = { image: 4 * 1024 * 1024, video: 25 * 1024 * 1024, audio: 6
 const MAX_PICTURES = 4;
 
 const AUDIENCE_OPTIONS = [
-  ["friends", "\u{1f465} All my friends"],
-  ["close", "\u2605 Close friends only"],
-  ["me", "\u{1f512} Only me"],
+  ["friends", "All my friends"],
+  ["close", "Close friends only"],
+  ["me", "Only me"],
 ];
 
 // what each kind of audience looks like on a post
-const AUDIENCE_LABELS = { friends: "friends", close: "\u2605 close friends", me: "\u{1f512} only me" };
+const AUDIENCE_LABELS = { friends: "friends", close: "close friends", me: "only me" };
+const AUDIENCE_ICONS = { friends: "users", close: "star", me: "lock" };
 
 function mediaKindOf(file) {
   const t = file.type || "";
