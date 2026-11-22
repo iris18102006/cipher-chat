@@ -171,7 +171,7 @@ def post_dicts(viewer: Viewer, rows) -> list[dict]:
                 # it was reposted to you, but it isn't yours to read: say nothing about it
                 d["original"] = {"hidden": True}
             else:
-                d["original"] = plain_post(viewer, originals[r["shared_id"]], media_map)
+                d["original"] = plain_post(viewer, originals[r["shared_id"]], media_map, counts)
         out.append(d)
     return out
 
