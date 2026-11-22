@@ -356,7 +356,7 @@ function renderGroupHeader() {
   const typing = groupTypingText(g);
   $("chat-status").textContent = typing ? typing + "..." : memberCount(g.members) + (fs ? " \u00b7 forward secret" : "");
   $("chat-status").className = "";
-  for (const id of ["view-profile", "verify", "block"]) $(id).hidden = true;
+  for (const id of ["view-profile", "verify", "block", "delete-chat"]) $(id).hidden = true;
   $("group-info").hidden = false;
   for (const id of ["key-warning", "block-banner", "request-banner", "verify-box"]) $(id).hidden = true;
   $("typing").hidden = !typing;
