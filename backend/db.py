@@ -138,6 +138,17 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_posts_author ON posts (author_id, id DESC);
             CREATE INDEX IF NOT EXISTS idx_posts_shared ON posts (shared_id);
+            -- comments under a post. They go when the post goes or when the person who wrote them
+            -- is deleted. Plain text like posts, and the server checks every one (moderation.py)
+            CREATE TABLE IF NOT EXISTS post_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+                author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                edited_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_post_comments_post ON post_comments (post_id, id);
             CREATE TABLE IF NOT EXISTS post_likes (
                 post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
