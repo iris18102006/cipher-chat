@@ -128,7 +128,7 @@ def engagement(viewer: Viewer, row) -> dict:
     }
 
 
-def plain_post(viewer: Viewer, row, media_map: dict) -> dict:
+def plain_post(viewer: Viewer, row, media_map: dict, counts: dict | None = None) -> dict:
     mine = row["author_id"] == viewer.id
     open_post = row["audience"] == "friends" and not row["hidden"]
     return {
