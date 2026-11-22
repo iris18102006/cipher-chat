@@ -254,3 +254,18 @@ function paintComments(card, p) {
     }
   }
 }
+
+// somebody commented on one of my posts
+function onCommentEvent(data) {
+  const from = state.contacts.get(data.from);
+  const name = from ? shownName(from) : data.from;
+  if (feed.open && commentState.open.has(data.id) && commentsFor(data.id).loaded) {
+    const p = postOnScreen(data.id);
+    if (p) {
+      p.comments = (p.comments || 0) + 1;
+      loadComments(p, false);
+    }
+    return;
+  }
+  toast(name + " commented on your post", () => openPostPage(data.id));
+}
