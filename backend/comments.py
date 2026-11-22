@@ -134,3 +134,13 @@ def edit_comment(comment_id: int, body: CommentBody, user=Depends(current_user),
         conn.commit()
     fresh = conn.execute(COMMENT_SELECT + " WHERE c.id = ?", (comment_id,)).fetchone()
     return comment_dict(viewer, fresh, post["author_id"])
+
+
+@router.delete("/api/comments/{comment_id}")
+def delete_comment(comment_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    viewer, row, post = need_comment(conn, user, comment_id)
+    if not comment_dict(viewer, row, post["author_id"])["can_delete"]:
+        raise HTTPException(403, "that isn't your comment or your post")
+    conn.execute("DELETE FROM post_comments WHERE id = ?", (comment_id,))
+    conn.commit()
+    return {"ok": True}
