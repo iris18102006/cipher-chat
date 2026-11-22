@@ -72,3 +72,33 @@ def test_you_cant_comment_on_posts_you_cant_see(client):
     assert b.get(f"/api/posts/{private}/comments").status_code == 404
     # the author can always comment on their own
     assert say(a, private, "note to self").status_code == 200
+
+
+def test_empty_long_and_rude_comments_are_turned_away(client, monkeypatch):
+    a, b, _ = trio(client)
+    pid = post(a)
+    assert say(b, pid, "   ").status_code == 400
+    assert say(b, pid, "x" * 301).status_code == 400
+    monkeypatch.setattr(main.moderation, "check_text", lambda t: "that isn't allowed" if "badword" in t else None)
+    r = say(b, pid, "badword here")
+    assert r.status_code == 400 and "isn't allowed" in r.json()["detail"]
+    assert texts(a, pid) == []
+
+
+def test_html_is_kept_as_plain_text(client):
+    a, b, _ = trio(client)
+    pid = post(a)
+    say(b, pid, "<img src=x onerror=alert(1)>")
+    assert texts(a, pid) == ["<img src=x onerror=alert(1)>"]
+
+
+def test_only_the_writer_can_edit(client):
+    a, b, c = trio(client)
+    pid = post(a)
+    cid = say(b, pid, "first").json()["id"]
+    assert c.patch(f"/api/comments/{cid}", json={"body": "hacked"}).status_code == 403
+    assert a.patch(f"/api/comments/{cid}", json={"body": "hacked"}).status_code == 403
+    r = b.patch(f"/api/comments/{cid}", json={"body": "second"})
+    assert r.status_code == 200 and r.json()["body"] == "second" and r.json()["edited"] is True
+    assert texts(a, pid) == ["second"]
+    assert b.patch(f"/api/comments/{cid}", json={"body": " "}).status_code == 400
