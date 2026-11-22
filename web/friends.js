@@ -43,7 +43,7 @@ function addSocialButtons(p, actions) {
     actions.append(socialButton("Accept friend request", go("POST", base + "/accept")));
     actions.append(socialButton("Decline", go("DELETE", base)));
   } else if (p.friend === "friends") {
-    actions.append(socialButton("\u2713 Friends", () => {}, "static"));
+    actions.append(iconButton("check", "Friends", () => {}, "static"));
     actions.append(socialButton("Unfriend", go("DELETE", base)));
   }
 
