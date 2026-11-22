@@ -47,3 +47,18 @@ function openLightbox(items, at) {
   paintLightbox();
   close.focus();
 }
+
+function paintLightbox() {
+  const r = lightbox.root;
+  if (!r) return;
+  const item = lightbox.items[lightbox.at];
+  const img = r.querySelector("#lb-img");
+  img.src = item.url;
+  img.alt = item.name || "picture";
+  r.querySelector("#lb-title").textContent = (item.name || "picture") + (lightbox.items.length > 1 ? "  (" + (lightbox.at + 1) + " of " + lightbox.items.length + ")" : "");
+  const save = r.querySelector("#lb-save");
+  save.href = item.url;
+  save.download = item.name || "picture";
+  r.querySelector(".lb-prev").hidden = lightbox.at === 0;
+  r.querySelector(".lb-next").hidden = lightbox.at === lightbox.items.length - 1;
+}
