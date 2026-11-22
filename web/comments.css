@@ -34,3 +34,44 @@
   align-items: baseline;
   gap: 6px;
 }
+
+.fcm-head b {
+  cursor: pointer;
+  color: #0a3a9a;
+}
+
+.fcm-time {
+  color: #777;
+}
+
+.fcm-text {
+  margin: 2px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fcm-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.fcm-act,
+.fcm-older,
+.fcm-save,
+.fcm-send {
+  padding: 1px 8px;
+  border: 1px solid #aca899;
+  border-radius: 10px;
+  background: #f6f4ea;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fcm-act:hover:not(:disabled),
+.fcm-older:hover:not(:disabled),
+.fcm-save:hover:not(:disabled),
+.fcm-send:hover:not(:disabled) {
+  background: #fff7c2;
+}
