@@ -13,3 +13,6 @@
 .ic.filled { fill: currentColor; }
 .ic-label { display: inline-flex; align-items: center; gap: 0.35em; }
 button .ic + .ic-text { margin-left: 0.4em; }
+/* a button that is only an icon */
+button.icon-only { display: inline-flex; align-items: center; justify-content: center; }
+button.icon-only .ic { width: 1.25em; height: 1.25em; }
