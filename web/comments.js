@@ -206,3 +206,51 @@ function commentForm(p) {
   form.append(row, err);
   return form;
 }
+
+function paintComments(card, p) {
+  const slot = card.querySelector(".feed-comments");
+  if (!slot) return;
+  if (!commentsOpen(p)) {
+    slot.hidden = true;
+    slot.replaceChildren();
+    return;
+  }
+  slot.hidden = false;
+  const st = commentsFor(p.id);
+  if (!st.loaded && !st.loading && !st.error) loadComments(p, false);
+  const parts = [];
+  if (st.more) {
+    const older = el("button", "fcm-older", st.loading ? "loading..." : "Show older comments");
+    older.type = "button";
+    older.disabled = st.loading;
+    older.onclick = () => loadComments(p, true);
+    parts.push(older);
+  }
+  if (st.error) {
+    const bad = el("p", "fc-error", st.error);
+    const retry = el("button", "fcm-older", "Try again");
+    retry.type = "button";
+    retry.onclick = () => {
+      st.error = "";
+      loadComments(p, false);
+    };
+    parts.push(bad, retry);
+  } else if (!st.loaded) {
+    parts.push(el("p", "fcm-empty", "loading..."));
+  } else if (!st.list.length) {
+    parts.push(el("p", "fcm-empty", "No comments yet. Say something nice."));
+  }
+  for (const c of st.list) parts.push(commentNode(p, c));
+  parts.push(commentForm(p));
+  // keep what was being typed (and where) through a repaint
+  const old = slot.querySelector(".fcm-form .fcm-input");
+  const hadFocus = old && document.activeElement === old;
+  slot.replaceChildren(...parts);
+  if (hadFocus) {
+    const fresh = slot.querySelector(".fcm-form .fcm-input");
+    if (fresh) {
+      fresh.focus();
+      fresh.setSelectionRange(fresh.value.length, fresh.value.length);
+    }
+  }
+}
