@@ -1379,6 +1379,45 @@ def history(
     ]
 
 
+@app.delete("/api/messages/{peer_name}")
+async def delete_chat(
+    peer_name: str,
+    everyone: bool = False,
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    """Delete a whole conversation. For yourself: it disappears for you and nobody is told. For
+    everyone: every message between you two is removed from the server and their chat empties."""
+    peer = get_peer(conn, peer_name)
+    me = user["id"]
+    pair = (
+        "((sender_id = :me AND recipient_id = :peer) OR (sender_id = :peer AND recipient_id = :me))"
+    )
+    args = {"me": me, "peer": peer["id"]}
+    if everyone:
+        conn.execute(f"DELETE FROM messages WHERE {pair}", args)
+        conn.execute(
+            "DELETE FROM chat_clears WHERE (user_id = :me AND peer_id = :peer) OR (user_id = :peer AND peer_id = :me)",
+            args,
+        )
+        conn.commit()
+        await manager.send_user(peer["username"], {"type": "chat-deleted", "from": user["username"]})
+        return {"ok": True, "everyone": True}
+    last = conn.execute(f"SELECT COALESCE(MAX(id), 0) FROM messages WHERE {pair}", args).fetchone()[0]
+    conn.execute(
+        "INSERT INTO chat_clears (user_id, peer_id, up_to_id) VALUES (:me, :peer, :last) "
+        "ON CONFLICT (user_id, peer_id) DO UPDATE SET up_to_id = excluded.up_to_id",
+        {**args, "last": last},
+    )
+    # what was waiting to be read there is gone from view, so it mustn't keep counting as unread
+    conn.execute(
+        "UPDATE messages SET read_at = COALESCE(read_at, datetime('now')) WHERE recipient_id = :me AND sender_id = :peer AND id <= :last",
+        {**args, "last": last},
+    )
+    conn.commit()
+    return {"ok": True, "everyone": False}
+
+
 def message_rule(conn, me_id: int, peer_id: int) -> tuple[int, str]:
     """Can I message them right now? Returns (hidden value to store, reason it's refused).
 
