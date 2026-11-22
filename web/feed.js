@@ -198,11 +198,15 @@ function paintEngage(card, p) {
   };
   bar.append(like);
 
+  const talk = iconButton("comment", commentLabel(p), () => toggleComments(card, p), "");
+  talk.setAttribute("aria-expanded", String(commentsOpen(p)));
+  bar.append(talk);
+
   if (target && target.can_repost) {
     const n = target.reposts ? " " + target.reposts : "";
-    bar.append(plainButton("\u21bb Repost" + n, () => repostDialog(target)));
+    bar.append(iconButton("repost", "Repost" + n, () => repostDialog(target)));
   }
-  if (target && target.can_send) bar.append(plainButton("\u2708 Share", () => shareDialog(target)));
+  if (target && target.can_send) bar.append(iconButton("send", "Share", () => shareDialog(target)));
 
   if (p.mine) {
     bar.append(plainButton("Edit", () => editDialog(p, card)));
