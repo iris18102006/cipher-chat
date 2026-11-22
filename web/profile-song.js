@@ -40,8 +40,9 @@ function songPlayer(url, label) {
   audio.src = url;
   audio.volume = 0.7;
 
-  const play = el("button", "pf-play", "\u25b6");
+  const play = el("button", "pf-play");
   play.type = "button";
+  play.append(icon("play"));
   play.setAttribute("aria-label", "play " + (label || "song"));
 
   const seek = el("input", "pf-seek");
