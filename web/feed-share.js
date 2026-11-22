@@ -134,13 +134,22 @@ function postCardNode(ref) {
         img.loading = "lazy";
         open.append(img);
       } else if (media.length) {
-        text.append(el("span", "chat-post-body", media[0].kind === "video" ? "\u{1f3ac} video" : "\u{1f3b5} song"));
+        text.append(withIcon(media[0].kind === "video" ? "video" : "music", media[0].kind === "video" ? "video" : "song"));
       }
       open.append(text);
-      card.replaceChildren(el("div", "chat-post-label", "\u2708 shared a post"), open);
+      const label = el("div", "chat-post-label");
+      label.append(withIcon("send", "shared a post"));
+      card.replaceChildren(label, open);
     })
     .catch(() => {
       card.replaceChildren(el("div", "chat-post-note", "This post isn't available to you. It may have been deleted, or it isn't shared with you."));
     });
   return card;
+}
+
+// the little group picture in the "send to" list
+function shareGroupIcon() {
+  const span = el("span", "share-group-icon");
+  span.append(icon("users"));
+  return span;
 }
