@@ -3,8 +3,9 @@
 There are two places a GIF can come from:
 
 1. Your own GIF library: GIFs and pictures you uploaded to keep (up to MAX_GIFS). This always works.
-2. GIPHY search, only if the person running the server set CIPHER_GIPHY_KEY (a free key from
-   developers.giphy.com). The browser never talks to GIPHY: it asks this server, the server asks
+2. GIPHY search, the main way to find GIFs: millions of free GIFs from the internet. It works once the
+   person running the server has a free key from developers.giphy.com, either in CIPHER_GIPHY_KEY or
+   in a file called giphy.key next to server.py. The browser never talks to GIPHY: it asks this server, the server asks
    GIPHY and passes the pictures on. That keeps the page's strict content policy (no other
    sites), and keeps people's addresses away from GIPHY. The server only ever fetches from
    GIPHY's own picture hosts, over https, and doesn't follow redirects.
