@@ -124,7 +124,7 @@ function paintGifs() {
     file.hidden = true;
     const add = plainButton("+ Add a GIF", () => file.click());
     add.disabled = gifs.mine.length >= gifs.max;
-    const note = el("span", "gif-note", gifs.mine.length + " of " + gifs.max + " kept. GIFs you add stay in your library.");
+    const note = el("span", "gif-note", gifs.mine.length + " of " + gifs.max + " saved. Search is the easy way to find GIFs, this is for ones you upload yourself.");
     file.onchange = async () => {
       const picked = [...file.files];
       file.value = "";
