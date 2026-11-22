@@ -134,3 +134,37 @@ def test_deleting_the_post_takes_its_comments_along(client):
         assert conn.execute("SELECT COUNT(*) FROM post_comments").fetchone()[0] == 0
     finally:
         conn.close()
+
+
+def test_blocked_people_are_left_out(client):
+    a, b, c = trio(client)
+    pid = post(a)
+    say(b, pid, "from bob")
+    say(c, pid, "from carol")
+    c.post("/api/blocks/bob")  # carol blocks bob
+    assert texts(c, pid) == ["from carol"]
+    assert c.get(f"/api/posts/{pid}").json()["comments"] == 1
+    assert texts(a, pid) == ["from bob", "from carol"]
+
+
+def test_a_block_with_the_author_hides_the_whole_thread(client):
+    a, b, _ = trio(client)
+    pid = post(a)
+    say(b, pid, "hi")
+    a.post("/api/blocks/bob")
+    assert b.get(f"/api/posts/{pid}/comments").status_code == 404
+    assert say(b, pid).status_code == 404
+
+
+def test_comment_rate_limit(client, monkeypatch):
+    a, b, _ = trio(client)
+    pid = post(a)
+    monkeypatch.setattr(comments, "COMMENTS_PER_WINDOW", 3)
+    assert [say(b, pid, f"n{i}").status_code for i in range(4)] == [200, 200, 200, 429]
+
+
+def test_you_must_be_logged_in(client):
+    a, _, _ = trio(client)
+    pid = post(a)
+    client.cookies.clear()
+    assert client.get(f"/api/posts/{pid}/comments").status_code in (401, 403)
