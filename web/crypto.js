@@ -38,7 +38,9 @@ async function loadOrCreateIdentity(username) {
   const slot = "identity:" + username;
   let keys = await dbGet(db, slot);
   if (!keys) {
-    keys = await crypto.subtle.generateKey(ECDH, false, ["deriveKey"]);
+    // New identities are exportable only so the browser can place them inside an
+    // encrypted recovery vault. The raw private key is never sent to the server.
+    keys = await crypto.subtle.generateKey(ECDH, true, ["deriveKey"]);
     await dbSet(db, slot, keys);
   }
   return keys;
@@ -60,6 +62,16 @@ function unb64(s) {
 
 async function exportPub(publicKey) {
   return b64(await crypto.subtle.exportKey("raw", publicKey));
+}
+
+async function exportPrivateKey(privateKey) {
+  return b64(await crypto.subtle.exportKey("pkcs8", privateKey));
+}
+
+async function importIdentityPrivate(pkcs8, pub) {
+  const privateKey = await crypto.subtle.importKey("pkcs8", unb64(pkcs8), ECDH, true, ["deriveKey"]);
+  const publicKey = await importPub(pub);
+  return { privateKey, publicKey };
 }
 
 function importPub(s) {
@@ -320,10 +332,17 @@ async function loadOrCreateSigning(username) {
   const slot = "signing:" + username;
   let keys = await dbGet(db, slot);
   if (!keys) {
-    keys = await crypto.subtle.generateKey(SIGN_ALG, false, ["sign", "verify"]);
+    // See loadOrCreateIdentity: only the encrypted browser vault can export this key.
+    keys = await crypto.subtle.generateKey(SIGN_ALG, true, ["sign", "verify"]);
     await dbSet(db, slot, keys);
   }
   return keys;
+}
+
+async function importSigningPrivate(pkcs8, pub) {
+  const privateKey = await crypto.subtle.importKey("pkcs8", unb64(pkcs8), SIGN_ALG, true, ["sign"]);
+  const publicKey = await importSignPub(pub);
+  return { privateKey, publicKey };
 }
 
 function importSignPub(s) {
