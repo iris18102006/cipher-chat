@@ -226,6 +226,7 @@ async function openSettings(section) {
       const keys = await openRecoveryVault(data.vault, vaultPassword.value);
       state.identity = keys.identity;
       state.signing = keys.signing;
+      await importPrekeys(state.me, keys.prekeys);
       state.myPub = await exportPub(state.identity.publicKey);
       state.mySignPub = await exportPub(state.signing.publicKey);
       await api("/api/key", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pub: state.myPub }) });
