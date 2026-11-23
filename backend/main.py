@@ -122,6 +122,11 @@ app.add_middleware(SecurityHeaders)
 ph = PasswordHasher()
 init_db()
 
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+
 # verified against when the username doesn't exist, so login takes the same
 # time whether or not the account is real (no username enumeration)
 DUMMY_HASH = ph.hash("not-a-real-password")

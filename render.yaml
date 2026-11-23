@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: cipher-chat
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: CIPHER_HOST
+        value: 0.0.0.0
+      - key: CIPHER_PORT
+        value: 10000
+      - key: CIPHER_BLOB_DIR
+        value: /data/blobs
+      - key: CIPHER_SECURE_COOKIES
+        value: "1"
+      - key: CIPHER_SIGNUPS_PER_HOUR
+        value: "10"
+    disk:
+      name: cipher-chat-data
+      mountPath: /data
+      sizeGB: 10
