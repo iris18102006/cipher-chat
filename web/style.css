@@ -802,6 +802,11 @@ h2 {
   color: #556;
 }
 
+.settings-devices { border-top: 1px solid var(--c-line, #c5d4ea); margin-top: 12px; padding-top: 10px; }
+.device-list { display: grid; gap: 5px; margin: 6px 0; }
+.device-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--c-in-bg, #fff); border: 1px solid var(--c-line, #c5d4ea); }
+.device-row small { color: var(--c-muted, #666); }
+
 #settings-status {
   position: sticky;
   bottom: -12px;
