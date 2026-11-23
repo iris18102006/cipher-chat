@@ -159,6 +159,40 @@ async function openSettings(section) {
   status.id = "settings-status";
   status.setAttribute("role", "status");
 
+  const devices = el("div", "settings-section settings-devices");
+  devices.append(el("h3", "", "Your devices"));
+  const deviceList = el("div", "device-list", "loading...");
+  devices.append(deviceList);
+  try {
+    const data = await api("/api/sessions");
+    deviceList.replaceChildren(...data.sessions.map((session) => {
+      const row = el("div", "device-row");
+      const label = session.current ? "This device" : (session.user_agent || "Unknown browser");
+      row.append(el("b", "", label));
+      row.append(el("small", "", session.current ? "Current session · last seen " + session.last_seen : "Last seen " + session.last_seen));
+      return row;
+    }));
+    if (data.sessions.length > 1) {
+      const revoke = el("button", "quiet", "Log out other devices");
+      revoke.type = "button";
+      revoke.onclick = async () => {
+        revoke.disabled = true;
+        try {
+          const result = await fetch("/api/sessions/other", { method: "DELETE" });
+          if (!result.ok) throw new Error("couldn't revoke the other devices");
+          toast("Logged out " + (await result.json()).revoked + " other device(s)");
+          openSettings(section);
+        } catch (ex) {
+          toast(ex.message);
+          revoke.disabled = false;
+        }
+      };
+      devices.append(revoke);
+    }
+  } catch {
+    deviceList.replaceChildren(el("span", "bad", "couldn't load your devices"));
+  }
+
   const messages = radioGroup("Messages before I accept a friend request", "message_policy", POLICY_OPTIONS, s.message_policy, status, "message_policy", (value) => {
     // "let them message me" lets waiting messages through, so refresh the buddy list
     if (value === "allow") loadContacts();
@@ -179,7 +213,7 @@ async function openSettings(section) {
   posts.append(sharing);
   posts.append(await closeFriendsBox(status));
 
-  body.replaceChildren(messages, posts, status);
+  body.replaceChildren(messages, posts, devices, status);
   if (section === "posts") posts.scrollIntoView({ block: "start" });
 }
 
