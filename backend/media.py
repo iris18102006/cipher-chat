@@ -21,7 +21,7 @@ from . import moderation
 from .main import MAX_PHOTO_UPLOAD, MAX_SONG_UPLOAD, current_user, get_conn, process_image, read_body
 from .postaccess import Viewer
 from .songs import byte_range, sniff_audio
-from .security import SlidingLimiter
+from .security import PersistentLimiter
 
 router = APIRouter()
 
@@ -31,7 +31,7 @@ MAX_PER_POST = 5  # 4 pictures and a song, or a video and a song
 DRAFT_LIMIT = 12  # files that are uploaded but not on a post yet
 DRAFT_HOURS = 24  # ... and they are thrown away after this long
 UPLOADS_PER_WINDOW = 30
-upload_limiter = SlidingLimiter(UPLOADS_PER_WINDOW, 10 * 60)
+upload_limiter = PersistentLimiter("post-media-upload", UPLOADS_PER_WINDOW, 10 * 60)
 
 TYPES_TEXT = "use a png, jpg, gif or webp picture, an mp4 or webm video, or an mp3, ogg, wav, flac or m4a song"
 
