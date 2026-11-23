@@ -552,6 +552,23 @@ h2 {
   background: linear-gradient(color-mix(in srgb, var(--c-send-a, var(--orange)) 80%, #fff), var(--c-send-a, var(--orange)));
 }
 
+#emotion-panel {
+  position: absolute;
+  right: 56px;
+  bottom: 48px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(38px, 1fr));
+  gap: 4px;
+  padding: 6px;
+  background: var(--c-in-bg, #fff);
+  border: 1px solid var(--c-in-border, var(--line));
+  box-shadow: 2px 2px 6px #0004;
+}
+
+#emotion-panel[hidden] { display: none; }
+.emotion-choice { min-width: 38px; padding: 5px; font-size: 15px; }
+
 /* ---------- phones: one panel at a time ---------- */
 
 @media (max-width: 700px) {

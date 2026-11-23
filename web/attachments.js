@@ -332,7 +332,7 @@ function attCanSend() {
 function attSync() {
   // a GIF picked in one chat must not be sent to another, so the picker closes when the chat changes
   if (typeof closeGifs === "function") closeGifs();
-  for (const id of ["attach", "gif-btn", "mic"]) $(id).disabled = $("msg").disabled;
+  for (const id of ["attach", "gif-btn", "emotion-btn", "mic"]) $(id).disabled = $("msg").disabled;
 }
 
 let attBusy = false;
