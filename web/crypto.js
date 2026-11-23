@@ -185,6 +185,19 @@ function dbSetMany(db, entries) {
   });
 }
 
+function dbAllEntries(db) {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE).objectStore(STORE).getAll();
+    const keys = db.transaction(STORE).objectStore(STORE).getAllKeys();
+    let values;
+    let names;
+    const done = () => values && names && resolve(names.map((key, i) => [key, values[i]]));
+    req.onsuccess = () => { values = req.result; done(); };
+    keys.onsuccess = () => { names = keys.result; done(); };
+    req.onerror = keys.onerror = () => reject(req.error || keys.error);
+  });
+}
+
 // two tabs topping up at the same moment would hand out the same ids twice
 function withLock(name, fn) {
   if (typeof navigator !== "undefined" && navigator.locks) return navigator.locks.request(name, fn);
@@ -203,7 +216,7 @@ function makePrekeys(username, count) {
     const entries = [];
     const publics = [];
     for (let i = 0; i < count; i++) {
-      const pair = await crypto.subtle.generateKey(ECDH, false, ["deriveBits"]);
+      const pair = await crypto.subtle.generateKey(ECDH, true, ["deriveBits"]);
       const pub = await exportPub(pair.publicKey);
       entries.push([prekeySlot(username, next), { priv: pair.privateKey, pub }]);
       publics.push({ id: next, pub });
@@ -213,6 +226,32 @@ function makePrekeys(username, count) {
     await dbSetMany(db, entries);
     return publics;
   });
+}
+
+async function exportPrekeys(username) {
+  const entries = await dbAllEntries(await openDB());
+  const out = [];
+  for (const [key, value] of entries) {
+    if (!String(key).startsWith("prekey:" + username + ":") || !value || !value.priv) continue;
+    try {
+      out.push({ id: Number(String(key).split(":").pop()), pub: value.pub, priv: await exportPrivateKey(value.priv) });
+    } catch {
+      // A legacy non-exportable prekey cannot be included in a new vault.
+    }
+  }
+  return out;
+}
+
+async function importPrekeys(username, entries) {
+  const db = await openDB();
+  const saved = [];
+  for (const item of entries || []) {
+    if (!Number.isSafeInteger(item.id) || typeof item.pub !== "string" || typeof item.priv !== "string") continue;
+    const priv = await crypto.subtle.importKey("pkcs8", unb64(item.priv), ECDH, true, ["deriveBits"]);
+    saved.push([prekeySlot(username, item.id), { priv, pub: item.pub }]);
+  }
+  if (saved.length) await dbSetMany(db, saved);
+  return saved.length;
 }
 
 async function loadPrekey(username, id) {
@@ -368,6 +407,7 @@ async function makeRecoveryVault(password, username) {
     username,
     identity: { privateKey: await exportPrivateKey(state.identity.privateKey), publicKey: await exportPub(state.identity.publicKey) },
     signing: { privateKey: await exportPrivateKey(state.signing.privateKey), publicKey: await exportPub(state.signing.publicKey) },
+    prekeys: await exportPrekeys(username),
   };
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(bundle)));
   return { version: 1, kdf: "PBKDF2-SHA-256", salt: b64(salt), iv: b64(iv), ciphertext: b64(ciphertext) };
@@ -387,6 +427,7 @@ async function openRecoveryVault(vault, password) {
   return {
     identity: await importIdentityPrivate(bundle.identity.privateKey, bundle.identity.publicKey),
     signing: await importSigningPrivate(bundle.signing.privateKey, bundle.signing.publicKey),
+    prekeys: bundle.prekeys || [],
   };
 }
 
