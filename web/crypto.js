@@ -345,6 +345,51 @@ async function importSigningPrivate(pkcs8, pub) {
   return { privateKey, publicKey };
 }
 
+const VAULT_ITERATIONS = 600000;
+
+async function vaultKey(password, salt) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: VAULT_ITERATIONS, hash: "SHA-256" },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function makeRecoveryVault(password, username) {
+  if (!state.identity || !state.signing) throw new Error("keys are not ready yet");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await vaultKey(password, salt);
+  const bundle = {
+    format: 1,
+    username,
+    identity: { privateKey: await exportPrivateKey(state.identity.privateKey), publicKey: await exportPub(state.identity.publicKey) },
+    signing: { privateKey: await exportPrivateKey(state.signing.privateKey), publicKey: await exportPub(state.signing.publicKey) },
+  };
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(bundle)));
+  return { version: 1, kdf: "PBKDF2-SHA-256", salt: b64(salt), iv: b64(iv), ciphertext: b64(ciphertext) };
+}
+
+async function openRecoveryVault(vault, password) {
+  if (!vault || vault.version !== 1 || vault.kdf !== "PBKDF2-SHA-256") throw new Error("unsupported recovery backup");
+  const key = await vaultKey(password, unb64(vault.salt));
+  let bundle;
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(vault.iv) }, key, unb64(vault.ciphertext));
+    bundle = JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    throw new Error("wrong recovery password or damaged backup");
+  }
+  if (bundle.format !== 1 || !bundle.identity || !bundle.signing) throw new Error("incomplete recovery backup");
+  return {
+    identity: await importIdentityPrivate(bundle.identity.privateKey, bundle.identity.publicKey),
+    signing: await importSigningPrivate(bundle.signing.privateKey, bundle.signing.publicKey),
+  };
+}
+
 function importSignPub(s) {
   return crypto.subtle.importKey("raw", unb64(s), SIGN_ALG, true, ["verify"]);
 }
