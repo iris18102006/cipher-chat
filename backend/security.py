@@ -7,6 +7,8 @@ import os
 import time
 from collections import defaultdict
 
+from .db import connect
+
 from starlette.datastructures import MutableHeaders
 from starlette.requests import HTTPConnection
 
@@ -153,6 +155,56 @@ class SlidingLimiter:
 
     def clear(self) -> None:
         self.hits.clear()
+
+
+class PersistentLimiter:
+    """A SQLite-backed sliding-window limiter that survives server restarts."""
+
+    def __init__(self, namespace: str, limit: int, window: float):
+        self.namespace = namespace
+        self.limit = limit
+        self.window = window
+
+    def _recent(self, conn, key: str, now: float) -> int:
+        cutoff = now - self.window
+        conn.execute(
+            "DELETE FROM rate_events WHERE namespace = ? AND created_at < ?",
+            (self.namespace, cutoff),
+        )
+        return conn.execute(
+            "SELECT COUNT(*) FROM rate_events WHERE namespace = ? AND rate_key = ? AND created_at >= ?",
+            (self.namespace, key, cutoff),
+        ).fetchone()[0]
+
+    def blocked(self, key: str) -> bool:
+        conn = connect()
+        try:
+            count = self._recent(conn, str(key), time.time())
+            conn.commit()
+            return count >= self.limit
+        finally:
+            conn.close()
+
+    def hit(self, key: str) -> None:
+        conn = connect()
+        try:
+            now = time.time()
+            self._recent(conn, str(key), now)
+            conn.execute(
+                "INSERT INTO rate_events(namespace, rate_key, created_at) VALUES (?, ?, ?)",
+                (self.namespace, str(key), now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def clear(self) -> None:
+        conn = connect()
+        try:
+            conn.execute("DELETE FROM rate_events WHERE namespace = ?", (self.namespace,))
+            conn.commit()
+        finally:
+            conn.close()
 
 
 class SecurityHeaders:

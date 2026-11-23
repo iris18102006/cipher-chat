@@ -37,6 +37,15 @@ def init_db():
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            -- Persistent abuse-control events survive application restarts. Old rows are
+            -- pruned by the limiter that owns each namespace.
+            CREATE TABLE IF NOT EXISTS rate_events (
+                namespace TEXT NOT NULL,
+                rate_key TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_rate_events_lookup
+                ON rate_events (namespace, rate_key, created_at);
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

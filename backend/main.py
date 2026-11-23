@@ -35,7 +35,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from .db import connect, init_db
-from .security import Pruner, SecurityHeaders, SlidingLimiter, client_ip, cookie_secure
+from .security import PersistentLimiter, Pruner, SecurityHeaders, SlidingLimiter, client_ip, cookie_secure
 
 COOKIE = "session"
 SESSION_DAYS = 30
@@ -409,7 +409,7 @@ FAIL_LIMIT = 8
 FAIL_WINDOW = 5 * 60
 IP_FAIL_LIMIT = 40  # failed logins from one address, whatever usernames it tries, per FAIL_WINDOW
 _fails: dict[str, list[float]] = defaultdict(list)
-ip_fail_limiter = SlidingLimiter(IP_FAIL_LIMIT, FAIL_WINDOW)
+ip_fail_limiter = PersistentLimiter("login-ip", IP_FAIL_LIMIT, FAIL_WINDOW)
 _fails_pruner = Pruner(_fails, FAIL_WINDOW)
 
 
@@ -433,7 +433,7 @@ def check_rate_limit(key: str):
 
 SIGNUP_LIMIT = int(os.environ.get("CIPHER_SIGNUPS_PER_HOUR", "10"))  # accounts one address can make per hour
 SIGNUP_WINDOW = 60 * 60
-signup_limiter = SlidingLimiter(SIGNUP_LIMIT, SIGNUP_WINDOW)
+signup_limiter = PersistentLimiter("signup-ip", SIGNUP_LIMIT, SIGNUP_WINDOW)
 
 
 # ---------- prekey claim limiting (in memory, per claimer + target) ----------
