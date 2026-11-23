@@ -37,6 +37,17 @@ def init_db():
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            -- The server stores only an opaque, browser-encrypted recovery vault.
+            CREATE TABLE IF NOT EXISTS key_vaults (
+                user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL,
+                kdf TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                iv TEXT NOT NULL,
+                ciphertext TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             -- Persistent abuse-control events survive application restarts. Old rows are
             -- pruned by the limiter that owns each namespace.
             CREATE TABLE IF NOT EXISTS rate_events (
