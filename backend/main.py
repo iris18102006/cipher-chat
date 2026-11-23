@@ -140,6 +140,14 @@ class Credentials(BaseModel):
     password: str
 
 
+class VaultBody(BaseModel):
+    version: int
+    kdf: str
+    salt: str
+    iv: str
+    ciphertext: str
+
+
 class KeyBody(BaseModel):
     pub: str
 
@@ -1219,6 +1227,46 @@ async def put_settings(body: SettingsBody, user=Depends(current_user), conn=Depe
 
 
 # ---------- keys, contacts, history ----------
+
+
+def validate_vault(body: VaultBody):
+    if body.version != 1 or body.kdf != "PBKDF2-SHA-256":
+        raise HTTPException(400, "unsupported recovery vault format")
+    if not (16 <= len(body.salt) <= 256 and 16 <= len(body.iv) <= 128 and 32 <= len(body.ciphertext) <= 2_000_000):
+        raise HTTPException(400, "invalid recovery vault")
+    if any(ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=_-" for ch in body.salt + body.iv + body.ciphertext):
+        raise HTTPException(400, "invalid recovery vault encoding")
+
+
+@app.get("/api/key-vault")
+def get_key_vault(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute(
+        "SELECT version, kdf, salt, iv, ciphertext, updated_at FROM key_vaults WHERE user_id = ?",
+        (user["id"],),
+    ).fetchone()
+    if not row:
+        return {"vault": None}
+    return {"vault": dict(row)}
+
+
+@app.put("/api/key-vault")
+def put_key_vault(body: VaultBody, user=Depends(current_user), conn=Depends(get_conn)):
+    validate_vault(body)
+    conn.execute(
+        "INSERT INTO key_vaults(user_id, version, kdf, salt, iv, ciphertext) VALUES (?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET version=excluded.version, kdf=excluded.kdf, salt=excluded.salt, "
+        "iv=excluded.iv, ciphertext=excluded.ciphertext, updated_at=CURRENT_TIMESTAMP",
+        (user["id"], body.version, body.kdf, body.salt, body.iv, body.ciphertext),
+    )
+    conn.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/key-vault")
+def delete_key_vault(user=Depends(current_user), conn=Depends(get_conn)):
+    conn.execute("DELETE FROM key_vaults WHERE user_id = ?", (user["id"],))
+    conn.commit()
+    return {"ok": True}
 
 
 @app.put("/api/key")
