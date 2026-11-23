@@ -57,7 +57,7 @@ Things that follow from this:
 - Your own sent messages are saved the same way (you can't open them from the ciphertext either). Read messages and sent messages live on the device you used, in IndexedDB, next to your private key.
 - If your friend has run out of prekeys (they were offline for a long time and a lot of messages came in), the message is sent the old way and the chat shows a small "no forward secrecy" label on it. They make more when they're back online.
 - Prekeys are tied to your identity key. A new key (new browser, cleared site data) means all the old prekeys are dropped.
-- Prekey claims are rate limited per pair so one person can't use up someone else's supply, and a claim in a block gets a decoy so a block stays invisible.
+- Prekey claims are rate limited per pair so one person can't use up someone else's supply; the limit is persisted in SQLite, and a claim in a block gets a decoy so a block stays invisible.
 - This is not a Double Ratchet: there's no chain of keys to keep in sync between tabs, every message simply has its own key. That's simpler, but it uses up one prekey per message.
 
 ## Group chats
