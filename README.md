@@ -301,14 +301,13 @@ to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
 - [x] Rate limit signups and failed logins per address
 - [x] Secure cookies on https without a setting
 - [x] Clean up old files in the background
-- [ ] Try the streaming download by hand in real Firefox and Safari and write down what happens
 - [x] Stream big downloads in Firefox and Safari (a service worker) so the 1 GB cap can go
 - [x] Delete whole chat conversations for yourself or for everyone.
 - [x] Posts have comments, and you can edit and delete them
 - [x] Pictures in chats open in a viewer inside the app, not a new window
 - [x] Remove emojis from the whole app (line icons instead)
 - [x] GIFs from the internet (GIPHY search)
-- [ ] Emoji and emotion picker (:3 :) :o) in the chat bar
+- [x] Emoji and emotion picker (:3 :) :o) in the chat bar
 
 so far this project has been worked on daily,
 soon it will be provided with pictures of the app itself after it's done
