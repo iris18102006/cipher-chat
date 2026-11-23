@@ -177,11 +177,8 @@ def test_old_failed_logins_are_forgotten(client):
 
 
 def test_old_prekey_claims_are_forgotten(client):
-    now = time.time()
-    main._claims.clear()
-    main._claims[(1, 2)] = [now - 2 * main.CLAIM_WINDOW]
-    main._claims[(3, 4)] = [now]
-    main._claims_pruner.last = 0.0
-    main.check_claim_limit(5, 6)
-    assert (1, 2) not in main._claims
-    assert (3, 4) in main._claims
+    main.claim_limiter.clear()
+    for _ in range(main.CLAIM_LIMIT):
+        main.claim_limiter.hit("1:2")
+    assert main.claim_limiter.blocked("1:2")
+    assert not main.claim_limiter.blocked("3:4")

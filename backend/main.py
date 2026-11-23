@@ -438,20 +438,14 @@ signup_limiter = PersistentLimiter("signup-ip", SIGNUP_LIMIT, SIGNUP_WINDOW)
 
 # ---------- prekey claim limiting (in memory, per claimer + target) ----------
 
-_claims: dict[tuple[int, int], list[float]] = defaultdict(list)
-_claims_pruner = Pruner(_claims, CLAIM_WINDOW)
+claim_limiter = PersistentLimiter("prekey-claim", CLAIM_LIMIT, CLAIM_WINDOW)
 
 
 def check_claim_limit(claimer_id: int, target_id: int):
-    _claims_pruner.maybe()
-    now = time.time()
-    key = (claimer_id, target_id)
-    recent = [t for t in _claims[key] if now - t < CLAIM_WINDOW]
-    if len(recent) >= CLAIM_LIMIT:
-        _claims[key] = recent
+    key = f"{claimer_id}:{target_id}"
+    if claim_limiter.blocked(key):
         raise HTTPException(429, "slow down, you're sending a lot of messages to this person")
-    recent.append(now)
-    _claims[key] = recent
+    claim_limiter.hit(key)
 
 
 # ---------- sessions ----------

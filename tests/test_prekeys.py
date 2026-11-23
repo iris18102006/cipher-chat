@@ -8,7 +8,7 @@ from tests.test_backend import ORIGIN, signup
 
 @pytest.fixture(autouse=True)
 def fresh_claims():
-    main._claims.clear()
+    main.claim_limiter.clear()
 
 
 def pk(ch: str) -> str:
