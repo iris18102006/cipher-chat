@@ -806,6 +806,10 @@ h2 {
 .device-list { display: grid; gap: 5px; margin: 6px 0; }
 .device-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--c-in-bg, #fff); border: 1px solid var(--c-line, #c5d4ea); }
 .device-row small { color: var(--c-muted, #666); }
+.settings-vault { border-top: 1px solid var(--c-line, #c5d4ea); margin-top: 12px; padding-top: 10px; }
+.settings-vault input { display: block; width: 100%; box-sizing: border-box; margin: 6px 0; padding: 6px; }
+.settings-vault button { margin: 3px 4px 3px 0; }
+.settings-vault small { display: block; margin-top: 5px; }
 
 #settings-status {
   position: sticky;
