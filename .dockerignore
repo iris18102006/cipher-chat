@@ -1,0 +1,8 @@
+.git
+.venv
+giphy.key
+backend/cipher.db
+backend/blobs
+__pycache__
+*.pyc
+tests
