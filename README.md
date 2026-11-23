@@ -308,7 +308,7 @@ to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
 - [x] Pictures in chats open in a viewer inside the app, not a new window
 - [x] Remove emojis from the whole app (line icons instead)
 - [x] GIFs from the internet (GIPHY search)
-- [ ] Emoji and emoticon picker (:3 :) :o) in the chat bar
+- [ ] Emoji and emotion picker (:3 :) :o) in the chat bar
 
 so far this project has been worked on daily,
 soon it will be provided with pictures of the app itself after it's done
