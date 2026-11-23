@@ -269,6 +269,10 @@ The GIF button searches GIPHY. It needs a free key: make one at developers.giphy
 first line of a file called `giphy.key` next to `server.py` (it is in `.gitignore`, so it never goes
 to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
 
+## Deployment
+
+Render is the supported first deployment target. The repository includes `Dockerfile`, `render.yaml`, and `DEPLOYMENT.md`. Use one web instance with a persistent disk for the SQLite database and encrypted blob pieces. Set `CIPHER_SECURE_COOKIES=1`, configure a custom HTTPS domain, and maintain backups of the mounted data directory before inviting users.
+
 ## Roadmap
 
 - [x] HKDF key derivation
