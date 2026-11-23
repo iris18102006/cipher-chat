@@ -408,6 +408,7 @@ async function makeRecoveryVault(password, username) {
     identity: { privateKey: await exportPrivateKey(state.identity.privateKey), publicKey: await exportPub(state.identity.publicKey) },
     signing: { privateKey: await exportPrivateKey(state.signing.privateKey), publicKey: await exportPub(state.signing.publicKey) },
     prekeys: await exportPrekeys(username),
+    groups: await exportGroupState(username),
   };
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(bundle)));
   return { version: 1, kdf: "PBKDF2-SHA-256", salt: b64(salt), iv: b64(iv), ciphertext: b64(ciphertext) };
@@ -428,6 +429,7 @@ async function openRecoveryVault(vault, password) {
     identity: await importIdentityPrivate(bundle.identity.privateKey, bundle.identity.publicKey),
     signing: await importSigningPrivate(bundle.signing.privateKey, bundle.signing.publicKey),
     prekeys: bundle.prekeys || [],
+    groups: bundle.groups || [],
   };
 }
 
@@ -490,7 +492,7 @@ async function groupChainStart(rootRaw, gid, version, sender) {
     base,
     256
   );
-  return crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveBits"]);
+  return crypto.subtle.importKey("raw", bits, "HKDF", true, ["deriveBits"]);
 }
 
 // One step: the key for this message, and the chain key for the next one. Neither can be
@@ -500,8 +502,8 @@ async function chainStep(ck) {
     crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: utf8(info) }, ck, 256);
   const [mkBits, nextBits] = await Promise.all([derive("message key"), derive("next chain key")]);
   return {
-    mk: await crypto.subtle.importKey("raw", mkBits, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]),
-    next: await crypto.subtle.importKey("raw", nextBits, "HKDF", false, ["deriveBits"]),
+    mk: await crypto.subtle.importKey("raw", mkBits, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]),
+    next: await crypto.subtle.importKey("raw", nextBits, "HKDF", true, ["deriveBits"]),
   };
 }
 
@@ -568,6 +570,37 @@ async function loadChain(me, gid, v, sender) {
 
 async function saveChain(me, gid, v, sender, state) {
   await dbSet(await openDB(), chainSlot(me, gid, v, sender), state);
+}
+
+async function exportGroupState(username) {
+  const entries = await dbAllEntries(await openDB());
+  const prefix = "gchain:" + username + ":";
+  const out = [];
+  for (const [slot, state] of entries) {
+    if (!String(slot).startsWith(prefix) || !state || !state.ck) continue;
+    try {
+      const parts = String(slot).slice(prefix.length).split(":");
+      const skipped = [];
+      for (const [n, key] of Object.entries(state.skipped || {})) skipped.push([n, b64(await crypto.subtle.exportKey("raw", key))]);
+      out.push({ gid: parts[0], version: Number(parts[1]), sender: parts.slice(2).join(":"), n: state.n, ck: b64(await crypto.subtle.exportKey("raw", state.ck)), skipped });
+    } catch {
+      // Legacy non-exportable chains remain local-only.
+    }
+  }
+  return out;
+}
+
+async function importGroupState(username, states) {
+  const entries = [];
+  for (const state of states || []) {
+    if (!state || !Number.isInteger(state.version) || !Number.isInteger(state.n) || typeof state.ck !== "string") continue;
+    const ck = await crypto.subtle.importKey("raw", unb64(state.ck), "HKDF", true, ["deriveBits"]);
+    const skipped = {};
+    for (const [n, raw] of state.skipped || []) skipped[n] = await crypto.subtle.importKey("raw", unb64(raw), { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+    entries.push([chainSlot(username, state.gid, state.version, state.sender), { ck, n: state.n, skipped }]);
+  }
+  if (entries.length) await dbSetMany(await openDB(), entries);
+  return entries.length;
 }
 
 // Two tabs must not both step the same chain. Run `fn` with the chain loaded and, if it
