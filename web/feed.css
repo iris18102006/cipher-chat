@@ -780,3 +780,6 @@ body.on-feed #app {
 #profile-overlay {
   z-index: 65;
 }
+#feed-compose-box[hidden] {
+  display: none !important;
+}
