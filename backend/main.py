@@ -458,9 +458,11 @@ def start_session(conn, request: Request, response: Response, user_id: int):
         (f"-{SESSION_DAYS} days",),
     )
     token = secrets.token_urlsafe(32)
+    ip_hash = hash_token(client_ip(request))
+    user_agent = request.headers.get("user-agent", "")[:300]
     conn.execute(
-        "INSERT INTO sessions (token, user_id) VALUES (?, ?)",
-        (hash_token(token), user_id),
+        "INSERT INTO sessions (token, user_id, user_agent, ip_hash, last_seen) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+        (hash_token(token), user_id, user_agent, ip_hash),
     )
     conn.commit()
     response.set_cookie(
@@ -488,7 +490,49 @@ def current_user(session: str | None = Cookie(default=None), conn=Depends(get_co
     row = user_from_token(conn, session)
     if not row:
         raise HTTPException(401, "not logged in")
+    if session:
+        conn.execute("UPDATE sessions SET last_seen = CURRENT_TIMESTAMP WHERE token = ?", (hash_token(session),))
+        conn.commit()
     return row
+
+
+@app.get("/api/sessions")
+def list_sessions(session: str | None = Cookie(default=None), user=Depends(current_user), conn=Depends(get_conn)):
+    current = hash_token(session) if session else ""
+    rows = conn.execute(
+        "SELECT token, user_agent, created_at, last_seen FROM sessions WHERE user_id = ? ORDER BY last_seen DESC",
+        (user["id"],),
+    ).fetchall()
+    return {
+        "sessions": [
+            {
+                "id": row["token"][:12],
+                "current": row["token"] == current,
+                "user_agent": row["user_agent"],
+                "created_at": row["created_at"],
+                "last_seen": row["last_seen"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.delete("/api/sessions/other")
+async def revoke_other_sessions(
+    response: Response,
+    session: str | None = Cookie(default=None),
+    user=Depends(current_user),
+    conn=Depends(get_conn),
+):
+    current = hash_token(session) if session else ""
+    rows = conn.execute(
+        "SELECT token FROM sessions WHERE user_id = ? AND token != ?", (user["id"], current)
+    ).fetchall()
+    conn.execute("DELETE FROM sessions WHERE user_id = ? AND token != ?", (user["id"], current))
+    conn.commit()
+    for row in rows:
+        await manager.close_session(row["token"])
+    return {"ok": True, "revoked": len(rows)}
 
 
 def get_peer(conn, username: str):
