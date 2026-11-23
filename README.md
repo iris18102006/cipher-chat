@@ -248,7 +248,7 @@ This is a learning project, not Signal.
 - Message settings only cover people who sent you a friend request. Nobody can message someone they have no friend request or friendship with. Being refused ("wait") is shown to the sender, unlike a block
 - Blocking isn't perfectly invisible: a blocked person can tell something is off because your profile disappears and friend requests to you are refused
 - The key directory is trusted on first use, only comparing fingerprints protects you from a malicious server
-- Login and signup rate limiting is in memory and resets when the server restarts. It counts per address, so many people behind one shared address (a school, say) share the same counts
+- Login, signup, feed-post, and post-comment rate limiting is stored in SQLite and survives server restarts. It counts per address for login/signup, so many people behind one shared address (a school, say) share those counts
 - Usernames can be found out: signing up with a taken name says so. That is normal for a chat where people look each other up by name, and logging in doesn't give anything away
 - Group messages are signed, but signing keys are trusted on first use just like identity keys: a malicious server that swaps someone's signing key before you ever saw it can't be caught. Comparing signing key fingerprints in the Members panel is what protects you. Messages from before signing existed show as "not signed", and a message from someone who has left the group shows "can't check"
 - If a member loses their private key (clears site data, new browser) they can't read the group until someone removes them and adds them again, or the key is next replaced
@@ -256,7 +256,7 @@ This is a learning project, not Signal.
 - Group "seen by" and typing are visible to every member who hasn't blocked you
 - Posts in the feed and the songs on profiles are not end-to-end encrypted (only messages are). The server can read them, and friends can see them. A share never shows the original post to people who couldn't see it, but the server knows about it
 - A profile song is only checked by looking at the first bytes of the file. It's played with a plain `<audio>` element and is served with `nosniff` and a sandbox policy
-- Feed rate limits (15 posts or shares per 10 minutes) are in memory and reset when the server restarts
+- Feed rate limits (15 posts or shares per 10 minutes) and comment limits are persisted in SQLite; old event rows are removed as new requests arrive
 - Someone who was removed keeps what they already read and the keys they already held, a new key only protects what's said afterwards
 - The server sees that a file exists, how big it is, who uploaded it and when, but not what it is or which chat it belongs to. Anybody logged in who knows a file's random id can download the locked pieces, which is useless without the key
 - A file is removed from the server after 30 days. The message stays but opening it says the file is gone, so save what you want to keep. Deleting a message doesn't delete the file, and somebody who was in the chat keeps a file they already opened
@@ -301,13 +301,14 @@ to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
 - [x] Rate limit signups and failed logins per address
 - [x] Secure cookies on https without a setting
 - [x] Clean up old files in the background
+- [ ] Try the streaming download by hand in real Firefox and Safari and write down what happens
 - [x] Stream big downloads in Firefox and Safari (a service worker) so the 1 GB cap can go
 - [x] Delete whole chat conversations for yourself or for everyone.
 - [x] Posts have comments, and you can edit and delete them
 - [x] Pictures in chats open in a viewer inside the app, not a new window
 - [x] Remove emojis from the whole app (line icons instead)
 - [x] GIFs from the internet (GIPHY search)
-- [x] Emoji and emotion picker (:3 :) :o) in the chat bar
+- [ ] Emoji and emoticon picker (:3 :) :o) in the chat bar
 
 so far this project has been worked on daily,
 soon it will be provided with pictures of the app itself after it's done

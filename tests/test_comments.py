@@ -9,7 +9,7 @@ from tests.test_groups import trio
 @pytest.fixture(autouse=True)
 def fresh(monkeypatch):
     main.feed._recent.clear()
-    comments._recent.clear()
+    comments.comment_limiter.clear()
     media.upload_limiter.clear()
     monkeypatch.delenv("CIPHER_ADMINS", raising=False)
 

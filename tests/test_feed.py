@@ -8,7 +8,7 @@ from tests.test_groups import drain, of_type, trio
 @pytest.fixture(autouse=True)
 def fresh_rate_limit():
     # the limiter lives in memory and every test starts with user id 1 again
-    main.feed._recent.clear()
+    main.feed.post_limiter.clear()
 
 
 def post(c, text="hello world"):

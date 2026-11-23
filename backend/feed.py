@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from . import media, moderation
 from .main import POST_AUDIENCES, avatar_url, clean_text, current_user, friend_ids, get_conn, manager
+from .security import PersistentLimiter
 from .postaccess import HIDE_AFTER_REPORTS, POST_SELECT, Viewer, blocked_with, comment_counts, is_admin
 
 router = APIRouter()
@@ -34,7 +35,7 @@ POSTS_PER_WINDOW = 15  # how many posts and reposts one person can make ...
 POST_WINDOW = 10 * 60  # ... in this many seconds
 REPORT_REASONS = ("nudity", "violence", "harassment", "other")
 LIKERS_SHOWN = 3  # names shown under a post, the rest are behind "liked by"
-_recent: dict[int, deque] = defaultdict(deque)  # user id -> when they last posted (in memory)
+post_limiter = PersistentLimiter("feed-post", POSTS_PER_WINDOW, POST_WINDOW)
 
 
 class PostBody(BaseModel):
@@ -63,13 +64,9 @@ class CloseFriendsBody(BaseModel):
 
 
 def check_rate(user_id: int):
-    now = time.monotonic()
-    seen = _recent[user_id]
-    while seen and now - seen[0] > POST_WINDOW:
-        seen.popleft()
-    if len(seen) >= POSTS_PER_WINDOW:
+    if post_limiter.blocked(str(user_id)):
         raise HTTPException(429, "slow down, you've posted a lot in the last few minutes")
-    seen.append(now)
+    post_limiter.hit(str(user_id))
 
 
 def pick_audience(conn, user, wanted: str | None) -> str:

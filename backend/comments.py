@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from .feed import clean_words, need_post, person
 from .main import current_user, get_conn, manager
+from .security import PersistentLimiter
 from .postaccess import Viewer
 
 router = APIRouter()
@@ -26,7 +27,7 @@ COMMENT_LIMIT = 300  # characters in a comment
 COMMENTS_PAGE = 20
 COMMENTS_PER_WINDOW = 20  # how many comments one person can make ...
 COMMENT_WINDOW = 5 * 60  # ... in this many seconds
-_recent: dict[int, deque] = defaultdict(deque)  # user id -> when they last commented (in memory)
+comment_limiter = PersistentLimiter("post-comment", COMMENTS_PER_WINDOW, COMMENT_WINDOW)
 
 COMMENT_SELECT = """
     SELECT c.id, c.post_id, c.author_id, c.body, c.created_at, c.edited_at,
@@ -40,13 +41,9 @@ class CommentBody(BaseModel):
 
 
 def check_rate(user_id: int):
-    now = time.monotonic()
-    seen = _recent[user_id]
-    while seen and now - seen[0] > COMMENT_WINDOW:
-        seen.popleft()
-    if len(seen) >= COMMENTS_PER_WINDOW:
+    if comment_limiter.blocked(str(user_id)):
         raise HTTPException(429, "slow down, you've commented a lot in the last few minutes")
-    seen.append(now)
+    comment_limiter.hit(str(user_id))
 
 
 def comment_dict(viewer: Viewer, row, post_author_id: int) -> dict:
