@@ -193,6 +193,50 @@ async function openSettings(section) {
     deviceList.replaceChildren(el("span", "bad", "couldn't load your devices"));
   }
 
+  const vault = el("div", "settings-section settings-vault");
+  vault.append(el("h3", "", "Encrypted key backup"));
+  vault.append(el("p", "pf-hint", "Your recovery password encrypts the keys in this browser before anything is uploaded. The server never receives the password."));
+  const vaultPassword = el("input");
+  vaultPassword.type = "password";
+  vaultPassword.minLength = 12;
+  vaultPassword.placeholder = "recovery password (12+ characters)";
+  vaultPassword.autocomplete = "new-password";
+  const backup = el("button", "", "Create or update encrypted backup");
+  backup.type = "button";
+  const restore = el("button", "", "Restore keys from backup");
+  restore.type = "button";
+  const vaultStatus = el("small", "");
+  backup.onclick = async () => {
+    if (vaultPassword.value.length < 12) return (vaultStatus.textContent = "Use at least 12 characters.");
+    backup.disabled = true;
+    try {
+      const made = await makeRecoveryVault(vaultPassword.value, state.me);
+      await api("/api/key-vault", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(made) });
+      vaultStatus.textContent = "Encrypted backup saved.";
+      vaultPassword.value = "";
+    } catch (ex) { vaultStatus.textContent = ex.message; }
+    backup.disabled = false;
+  };
+  restore.onclick = async () => {
+    if (vaultPassword.value.length < 12) return (vaultStatus.textContent = "Enter the recovery password first.");
+    restore.disabled = true;
+    try {
+      const data = await api("/api/key-vault");
+      if (!data.vault) throw new Error("no encrypted backup found");
+      const keys = await openRecoveryVault(data.vault, vaultPassword.value);
+      state.identity = keys.identity;
+      state.signing = keys.signing;
+      state.myPub = await exportPub(state.identity.publicKey);
+      state.mySignPub = await exportPub(state.signing.publicKey);
+      await api("/api/key", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pub: state.myPub }) });
+      await api("/api/signkey", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pub: state.mySignPub }) });
+      vaultStatus.textContent = "Keys restored for this session. Reload to use them everywhere.";
+      vaultPassword.value = "";
+    } catch (ex) { vaultStatus.textContent = ex.message; }
+    restore.disabled = false;
+  };
+  vault.append(vaultPassword, backup, restore, vaultStatus);
+
   const messages = radioGroup("Messages before I accept a friend request", "message_policy", POLICY_OPTIONS, s.message_policy, status, "message_policy", (value) => {
     // "let them message me" lets waiting messages through, so refresh the buddy list
     if (value === "allow") loadContacts();
@@ -213,7 +257,7 @@ async function openSettings(section) {
   posts.append(sharing);
   posts.append(await closeFriendsBox(status));
 
-  body.replaceChildren(messages, posts, devices, status);
+  body.replaceChildren(messages, posts, devices, vault, status);
   if (section === "posts") posts.scrollIntoView({ block: "start" });
 }
 
