@@ -439,7 +439,8 @@ function paintTabs() {
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));
   }
-  $("feed-compose-box").hidden = feed.single != null;
+  // Posting belongs to the Everyone timeline. The other tabs are browse/activity views.
+  $("feed-compose-box").hidden = feed.single != null || feed.tab !== "all";
   $("feed-tabs").hidden = feed.single != null;
   $("feed-back-feed").hidden = feed.single == null;
   $("feed-title").textContent = feed.single != null ? "Post" : "Feed";
@@ -522,6 +523,9 @@ function mountCompose() {
 }
 
 for (const b of document.querySelectorAll("#feed-tabs button")) {
+  const tabIcons = { all: "users", close: "star", mine: "file" };
+  const tabIcon = tabIcons[b.dataset.tab];
+  if (tabIcon && !b.querySelector(".ic")) b.prepend(icon(tabIcon));
   b.onclick = () => {
     feed.tab = b.dataset.tab;
     paintTabs();

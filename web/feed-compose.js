@@ -98,6 +98,11 @@ function makeComposer(opts) {
   ];
   let picking = "image";
   if (!isRepost) {
+    addMenu.append(
+      iconButton("image", "GIFs", () => {
+        if (typeof openGifsForPost === "function") openGifsForPost(addGifFile);
+      })
+    );
     for (const [kind, name, accept] of kinds) {
       addMenu.append(
         iconButton(kind === "image" ? "image" : kind === "video" ? "video" : "music", name, () => {
@@ -125,34 +130,36 @@ function makeComposer(opts) {
     return "";
   }
 
-  files.onchange = async () => {
-    const picked = [...files.files];
+  async function addGifFile(file) {
+    await addPickedFile(file, "image");
+  }
+
+  async function addPickedFile(file, forcedKind) {
     files.value = "";
     showError("");
-    for (const file of picked) {
-      const kind = mediaKindOf(file);
-      const why = whyNot(kind, file);
-      if (why) {
-        showError(why);
-        continue;
-      }
-      const item = { kind, name: file.name, uploading: true, progress: 0, id: 0, url: "" };
-      items.push(item);
-      uploading++;
-      paint();
-      try {
-        const made = await uploadPostMedia(file, (p) => {
-          item.progress = p;
-          paintProgress(item);
-        });
-        Object.assign(item, made, { uploading: false });
-      } catch (ex) {
-        items.splice(items.indexOf(item), 1);
-        showError(ex.message);
-      }
-      uploading--;
-      paint();
+    const kind = forcedKind || mediaKindOf(file);
+    const why = whyNot(kind, file);
+    if (why) return showError(why);
+    const item = { kind, name: file.name, uploading: true, progress: 0, id: 0, url: "" };
+    items.push(item);
+    uploading++;
+    paint();
+    try {
+      const made = await uploadPostMedia(file, (p) => {
+        item.progress = p;
+        paintProgress(item);
+      });
+      Object.assign(item, made, { uploading: false });
+    } catch (ex) {
+      items.splice(items.indexOf(item), 1);
+      showError(ex.message);
     }
+    uploading--;
+    paint();
+  }
+
+  files.onchange = async () => {
+    for (const file of [...files.files]) await addPickedFile(file);
   };
 
   const progressBars = new Map();

@@ -6,7 +6,7 @@
 // The browser never talks to GIPHY. Search words go to our server, which asks GIPHY and passes
 // the pictures on, so the page's strict content policy stays as it is.
 
-const gifs = { open: false, tab: "search", search: false, loaded: false, mine: [], max: 40, timer: null, next: null, query: "", busy: false };
+const gifs = { open: false, tab: "search", search: false, loaded: false, mine: [], max: 40, timer: null, next: null, query: "", busy: false, postPick: null };
 
 function gifPanel() {
   return $("gif-panel");
@@ -16,6 +16,14 @@ function closeGifs() {
   gifs.open = false;
   gifPanel().hidden = true;
   $("gif-btn").setAttribute("aria-expanded", "false");
+  gifs.postPick = null;
+}
+
+// Feed composers use the same server-mediated GIF picker as chats, but attach the
+// downloaded bytes to /api/post-media instead of sending a chat attachment.
+function openGifsForPost(onPick) {
+  gifs.postPick = onPick;
+  openGifs();
 }
 
 async function openGifs() {
@@ -48,8 +56,10 @@ async function sendGif(url) {
     const blob = await res.blob();
     const type = blob.type === "image/webp" ? "image/webp" : "image/gif";
     const file = new File([blob], "gif-" + Date.now() + (type === "image/webp" ? ".webp" : ".gif"), { type });
+    const postPick = gifs.postPick;
     closeGifs();
-    await sendFiles([file], "file");
+    if (postPick) await postPick(file);
+    else await sendFiles([file], "file");
   } catch (ex) {
     toast(whyFailed(ex, "Couldn't send that GIF, try again."));
   } finally {
