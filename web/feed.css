@@ -783,3 +783,5 @@ body.on-feed #app {
 #feed-compose-box[hidden] {
   display: none !important;
 }
+
+#feed-compose-box[hidden] { display: none !important; }

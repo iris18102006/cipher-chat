@@ -440,7 +440,7 @@ function paintTabs() {
     b.setAttribute("aria-pressed", String(on));
   }
   // Posting belongs to the Everyone timeline. The other tabs are browse/activity views.
-  $("feed-compose-box").hidden = feed.single != null || feed.tab !== "all";
+  const composeBox = $("feed-compose-box"); const showComposer = feed.single == null && feed.tab === "all"; composeBox.hidden = !showComposer; composeBox.style.display = showComposer ? "" : "none";
   $("feed-tabs").hidden = feed.single != null;
   $("feed-back-feed").hidden = feed.single == null;
   $("feed-title").textContent = feed.single != null ? "Post" : "Feed";
