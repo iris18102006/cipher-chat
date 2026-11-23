@@ -31,7 +31,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from . import moderation
 from .main import MAX_GIF_UPLOAD, MAX_GIFS, clean_text, current_user, get_conn, process_image, read_body
-from .security import SlidingLimiter
+from .security import PersistentLimiter
 
 router = APIRouter()
 
@@ -43,8 +43,8 @@ MAX_MEDIA_BYTES = 8 * 1024 * 1024
 TIMEOUT = 8
 CACHE_SIZE = 1500
 
-search_limiter = SlidingLimiter(60, 60)  # searches per person per minute
-media_limiter = SlidingLimiter(400, 60)  # pictures per person per minute
+search_limiter = PersistentLimiter("giphy-search", 60, 60)  # searches per person per minute
+media_limiter = PersistentLimiter("giphy-media", 400, 60)  # pictures per person per minute
 
 # what GIPHY told us about each result, so the picture can be fetched by id. Never from the browser.
 _seen: "OrderedDict[str, dict]" = OrderedDict()
