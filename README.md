@@ -34,7 +34,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 
 ## How it works
 
-1. Each account gets an ECDH (P-256) keypair in the browser (Web Crypto API). The private key is non-extractable and stored in IndexedDB.
+1. Each account gets an ECDH (P-256) keypair in the browser (Web Crypto API). Legacy identities are non-extractable in IndexedDB; new identities can place exportable key material inside a browser-encrypted recovery vault, but the private key still never goes to the server in plaintext.
 2. The public key is uploaded to the server, which acts as a key directory.
 3. To talk to a friend, your browser derives a shared secret from your private key and their public key, then runs it through HKDF (SHA-256) to get a 256-bit AES key.
 4. Messages are encrypted with AES-GCM (random 12-byte IV per message) before leaving the browser.
@@ -237,8 +237,8 @@ The crypto in the browser (forward secrecy, signing, the group key chains, and a
 
 This is a learning project, not Signal.
 
-- Your private key lives in one browser. Logging in from a new browser creates a new key, so old history can't be decrypted there and friends get a key-change warning.
-- Clearing site data deletes your private key and with it your ability to read old messages.
+- Legacy accounts still have their private key in one browser. Logging in from a new browser creates a new key, so old history can't be decrypted there and friends get a key-change warning. New accounts can create an encrypted recovery vault for identity, signing, and newly generated prekeys.
+- Clearing site data still deletes legacy private keys and any local message/group state. A recovery vault can restore the supported new-account keys, but group key-chain state and already-read message keys are not included yet.
 - Forward secrecy only covers messages sent after it was added: 1:1 messages from the prekey update on, and group messages from the group's `fs_version` on. Older ones are still opened by a stolen private key
 - A forward secret message can only be opened once, so the text you've read is kept on your device in IndexedDB. Someone who gets your whole browser profile can read what you've read, and a second browser can't read it at all. That goes for groups too: the key chains live in one browser
 - Group forward secrecy has gaps by design. A device that is stolen while it is running holds the chain state, so it can read what's sent after the theft until the key version changes. Your wrapped copy of a new key stays on the server until your device next opens the group and sets up its chains. Keys for messages that were skipped (up to 1000 per sender) are kept until the message shows up. If a member's device is offline for a very long time while more than that many messages are sent, the oldest ones can no longer be opened there
@@ -299,6 +299,9 @@ to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
 - [x] Voice messages up to 5 minutes
 - [x] Security headers and a Content-Security-Policy
 - [x] Rate limit signups and failed logins per address
+- [x] Persist authentication, feed, comment, media, GIF, and prekey rate limits in SQLite
+- [x] List active devices and revoke other sessions
+- [x] Store browser-encrypted identity/signing/prekey recovery vaults
 - [x] Secure cookies on https without a setting
 - [x] Clean up old files in the background
 - [ ] Try the streaming download by hand in real Firefox and Safari and write down what happens
@@ -308,7 +311,8 @@ to GitHub), or set `CIPHER_GIPHY_KEY`, then restart the server.
 - [x] Pictures in chats open in a viewer inside the app, not a new window
 - [x] Remove emojis from the whole app (line icons instead)
 - [x] GIFs from the internet (GIPHY search)
-- [ ] Emoji and emoticon picker (:3 :) :o) in the chat bar
+- [x] Emoji and emoticon picker (:3 :) :o) in the chat bar
+- [ ] Include group key-chain state and local read-message keys in encrypted recovery vaults
 
 so far this project has been worked on daily,
 soon it will be provided with pictures of the app itself after it's done
