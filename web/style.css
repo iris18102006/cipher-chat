@@ -557,9 +557,9 @@ h2 {
   right: 56px;
   bottom: 48px;
   z-index: 5;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(38px, 1fr));
-  gap: 4px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: 330px;
+  overflow-y: auto;
   padding: 6px;
   background: var(--c-in-bg, #fff);
   border: 1px solid var(--c-in-border, var(--line));
@@ -567,7 +567,12 @@ h2 {
 }
 
 #emotion-panel[hidden] { display: none; }
-.emotion-choice { min-width: 38px; padding: 5px; font-size: 15px; }
+.emotion-section { margin: 0 0 7px; }
+.emotion-section:last-child { margin-bottom: 0; }
+.emotion-section h3 { margin: 2px 0 4px; font-size: 11px; color: var(--c-muted, #555); }
+.emotion-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.emotion-choice { width: 100%; min-width: 0; padding: 4px 1px; border: 0; background: transparent; border-radius: 4px; font-size: 20px; line-height: 1.2; cursor: pointer; }
+.emotion-choice:hover, .emotion-choice:focus-visible { background: var(--c-bar, #e8eef8); }
 
 /* ---------- phones: one panel at a time ---------- */
 

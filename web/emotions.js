@@ -1,51 +1,44 @@
-// Small, keyboard-friendly emoji and text-emotion picker for the chat composer.
-// Picking an item inserts text at the cursor; it never sends until the user presses Send.
-const EMOTIONS = [
-  [":)", "smile"], [":3", "cat smile"], [":o)", "surprised smile"], [";)" , "wink"],
-  [":(", "sad"], [":'(", "crying"], [":D", "big smile"], ["<3", "heart"],
-  ["😀", "grinning"], ["😂", "laughing"], ["😍", "love"], ["😭", "crying"], ["😡", "angry"], ["😎", "cool"]
-];
+// Emoji and text-emotion picker. Choices are inserted at the cursor and never sent automatically.
+const EMOTION_SECTIONS = [
+  ["Faces & emotions", "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😋 😛 😜 🤪 🤨 🧐 🤓 😎 🥳 😏 😢 😭 😡 🤬 😱 😴 🤔 🤗 🤭 🤫 🤥 😬 🙄 😮 🤯 🥺"],
+  ["Text faces", ":3 | :) | :D | :o) | ;) | :P | :( | :'(? | -_- | ^_^ | <3 | T_T"],
+  ["People & gestures", "👋 🤚 ✋ 🖖 👏 🙌 🤝 👍 👎 👌 ✌️ 🤞 🤟 🤘 👊 💪 🙏 💅 👀 🫶 ❤️ 💔"],
+  ["Animals & nature", "🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🐔 🐧 🐦 🦄 🐝 🦋 🐌 🐙 🐠 🐳 🌸 🌻 🌈 ⭐ 🔥 ☀️"],
+  ["Food & drink", "🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍕 🍔 🍟 🌭 🌮 🍿 🍩 🍪 🎂 🍫 ☕ 🧋 🍺 🍷 🍸"],
+  ["Activities & fun", "⚽ 🏀 🏈 ⚾ 🎾 🏆 🎮 🎲 🎯 🎨 🎵 🎶 🎸 🎤 🎧 🎬 🎉 🎁 🎈 🚀"],
+  ["Travel & places", "🚗 🚕 🚌 🚓 🚑 ✈️ 🚲 🚂 🚢 🏠 🏢 🏥 🏖️ 🌋 🗺️"],
+  ["Objects & symbols", "💡 📱 💻 ⌚ 📷 🔑 🔒 📌 📎 ✏️ 📚 💰 💎 ✅ ❌ ❗ ❓ 💯 💥 ✨"]
+].map(([name, values]) => [name, values.split(values.includes("|") ? "|" : " ").map((value) => value.trim()).filter(Boolean)]);
 
 const emotionPanel = $("emotion-panel");
 const emotionButton = $("emotion-btn");
 const messageBox = $("msg");
-
-function closeEmotions() {
-  emotionPanel.hidden = true;
-  emotionButton.setAttribute("aria-expanded", "false");
-}
-
+function closeEmotions() { emotionPanel.hidden = true; emotionButton.setAttribute("aria-expanded", "false"); }
 function insertEmotion(value) {
-  const start = messageBox.selectionStart;
-  const end = messageBox.selectionEnd;
-  messageBox.setRangeText(value, start, end, "end");
+  messageBox.setRangeText(value, messageBox.selectionStart, messageBox.selectionEnd, "end");
   messageBox.dispatchEvent(new Event("input", { bubbles: true }));
   messageBox.focus();
   closeEmotions();
 }
-
-for (const [value, label] of EMOTIONS) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "emotion-choice";
-  b.textContent = value;
-  b.title = label;
-  b.setAttribute("aria-label", label + " " + value);
-  b.onclick = () => insertEmotion(value);
-  emotionPanel.append(b);
+for (const [name, values] of EMOTION_SECTIONS) {
+  const section = el("section", "emotion-section");
+  section.append(el("h3", "", name));
+  const grid = el("div", "emotion-grid");
+  for (const value of values) {
+    const b = el("button", "emotion-choice", value);
+    b.type = "button";
+    b.title = value;
+    b.setAttribute("aria-label", "insert " + value);
+    b.onclick = () => insertEmotion(value);
+    grid.append(b);
+  }
+  section.append(grid);
+  emotionPanel.append(section);
 }
-
 emotionButton.onclick = () => {
   const open = emotionPanel.hidden;
   emotionPanel.hidden = !open;
   emotionButton.setAttribute("aria-expanded", String(open));
-  if (open) messageBox.focus();
 };
-
-document.addEventListener("mousedown", (e) => {
-  if (!emotionPanel.hidden && !emotionPanel.contains(e.target) && e.target !== emotionButton) closeEmotions();
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !emotionPanel.hidden) closeEmotions();
-});
+document.addEventListener("mousedown", (e) => { if (!emotionPanel.hidden && !emotionPanel.contains(e.target) && e.target !== emotionButton) closeEmotions(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !emotionPanel.hidden) closeEmotions(); });
