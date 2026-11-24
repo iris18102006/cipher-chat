@@ -9,6 +9,8 @@ services:
         value: 0.0.0.0
       - key: CIPHER_PORT
         value: 10000
+      - key: CIPHER_DB_PATH
+        value: /data/cipher.db
       - key: CIPHER_BLOB_DIR
         value: /data/blobs
       - key: CIPHER_SECURE_COOKIES

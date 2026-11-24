@@ -1,8 +1,12 @@
 """SQLite connection and schema for cipher-chat."""
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "cipher.db"
+# On Render this must point at the persistent disk (CIPHER_DB_PATH=/data/cipher.db),
+# anything inside the app folder is wiped on every deploy and restart.
+DB_PATH = Path(os.environ.get("CIPHER_DB_PATH") or Path(__file__).parent / "cipher.db")
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def connect():
