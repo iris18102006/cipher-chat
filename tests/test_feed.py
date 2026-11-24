@@ -157,7 +157,7 @@ def test_deleting_the_original_leaves_the_share_saying_so(client):
 
 
 def test_rate_limit(client, monkeypatch):
-    monkeypatch.setattr("backend.feed.POSTS_PER_WINDOW", 3)
+    monkeypatch.setattr("backend.feed.post_limiter.limit", 3)
     a, b, c = trio(client)
     assert [post(a).status_code for _ in range(4)] == [200, 200, 200, 429]
 

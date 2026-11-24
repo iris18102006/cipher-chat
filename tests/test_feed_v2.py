@@ -6,12 +6,12 @@ import pytest
 from backend import main, moderation
 from tests.test_backend import make_image, signup
 from tests.test_groups import trio
-from backend import gifs, media
+from backend import feed, gifs, media  # noqa: E402  (main is imported above, feed needs it first)
 
 
 @pytest.fixture(autouse=True)
 def fresh(monkeypatch):
-    main.feed._recent.clear()
+    feed.post_limiter.clear()
     media.upload_limiter.clear()
     gifs.search_limiter.clear()
     gifs.media_limiter.clear()

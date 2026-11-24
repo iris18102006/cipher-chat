@@ -2,13 +2,13 @@
 import pytest
 
 from backend import main  # noqa: F401  (main has to be imported first, the other modules import it)
-from backend import comments, db, media
+from backend import comments, db, feed, media
 from tests.test_groups import trio
 
 
 @pytest.fixture(autouse=True)
 def fresh(monkeypatch):
-    main.feed._recent.clear()
+    feed.post_limiter.clear()
     comments.comment_limiter.clear()
     media.upload_limiter.clear()
     monkeypatch.delenv("CIPHER_ADMINS", raising=False)
@@ -159,7 +159,7 @@ def test_a_block_with_the_author_hides_the_whole_thread(client):
 def test_comment_rate_limit(client, monkeypatch):
     a, b, _ = trio(client)
     pid = post(a)
-    monkeypatch.setattr(comments, "COMMENTS_PER_WINDOW", 3)
+    monkeypatch.setattr(comments.comment_limiter, "limit", 3)
     assert [say(b, pid, f"n{i}").status_code for i in range(4)] == [200, 200, 200, 429]
 
 

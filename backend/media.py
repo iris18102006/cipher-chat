@@ -171,6 +171,7 @@ async def upload_post_media(request: Request, user=Depends(current_user), conn=D
     if upload_limiter.blocked(key):
         raise HTTPException(429, "slow down, you've uploaded a lot in the last few minutes")
     clear_old_drafts(conn, user["id"])
+    conn.commit()  # the limiter below uses its own connection, an open write here would lock it
     drafts = conn.execute(
         "SELECT COUNT(*) FROM post_media WHERE owner_id = ? AND post_id IS NULL", (user["id"],)
     ).fetchone()[0]

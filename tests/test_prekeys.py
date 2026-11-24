@@ -187,7 +187,7 @@ def test_claims_in_a_block_get_a_decoy_and_use_nothing_up(client):
 
 
 def test_claims_are_rate_limited_per_pair(client, monkeypatch):
-    monkeypatch.setattr(main, "CLAIM_LIMIT", 3)
+    monkeypatch.setattr(main.claim_limiter, "limit", 3)
     a, b, c = make_user(client, "alice", "a"), make_user(client, "bob", "b"), make_user(client, "carol", "c")
     befriend(a, b, "alice", "bob")
     befriend(a, c, "alice", "carol")
