@@ -6,7 +6,7 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
  
 ## Features
 
-- Accounts (argon2 password hashes, httpOnly session cookies that expire after 30 days)
+- Accounts (argon2 password hashes, httpOnly session cookies that expire after 30 days, plus a remember-me token: the login response returns it, the app keeps it in `localStorage`, and when the browser has cleared the cookie it trades it back for a fresh session cookie)
 - Buddy list with online dots, last seen, unread badges and search
 - Direct messages with bubbles, timestamps, day separators and autoscroll
 - Message replies: press **Reply** under a message and the chat shows the quoted original line (emoji included) above what you send
@@ -160,6 +160,8 @@ The policy needs a recent browser: a websocket to the same address under `connec
 ### https and the session cookie
 
 The session cookie is `HttpOnly` and `SameSite=Lax`. It is marked `Secure` by itself whenever the request came in over https (or your proxy says it did, see below). `CIPHER_SECURE_COOKIES=1` forces it on and `CIPHER_SECURE_COOKIES=0` forces it off. If you start the server on a network address without https and without a proxy, it prints a warning.
+
+Browsers vary in how long they keep cookies — some clear them when all Chrome windows are closed (its "clear data on close" settings). To survive that, login and signup return a **remember-me token** as `rm`; the app stores it in `localStorage` and, when the app opens and the cookie is gone, calls `GET /api/session-with-rm?token=<rm>` to get a fresh session cookie. Logging out clears it.
 
 ### Behind a reverse proxy
 
