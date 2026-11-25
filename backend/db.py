@@ -303,6 +303,9 @@ def init_db():
         _add_column(conn, "messages", "replied_to", "INTEGER")
         # the whole-site app theme (see APP_THEMES in main.py)
         _add_column(conn, "users", "app_theme", "TEXT NOT NULL DEFAULT 'classic'")
+        # a token the browser keeps in localStorage: it gets a fresh session cookie
+        # when the browser clears cookies (see /api/session-with-rm)
+        _add_column(conn, "users", "rm_token", "TEXT")
         # profile fields, all optional, all plain text (the browser never renders them as html)
         _add_column(conn, "users", "display_name", "TEXT NOT NULL DEFAULT ''")
         _add_column(conn, "users", "mood", "TEXT NOT NULL DEFAULT ''")
