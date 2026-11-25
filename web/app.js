@@ -1098,6 +1098,7 @@ setInterval(() => {
   try {
     const me = await api("/api/me");
     state.me = me.username;
+    applyAppTheme(me.app_theme || "classic");
     $("me-name").textContent = me.username;
     state.identity = await loadOrCreateIdentity(me.username);
     state.myPub = await exportPub(state.identity.publicKey);

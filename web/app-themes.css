@@ -1,0 +1,130 @@
+/* App themes: one of these classes on <html> changes the whole site's palette.
+   Set one from Settings ("App theme"); it is saved on the server per person.
+   The names match APP_THEMES in backend/main.py. The variables are the ones in
+   web/style.css. "classic" is the default look there, so it has no class. */
+
+html.theme-neon {
+  --blue: #00e5ff;
+  --blue-light: #00a8cc;
+  --sky: #060c1a;
+  --orange: #39ff14;
+  --orange-dark: #14a00a;
+  --paper: #0c1a2e;
+  --mist: #132642;
+  --line: #2c6e5c;
+  --text: #e8fbff;
+  --muted: #7fbdae;
+  --green: #39ff14;
+}
+
+html.theme-midnight {
+  --blue: #8a3fff;
+  --blue-light: #a366ff;
+  --sky: #050b1a;
+  --orange: #c78fff;
+  --orange-dark: #7a3bff;
+  --paper: #0e1a2f;
+  --mist: #1c2a46;
+  --line: #3d2f7f;
+  --text: #e8deff;
+  --muted: #b09fd8;
+  --green: #a45dff;
+}
+
+html.theme-terminal {
+  --blue: #0c3;
+  --blue-light: #0ad;
+  --sky: #000;
+  --orange: #ff6;
+  --orange-dark: #cc0;
+  --paper: #0a0a08;
+  --mist: #14140f;
+  --line: #2e2e22;
+  --text: #dfe8c8;
+  --muted: #7c8a63;
+  --green: #ff6;
+}
+
+html.theme-ocean {
+  --blue: #2a7bd9;
+  --blue-light: #5ba2e8;
+  --sky: #eef5f9;
+  --orange: #ff9c73;
+  --orange-dark: #f05a3a;
+  --paper: #ffffff;
+  --mist: #eef6f9;
+  --line: #88c9e8;
+  --text: #11425f;
+  --muted: #5b8c9e;
+  --green: #4a8c5d;
+}
+
+html.theme-forest {
+  --blue: #2e6b3f;
+  --blue-light: #4a8c5d;
+  --sky: #d9ead3;
+  --orange: #c98b2b;
+  --orange-dark: #8a5c14;
+  --paper: #f6fbf3;
+  --mist: #e3f2e8;
+  --line: #9cbf97;
+  --text: #1d3321;
+  --muted: #5d7a60;
+  --green: #4a8c5d;
+}
+
+html.theme-gothic {
+  --blue: #4a0d12;
+  --blue-light: #6b1d22;
+  --sky: #0d0d0f;
+  --orange: #b3122a;
+  --orange-dark: #7a0d15;
+  --paper: #17171b;
+  --mist: #1e1e22;
+  --line: #4a0d12;
+  --text: #e6e0d4;
+  --muted: #8c8577;
+  --green: #b3122a;
+}
+
+html.theme-kawaii {
+  --blue: #ff8ec7;
+  --blue-light: #ffb3d9;
+  --sky: #ffeaf4;
+  --orange: #ffb3d9;
+  --orange-dark: #ff6fb5;
+  --paper: #fff8fc;
+  --mist: #fff0f7;
+  --line: #ffb3d9;
+  --text: #5a2d4a;
+  --muted: #a0708f;
+  --green: #ff6fb5;
+}
+
+html.theme-emo {
+  --blue: #9d55c7;
+  --blue-light: #b173d6;
+  --sky: #1b1b22;
+  --orange: #ff2e93;
+  --orange-dark: #d11a7a;
+  --paper: #26262f;
+  --mist: #1f1f28;
+  --line: #6b3a63;
+  --text: #f1e9f5;
+  --muted: #a99bb5;
+  --green: #ff2e93;
+}
+
+html.theme-sunset {
+  --blue: #ff8a3d;
+  --blue-light: #ffa866;
+  --sky: #fff0e0;
+  --orange: #7a2cff;
+  --orange-dark: #4a1a9e;
+  --paper: #fffaf4;
+  --mist: #fde9dc;
+  --line: #f4cfa6;
+  --text: #4a2312;
+  --muted: #9b6b52;
+  --green: #8a3dff;
+}

@@ -259,7 +259,34 @@ async function openSettings(section) {
   posts.append(sharing);
   posts.append(await closeFriendsBox(status));
 
-  body.replaceChildren(messages, posts, devices, vault, status);
+  const theme = el("div", "settings-section");
+  theme.id = "settings-app-theme";
+  theme.append(el("h3", "", "App theme"));
+  theme.append(el("p", "pf-hint", "Change how the whole site looks. Nobody else sees it."));
+  const grid = el("div", "at-grid");
+  for (const [name, label] of APP_THEMES) {
+    const b = el("button", "at-swatch");
+    b.dataset.theme = name;
+    b.style.background = APP_THEME_SWATCH[name] || "";
+    b.title = label;
+    b.setAttribute("aria-pressed", name === currentAppTheme());
+    b.onclick = async () => {
+      const was = currentAppTheme();
+      applyAppTheme(name);
+      for (const sw of grid.querySelectorAll(".at-swatch")) {
+        sw.setAttribute("aria-pressed", sw.dataset.theme === name ? "true" : "false");
+      }
+      try {
+        await saveAppTheme(name);
+      } catch {
+        applyAppTheme(was);
+      }
+    };
+    grid.append(b);
+  }
+  theme.append(grid);
+
+  body.replaceChildren(messages, theme, posts, devices, vault, status);
   if (section === "posts") posts.scrollIntoView({ block: "start" });
 }
 
