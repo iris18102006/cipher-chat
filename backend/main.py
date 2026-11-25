@@ -96,6 +96,13 @@ PHOTO_PX = 1600
 CAPTION_LIMIT = 60
 MAX_SONG_UPLOAD = 6 * 1024 * 1024  # a profile song, about 6 minutes of a normal mp3
 
+# the whole-site app theme. The names have to match the .theme-* classes in
+# web/app-themes.css; "classic" is the default look, so it has no class.
+APP_THEMES = (
+    "classic", "neon", "midnight", "terminal", "ocean",
+    "forest", "gothic", "kawaii", "emo", "sunset",
+)
+
 # Safe MySpace-style profile customization. Users can combine whitelisted
 # visual options, but never submit arbitrary CSS/HTML.
 CUSTOM_COLORS = ("page", "card", "text", "head_a", "head_b", "head_text", "border")
@@ -631,13 +638,33 @@ async def logout(
 @app.get("/api/me")
 def me(user=Depends(current_user), conn=Depends(get_conn)):
     row = conn.execute(
-        "SELECT display_name, avatar_id FROM users WHERE id = ?", (user["id"],)
+        "SELECT display_name, avatar_id, app_theme FROM users WHERE id = ?", (user["id"],)
     ).fetchone()
     return {
         "username": user["username"],
         "display_name": row["display_name"],
         "avatar": avatar_url(row["avatar_id"]),
+        "app_theme": row["app_theme"] or "classic",
     }
+
+
+class AppThemeBody(BaseModel):
+    app_theme: str
+
+
+@app.get("/api/app-theme")
+def get_app_theme(user=Depends(current_user), conn=Depends(get_conn)):
+    row = conn.execute("SELECT app_theme FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return {"app_theme": row["app_theme"] or "classic"}
+
+
+@app.put("/api/app-theme")
+def set_app_theme(body: AppThemeBody, user=Depends(current_user), conn=Depends(get_conn)):
+    if body.app_theme not in APP_THEMES:
+        raise HTTPException(400, "unknown theme")
+    conn.execute("UPDATE users SET app_theme = ? WHERE id = ?", (body.app_theme, user["id"]))
+    conn.commit()
+    return {"app_theme": body.app_theme}
 
 
 # ---------- profiles ----------
