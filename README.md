@@ -9,12 +9,14 @@ The server only ever sees ciphertext. Keys are generated in your browser and the
 - Accounts (argon2 password hashes, httpOnly session cookies that expire after 30 days)
 - Buddy list with online dots, last seen, unread badges and search
 - Direct messages with bubbles, timestamps, day separators and autoscroll
+- Message replies: press **Reply** under a message and the chat shows the quoted original line (emoji included) above what you send
 - Typing indicator, delivered and read ticks
 - Message history that survives refreshes (stored encrypted, decrypted in your browser)
 - Key-change warning: if a friend's key changes, the composer locks until you trust the new key
 - Profiles you customize without writing any code: display name, mood, headline, about me, interests, location, "now playing", a profile photo, 8 themes with previews, an accent colour (presets or any colour you pick), 12 bundled fonts, avatar shapes, real heart and star patterns, border and corner controls, with a live preview while you edit
 - Requests and Blocked buttons in the top bar: answer friend requests (with a count) and see or unblock the people you blocked, without hunting through the buddy list
 - Settings: choose what happens to messages from someone whose friend request you haven't accepted yet: let them through, hold them until you accept (up to 3, you only see a count), or make them wait. You answer the request right from the chat
+- App theme: in **Settings**, pick how the whole site looks — 10 palettes (classic, neon, midnight, terminal, ocean, forest, gothic, kawaii, emo, sunset). It's saved for you, nobody else sees it
 - Pictures: upload a profile photo, a gallery of up to 12 photos and GIFs (click to view full size), a background picture, and stickers you drag around a small copy of your page. All without writing code
 - Files and voice messages: send any file (up to 2 GB), photos and videos, or record a voice message of up to 5 minutes, in chats and in groups. It is all locked in your browser before it is uploaded, and big files stream straight to disk when you download them, in every browser
 - Top friends (pick up to 8, in order), a visitor counter and mutual friends on every profile
