@@ -15,6 +15,8 @@ const state = {
   ws: null,
   retry: 0,
   keyCache: new Map(), // peer pub (base64) -> AES key
+  reply: null, // { to: id, text } of the message the composer is set to reply to
+  msgSnippets: new Map(), // message id -> text: the words of messages, so a reply can quote them
   // group chats (groups.js)
   groups: new Map(), // id -> { id, name, owner, members, key_version, rekey_needed, unread, last_msg, typing, canWrite }
   openGroup: null, // id of the group chat that's open, or null (state.open is null while it is)
@@ -70,6 +72,12 @@ function tooLong(text) {
 function parseTs(ts) {
   // sqlite gives "YYYY-MM-DD HH:MM:SS" in UTC
   return new Date(ts.replace(" ", "T") + "Z");
+}
+
+// a few words of a message, for the reply quote and the composer banner
+function truncate(text, n = 80) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n) + "…" : t;
 }
 
 function clock(d) {
@@ -493,6 +501,7 @@ function renderMessages(keepScroll) {
     if (inGroup && !mine && !(prev && prev.from === m.from)) {
       row.append(el("div", "sender", memberName(state.openGroup, m.from)));
     }
+    if (m.repliedTo) row.append(quoteBlock(m));
     row.append(messageBody(m));
     const meta = el("div", "meta");
     if (firstFS && m.v !== 2 && m.id > firstFS.id) {
@@ -509,6 +518,11 @@ function renderMessages(keepScroll) {
       if (t.title) tick.title = t.title;
       meta.append(tick);
     }
+    const replyBtn = el("button", "reply-btn", "Reply");
+    replyBtn.type = "button";
+    replyBtn.title = "Reply to this message";
+    replyBtn.onclick = () => setReply(m);
+    meta.append(replyBtn);
     row.append(meta);
     box.append(row);
     prev = m;
@@ -518,11 +532,41 @@ function renderMessages(keepScroll) {
   else if (stick) scrollBottom();
 }
 
+// the quoted line above a message that is a reply
+function quoteBlock(m) {
+  const q = el("div", "quote");
+  const who = el("div", "quote-from");
+  who.append(icon("reply"));
+  if (m.repliedFrom) who.append(el("span", "", m.repliedFrom));
+  q.append(who, el("div", "quote-text", truncate(state.msgSnippets.get(m.repliedTo) || "a message", 120)));
+  return q;
+}
+
+// the composer now replies to m: show a banner above it
+function setReply(m) {
+  state.reply = { to: m.id, text: m.text || "" };
+  $("reply-name").textContent = m.repliedFrom || "a message";
+  $("reply-snippet").textContent = truncate(m.text || "", 80);
+  $("reply-banner").hidden = false;
+}
+
+function clearReply() {
+  state.reply = null;
+  const b = $("reply-banner");
+  b.hidden = true;
+  $("reply-name").textContent = "";
+  $("reply-snippet").textContent = "";
+}
+
 async function decryptList(peer, rows) {
   const out = [];
   for (const r of rows) {
     const { text, failed } = await decryptMessage(peer, r);
-    out.push({ id: r.id, from: r.from, v: r.v, text, failed, ts: r.ts, delivered: r.delivered, read: r.read, held: !!r.held });
+    out.push({
+      id: r.id, from: r.from, v: r.v, text, failed, ts: r.ts,
+      delivered: r.delivered, read: r.read, held: !!r.held, repliedTo: r.replied_to || null,
+    });
+    state.msgSnippets.set(r.id, text);
   }
   return out;
 }
@@ -547,6 +591,7 @@ async function openChat(peer) {
   stopTyping(); // tell whoever we were typing to that we stopped
   state.openGroup = null;
   state.open = peer;
+  clearReply();
   if (typeof applyChatTheme === "function") applyChatTheme();
   document.body.classList.add("in-chat");
   $("chat-empty").hidden = true;
@@ -684,7 +729,11 @@ async function handleWS(data) {
     const mine = data.from === state.me;
     if (list && !list.some((m) => m.id === data.id)) {
       const { text, failed } = await decryptMessage(peer, data);
-      list.push({ id: data.id, from: data.from, v: data.v, text, failed, ts: data.ts, delivered: !!data.delivered, read: false, held: !!data.held });
+      list.push({
+        id: data.id, from: data.from, v: data.v, text, failed, ts: data.ts,
+        delivered: !!data.delivered, read: false, held: !!data.held, repliedTo: data.replied_to || null,
+      });
+      state.msgSnippets.set(data.id, text);
     }
     if (!mine) {
       c.typing = false;
@@ -804,7 +853,9 @@ async function sendMessage() {
   const peer = state.open;
   const text = $("msg").value.trim();
   if (!peer || !text) return;
-  if (await sendDirectText(peer, text)) {
+  const reply = state.reply;
+  if (await sendDirectText(peer, text, reply)) {
+    clearReply();
     $("msg").value = "";
     autosize();
     stopTyping();
@@ -812,8 +863,9 @@ async function sendMessage() {
 }
 
 // Locks one message for one person and sends it, and says whether it went out. What you type
-// uses this, and so do files and voice messages (attachments.js).
-async function sendDirectText(peer, text) {
+// uses this, and so do files and voice messages (attachments.js). `reply` is { to, text } when
+// the composer was set to reply to a message.
+async function sendDirectText(peer, text, reply = null) {
   const c = state.contacts.get(peer);
   if (!peer || !text || !c || !c.pub || c.changed) return false;
   if (tooLong(text)) return false;
@@ -849,7 +901,9 @@ async function sendDirectText(peer, text) {
     body = await encryptText(key, text);
     toast("Sent without forward secrecy: they're out of one-time keys. It will be fixed when they're back online.");
   }
-  if (sendWS({ type: "msg", to: peer, cid, ...body })) return true;
+  const payload = { type: "msg", to: peer, cid, ...body };
+  if (reply && reply.to) payload.replied_to = reply.to;
+  if (sendWS(payload)) return true;
   dropPending(state.me, cid).catch(() => {});
   return false;
 }
@@ -860,6 +914,7 @@ $("composer").onsubmit = (e) => {
   e.preventDefault();
   sendMessage();
 };
+$("reply-cancel").onclick = clearReply;
 
 $("msg").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {

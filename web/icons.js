@@ -13,6 +13,10 @@ const ICON_PATHS = {
     ["polyline", { points: "7 23 3 19 7 15" }],
     ["path", { d: "M21 13v2a4 4 0 0 1-4 4H3" }],
   ],
+  reply: [
+    ["polyline", { points: "15 10 5 19" }],
+    ["line", { x1: "20", y1: "5", x2: "9", y2: "16" }],
+  ],
   send: [
     ["line", { x1: "22", y1: "2", x2: "11", y2: "13" }],
     ["polygon", { points: "22 2 15 22 11 13 2 9 22 2" }],

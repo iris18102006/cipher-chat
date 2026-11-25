@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="profile.css">
   <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="app-themes.css">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="chat-themes.css">
   <link rel="stylesheet" href="feed.css">
@@ -107,6 +108,12 @@
         </div>
 
         <div id="gif-panel" role="dialog" aria-label="GIFs" hidden></div>
+
+        <div id="reply-banner" hidden>
+          <span id="reply-name" class="reply-label"></span>
+          <span id="reply-snippet" class="reply-snippet"></span>
+          <button id="reply-cancel" type="button" aria-label="cancel reply">&times;</button>
+        </div>
 
         <form id="composer" autocomplete="off">
           <button id="attach" type="button" aria-label="send a file, photo or video" title="send a file, photo or video" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
@@ -223,6 +230,7 @@
   <script src="filecrypto.js"></script>
   <script src="streamsave.js"></script>
   <script src="app.js"></script>
+  <script src="app-themes.js"></script>
   <script src="icons.js"></script>
   <script src="profile.js"></script>
   <script src="profile-media.js"></script>

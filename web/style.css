@@ -574,6 +574,82 @@ h2 {
 .emotion-choice { width: 100%; min-width: 0; padding: 4px 1px; border: 0; background: transparent; border-radius: 4px; font-size: 20px; line-height: 1.2; cursor: pointer; }
 .emotion-choice:hover, .emotion-choice:focus-visible { background: var(--c-bar, #e8eef8); }
 
+/* ---------- replies ---------- */
+
+#reply-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 10px 0;
+  padding: 3px 6px;
+  background: var(--mist);
+  border-left: 2px solid var(--blue);
+  font-size: 10px;
+  color: var(--blue);
+}
+
+#reply-banner .reply-label {
+  font-weight: bold;
+}
+
+#reply-banner .reply-snippet {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+#reply-banner button[aria-label="cancel reply"] {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+/* the app theme picker in Settings */
+#settings-app-theme .at-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.at-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  cursor: pointer;
+  padding: 0;
+}
+
+.at-swatch[aria-pressed="true"] {
+  border-color: var(--orange-dark);
+}
+
+.quote {
+  margin: 0 8px 6px;
+  padding: 3px 8px;
+  border-left: 2px solid var(--blue);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.quote-from {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--blue);
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.msg .reply-btn {
+  padding: 1px 5px;
+  font-size: 9px;
+  color: var(--muted);
+}
+
 /* ---------- phones: one panel at a time ---------- */
 
 @media (max-width: 700px) {
