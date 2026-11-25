@@ -1438,8 +1438,10 @@ def history(
     rows = conn.execute(
         """
         SELECT m.id, u.username AS sender, m.iv, m.ct, m.created_at,
-               m.delivered_at, m.read_at, m.hidden, m.v, m.eph, m.pid, m.cid
+               m.delivered_at, m.read_at, m.hidden, m.v, m.eph, m.pid, m.cid,
+               m.replied_to, p.username AS replied_from, p.created_at AS replied_ts
         FROM messages m JOIN users u ON u.id = m.sender_id
+        LEFT JOIN users p ON p.id = m.replied_to
         WHERE ((m.sender_id = :me AND m.recipient_id = :peer)
             OR (m.sender_id = :peer AND m.recipient_id = :me))
           AND NOT (m.recipient_id = :me AND m.hidden != 0)
@@ -1465,6 +1467,11 @@ def history(
             "read": r["read_at"] is not None,
             # my own message that's still waiting for them to accept my request
             "held": r["hidden"] == HELD and r["sender"] == user["username"],
+            # the message this one replies to, and who wrote it (the text itself stays
+            # encrypted: the client quotes it from its own copy when it has one)
+            "replied_to": r["replied_to"],
+            "replied_from": r["replied_from"],
+            "replied_ts": r["replied_ts"],
         }
         for r in reversed(rows)
     ]
@@ -1737,15 +1744,29 @@ async def websocket_endpoint(ws: WebSocket):
                             {"type": "msg-rejected", "to": peer["username"], "cid": data.get("cid"), "reason": why},
                         )
                         continue
+                # a reply points at one of the messages in this same conversation
+                replied_to = None
+                raw_reply = data.get("replied_to")
+                if raw_reply is not None:
+                    if not isinstance(raw_reply, int) or isinstance(raw_reply, bool) or raw_reply <= 0:
+                        continue
+                    parent = conn.execute(
+                        "SELECT id FROM messages WHERE id = ? AND ((sender_id = ? AND recipient_id = ?) "
+                        "OR (sender_id = ? AND recipient_id = ?))",
+                        (raw_reply, my_id, peer["id"], peer["id"], my_id),
+                    ).fetchone()
+                    replied_to = parent["id"] if parent else None
                 cur = conn.execute(
-                    "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden, v, eph, pid, cid) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (my_id, peer["id"], iv, ct, hidden, ver, eph, pid, cid),
+                    "INSERT INTO messages (sender_id, recipient_id, iv, ct, hidden, v, eph, pid, cid, replied_to) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (my_id, peer["id"], iv, ct, hidden, ver, eph, pid, cid, replied_to),
                 )
                 msg_id = cur.lastrowid
                 conn.commit()
                 row = conn.execute(
-                    "SELECT created_at FROM messages WHERE id = ?", (msg_id,)
+                    "SELECT m.created_at AS ts, p.username AS replied_from, p.created_at AS replied_ts "
+                    "FROM messages m LEFT JOIN users p ON p.id = m.replied_to WHERE m.id = ?",
+                    (msg_id,),
                 ).fetchone()
                 payload = {
                     "type": "msg",
@@ -1757,8 +1778,11 @@ async def websocket_endpoint(ws: WebSocket):
                     "v": ver,
                     "eph": eph,
                     "pid": pid,
-                    "ts": row["created_at"],
+                    "ts": row["ts"],
                     "cid": cid,
+                    "replied_to": replied_to,
+                    "replied_from": row["replied_from"],
+                    "replied_ts": row["replied_ts"],
                 }
                 got = 0 if hidden else await manager.send_user(peer["username"], payload)
                 delivered = got > 0
