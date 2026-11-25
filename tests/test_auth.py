@@ -1,10 +1,13 @@
+from fastapi.testclient import TestClient
+
 from tests.test_backend import signup
 
 
 def test_signup_lowercases_the_username(client):
     r = client.post("/api/signup", json={"username": "MiXeD_Case", "password": "password123"})
     assert r.status_code == 200
-    assert r.json() == {"username": "mixed_case"}
+    assert r.json()["username"] == "mixed_case"
+    assert isinstance(r.json()["rm"], str) and r.json()["rm"]
 
 
 def test_signup_rejects_symbols_in_the_username(client):
@@ -37,7 +40,8 @@ def test_signup_password_length_limits(client):
 def test_signup_trims_spaces_around_the_username(client):
     r = client.post("/api/signup", json={"username": "  trimmed  ", "password": "password123"})
     assert r.status_code == 200
-    assert r.json() == {"username": "trimmed"}
+    assert r.json()["username"] == "trimmed"
+    assert isinstance(r.json()["rm"], str)
 
 
 def test_logout_ends_the_session(client):
@@ -74,11 +78,43 @@ def test_app_theme_rejects_unknown(client):
     assert a.put("/api/app-theme", json={"app_theme": "nope"}).status_code == 400
 
 
+def test_login_and_signup_return_a_remember_me_token(client):
+    a = signup(client, "alice")
+    r = a.post("/api/login", json={"username": "alice", "password": "password123"})
+    assert r.status_code == 200
+    rm = r.json()["rm"]
+    assert isinstance(rm, str) and len(rm) > 10
+    b = signup(client, "bob")
+    assert isinstance(b.post("/api/login", json={"username": "bob", "password": "password123"}).json()["rm"], str)
+    # tokens are per account
+    assert b.post("/api/login", json={"username": "bob", "password": "password123"}).json()["rm"] != rm
+
+
+def test_remember_me_reestablishes_the_session(client):
+    a = signup(client, "alice")
+    rm = a.post("/api/login", json={"username": "alice", "password": "password123"}).json()["rm"]
+
+    # a fresh client has no cookie: it would be a logged-out visitor
+    c = TestClient(client.app)
+    c.portal = client.portal
+    assert c.get("/api/me").status_code == 401
+    ok = c.get("/api/session-with-rm", params={"token": rm})
+    assert ok.status_code == 200 and ok.json() == {"ok": True}
+    assert c.get("/api/me").json()["username"] == "alice"
+    # unknown or missing tokens are refused
+    assert c.get("/api/session-with-rm", params={"token": "nope"}).status_code == 401
+    assert c.get("/api/session-with-rm").status_code == 401
+    # logging out clears it, so the next visit starts logged out
+    assert a.post("/api/logout").status_code == 200
+    assert c.get("/api/session-with-rm", params={"token": rm}).status_code == 401
+
+
 def test_login_ignores_case_and_spaces_in_the_username(client):
     signup(client, "alice")
     r = client.post("/api/login", json={"username": "  ALICE ", "password": "password123"})
     assert r.status_code == 200
-    assert r.json() == {"username": "alice"}
+    assert r.json()["username"] == "alice"
+    assert isinstance(r.json()["rm"], str) and r.json()["rm"]
 
 
 def test_every_login_gets_its_own_session_token(client):
