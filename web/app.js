@@ -1072,6 +1072,7 @@ $("logout").onclick = async () => {
   try {
     await fetch("/api/logout", { method: "POST" });
   } catch {}
+  localStorage.removeItem("cc-rm");
   location.href = "/login.html";
 };
 
@@ -1094,9 +1095,30 @@ setInterval(() => {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) loadContacts().catch(() => {});
 }, 30000);
 
+// The cookie can be gone while you were logged in before: some browsers clear
+// cookies when you close the app (Chrome's "clear data on close" settings). api()
+// sends people to the login page then, so here we trade the remember-me token in
+// localStorage for a fresh session cookie and reload.
+async function meWithRememberToken() {
+  const resp = await fetch("/api/me");
+  if (resp.status !== 401) return resp;
+  const rm = localStorage.getItem("cc-rm");
+  if (rm) {
+    const ok = await fetch("/api/session-with-rm?token=" + encodeURIComponent(rm));
+    if (ok.ok) {
+      location.href = "/";
+      return null;
+    }
+  }
+  location.href = "/login.html";
+  return null;
+}
+
 (async function boot() {
   try {
-    const me = await api("/api/me");
+    const resp = await meWithRememberToken();
+    if (!resp) return;
+    const me = await resp.json();
     state.me = me.username;
     applyAppTheme(me.app_theme || "classic");
     $("me-name").textContent = me.username;

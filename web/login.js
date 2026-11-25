@@ -16,6 +16,8 @@ async function submit(path, form) {
       body: JSON.stringify({ username, password }),
     });
     if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.rm) localStorage.setItem("cc-rm", data.rm); // survives the cookie being cleared
       location.href = "/";
       return;
     }
