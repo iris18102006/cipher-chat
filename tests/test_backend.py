@@ -498,9 +498,9 @@ def test_block_sends_a_neutral_refresh_to_both_sides(client):
 def test_me_includes_display_name_and_avatar(client):
     a = signup(client, "alice")
     a.put("/api/profile", json={"display_name": "Ali"})
-    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": ""}
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": "", "app_theme": "classic"}
     avatar = put_avatar(a, make_image()).json()["avatar"]
-    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": avatar}
+    assert a.get("/api/me").json() == {"username": "alice", "display_name": "Ali", "avatar": avatar, "app_theme": "classic"}
 
 
 

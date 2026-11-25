@@ -59,6 +59,21 @@ def test_session_cookie_is_httponly_and_samesite(client):
     assert "samesite=lax" in cookie
 
 
+def test_app_theme_roundtrip(client):
+    a = signup(client, "alice")
+    assert a.get("/api/app-theme").json() == {"app_theme": "classic"}
+    assert a.get("/api/me").json()["app_theme"] == "classic"
+    r = a.put("/api/app-theme", json={"app_theme": "neon"})
+    assert r.status_code == 200 and r.json() == {"app_theme": "neon"}
+    assert a.get("/api/app-theme").json() == {"app_theme": "neon"}
+    assert a.get("/api/me").json()["app_theme"] == "neon"
+
+
+def test_app_theme_rejects_unknown(client):
+    a = signup(client, "alice")
+    assert a.put("/api/app-theme", json={"app_theme": "nope"}).status_code == 400
+
+
 def test_login_ignores_case_and_spaces_in_the_username(client):
     signup(client, "alice")
     r = client.post("/api/login", json={"username": "  ALICE ", "password": "password123"})
