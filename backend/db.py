@@ -299,6 +299,10 @@ def init_db():
         # 1 when the recipient had blocked the sender: stored so the sender's own
         # history stays intact, but never shown or delivered to the recipient
         _add_column(conn, "messages", "hidden", "INTEGER NOT NULL DEFAULT 0")
+        # the message this one replies to (a message id in the same conversation), or null
+        _add_column(conn, "messages", "replied_to", "INTEGER")
+        # the whole-site app theme (see APP_THEMES in main.py)
+        _add_column(conn, "users", "app_theme", "TEXT NOT NULL DEFAULT 'classic'")
         # profile fields, all optional, all plain text (the browser never renders them as html)
         _add_column(conn, "users", "display_name", "TEXT NOT NULL DEFAULT ''")
         _add_column(conn, "users", "mood", "TEXT NOT NULL DEFAULT ''")
