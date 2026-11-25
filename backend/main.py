@@ -495,6 +495,17 @@ def start_session(conn, request: Request, response: Response, user_id: int):
     )
 
 
+def remember_token(conn, user_id: int) -> str:
+    """A token the browser keeps in localStorage (a few months of inactivity, longer
+    than the session cookie). It lets the app get a fresh session cookie when the
+    browser has cleared the cookie but not the storage. Stored hashed, like the
+    session tokens."""
+    token = secrets.token_urlsafe(32)
+    conn.execute("UPDATE users SET rm_token = ? WHERE id = ?", (hash_token(token), user_id))
+    conn.commit()
+    return token
+
+
 def user_from_token(conn, token: str | None):
     if not token:
         return None
@@ -588,7 +599,7 @@ def signup(creds: Credentials, request: Request, response: Response, conn=Depend
     except sqlite3.IntegrityError:
         raise HTTPException(409, "that username is taken")
     start_session(conn, request, response, cur.lastrowid)
-    return {"username": username}
+    return {"username": username, "rm": remember_token(conn, cur.lastrowid)}
 
 
 @app.post("/api/login")
@@ -617,13 +628,14 @@ def login(
         raise HTTPException(401, "wrong username or password")
     _fails.pop(key, None)
     start_session(conn, request, response, row["id"])
-    return {"username": username}
+    return {"username": username, "rm": remember_token(conn, row["id"])}
 
 
 @app.post("/api/logout")
 async def logout(
     response: Response,
     session: str | None = Cookie(default=None),
+    user=Depends(current_user),
     conn=Depends(get_conn),
 ):
     if session:
@@ -632,7 +644,23 @@ async def logout(
         # a tab that's still open must not keep receiving messages after logging out
         await manager.close_session(hash_token(session))
     response.delete_cookie(COOKIE)
+    # and forget the remember-me token too, so the next visit doesn't log back in
+    conn.execute("UPDATE users SET rm_token = NULL WHERE id = ?", (user["id"],))
+    conn.commit()
     return {"ok": True}
+
+
+@app.get("/api/session-with-rm")
+def session_with_rm(request: Request, response: Response, conn=Depends(get_conn), token: str = Query(default="")):
+    """Re-establish the session cookie from a remember-me token. The browser calls this
+    when it opens the app without the cookie (Chrome clears cookies on close, for
+    example) but still has the token in localStorage."""
+    if token:
+        row = conn.execute("SELECT id FROM users WHERE rm_token = ?", (hash_token(token),)).fetchone()
+        if row:
+            start_session(conn, request, response, row["id"])
+            return {"ok": True}
+    raise HTTPException(401, "no such remember-me token")
 
 
 @app.get("/api/me")
